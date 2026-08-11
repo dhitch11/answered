@@ -8,10 +8,14 @@ import re, pathlib
 
 ROOT = pathlib.Path(__file__).parent
 
-MARK = ('<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">'
-        '<circle cx="16" cy="14" r="9" fill="none" stroke="#D9A263" stroke-width="2.2" '
-        'stroke-dasharray="42 15" stroke-linecap="round" transform="rotate(-42 16 14)"/>'
-        '<circle cx="16" cy="27" r="2.6" fill="#C9553B"/></svg>')
+MARK = (
+    '<svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/>'
+    '<path class="bm-arc1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" '
+    'stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/>'
+    '<path class="bm-arc2" d="M 15.6 3.9 A 11.2 11.2 0 0 1 15.6 20.1" fill="none" '
+    'stroke="var(--bronze)" stroke-width="3.4" stroke-linecap="round"/>'
+    '</svg>')
 
 NAVITEMS = [
     ('/trades.html',  'Answered', 'Answers your line'),
@@ -32,19 +36,19 @@ def nav(active):
         for h, l, d in NAVITEMS)
     return f'''<header class="nav">
   <div class="wrap">
-    <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>Answered</b></span></a>
+    <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg></span></a>
     <nav class="nav-links" aria-label="Primary">{links}</nav>
-    <a class="nav-cta" href="/#early">Get early access</a>
+    <a class="nav-cta" href="/#early">Turn it on</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Get early access</a></div>'''
+<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Turn it on</a></div>'''
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>Answered</b></span></a>
+        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
       </div>
       <div>
@@ -78,10 +82,10 @@ HEAD = '''<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{title}</title>
 <meta name="description" content="{desc}">
-<meta name="theme-color" content="#0F0D0B">
+<meta name="theme-color" content="#0B0C0E">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F0D0B'/%3E%3Ccircle cx='16' cy='15' r='8' fill='none' stroke='%23D9A263' stroke-width='2.4' stroke-dasharray='38 12' stroke-linecap='round' transform='rotate(-42 16 15)'/%3E%3Ccircle cx='16' cy='26' r='2.3' fill='%23C9553B'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Ccircle cx='16' cy='15' r='8' fill='none' stroke='%23E3FF4F' stroke-width='2.4' stroke-dasharray='38 12' stroke-linecap='round' transform='rotate(-42 16 15)'/%3E%3Ccircle cx='16' cy='26' r='2.3' fill='%23FF3355'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -191,7 +195,7 @@ PRICING = '''
         <div class="pc-for">03 / Receivables</div>
         <div class="pc-name">Recover</div>
         <div class="pc-price num">15%</div>
-        <div class="pc-unit">of dollars actually recovered, where we hold the licence.<br> Flat fee for pre default follow up.</div>
+        <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
         <div class="pc-free">Nothing recovered means nothing owed</div>
         <ul class="pc-list">
           <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
@@ -208,6 +212,84 @@ PRICING = '''
       </article>
     </div>
     <p class="src rv d3" style="margin-top:26px;max-width:88ch">Contribution figures are modeled on published vendor rates, not on measured production data. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
+  </div>
+</section>
+
+<section class="pad-s seam" data-aud="business both">
+  <div class="wrap">
+    <div style="display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:clamp(26px,4vw,60px);align-items:center" class="two">
+      <div>
+        <p class="eyebrow rv">The whole system</p>
+        <h2 class="h2 rv d1" style="margin-top:16px;max-width:15ch">Five parts. One of them is a phone code.</h2>
+        <p class="lede rv d2" style="margin-top:20px">Nothing is installed, nothing is ported, and your number never changes. The carrier does the forwarding it has always been able to do, and we answer the line on the other side of it.</p>
+      </div>
+      <div class="rv d2"><div class="bp run">
+  <svg viewBox="0 0 900 300" role="img" aria-labelledby="bpt bpd">
+    <title id="bpt">How a call reaches Answered</title>
+    <desc id="bpd">A caller dials the business number. The carrier forwards the call to a line Answered owns. Answered answers, qualifies the caller, and either books the job into the calendar or transfers a real emergency to the owner's cell.</desc>
+
+    <defs>
+      <pattern id="bpgrid" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M24 0V24M0 24H24" class="bp-grid"/>
+      </pattern>
+    </defs>
+    <rect x="0" y="0" width="900" height="300" fill="url(#bpgrid)" opacity=".55"/>
+
+    <!-- datum line -->
+    <path d="M40 150 H860" class="bp-wire dash"/>
+    <g class="bp-tick">
+      <path d="M40 142v16M250 142v16M470 142v16M690 142v16M860 142v16"/>
+    </g>
+
+    <!-- the live path -->
+    <path id="bppath" d="M70 150 H220 M280 150 H440 M500 150 H660 M720 150 H830" class="bp-wire"/>
+    <path d="M70 150 H830" class="bp-flow"/>
+
+    <!-- nodes -->
+    <g>
+      <circle cx="70" cy="150" r="26" class="bp-node hot"/>
+      <text x="70" y="155" text-anchor="middle" class="bp-lab">01</text>
+      <text x="70" y="200" text-anchor="middle" class="bp-t">Caller</text>
+      <text x="70" y="218" text-anchor="middle" class="bp-sub">dials your number</text>
+    </g>
+    <g>
+      <rect x="222" y="124" width="56" height="52" rx="10" class="bp-node"/>
+      <text x="250" y="155" text-anchor="middle" class="bp-lab">02</text>
+      <text x="250" y="200" text-anchor="middle" class="bp-t">Carrier</text>
+      <text x="250" y="218" text-anchor="middle" class="bp-sub">one code, forwards</text>
+    </g>
+    <g>
+      <rect x="442" y="120" width="56" height="60" rx="10" class="bp-node"/>
+      <text x="470" y="155" text-anchor="middle" class="bp-lab">03</text>
+      <text x="470" y="200" text-anchor="middle" class="bp-t">Answered</text>
+      <text x="470" y="218" text-anchor="middle" class="bp-sub">picks up, qualifies</text>
+      <text x="470" y="98" text-anchor="middle" class="bp-sub">says it is an AI, first sentence</text>
+      <path d="M470 106 V118" class="bp-wire"/>
+    </g>
+    <g>
+      <rect x="662" y="124" width="56" height="52" rx="10" class="bp-node"/>
+      <text x="690" y="155" text-anchor="middle" class="bp-lab">04</text>
+      <text x="690" y="200" text-anchor="middle" class="bp-t">Booked</text>
+      <text x="690" y="218" text-anchor="middle" class="bp-sub">into your calendar</text>
+    </g>
+    <g>
+      <circle cx="830" cy="150" r="22" class="bp-node"/>
+      <text x="830" y="155" text-anchor="middle" class="bp-lab">05</text>
+      <text x="830" y="200" text-anchor="middle" class="bp-t">You</text>
+      <text x="830" y="218" text-anchor="middle" class="bp-sub">text and transcript</text>
+    </g>
+
+    <!-- the emergency branch -->
+    <path d="M470 120 C470 70 620 70 690 70 H800 C820 70 830 80 830 100 V128" class="bp-wire dash"/>
+    <text x="640" y="58" text-anchor="middle" class="bp-sub">a real emergency transfers straight to your cell</text>
+
+    <!-- the reversal -->
+    <path d="M250 176 C250 240 250 250 300 250 H430" class="bp-wire dash"/>
+    <text x="470" y="254" text-anchor="middle" class="bp-sub">one code turns it off again, ten seconds</text>
+  </svg>
+  <span class="bp-cap">Fig 1 &middot; call path</span>
+</div></div>
+    </div>
   </div>
 </section>
 
@@ -278,7 +360,7 @@ PRICING = '''
 
     <div class="dkey rv d3">
       <i><b style="background:linear-gradient(180deg,var(--red-2),var(--red))"></b> what the calls cost us</i>
-      <i><b style="background:rgba(217,162,99,.30)"></b> what is left after them</i>
+      <i><b style="background:rgba(227,255,79,.22)"></b> what is left after them</i>
     </div>
 
     <p class="src rv d3" style="margin-top:22px;max-width:86ch">Hold costs more per event because holding is the product: the line stays connected for the whole wait, so an hour of queue is an hour of telephony. Answering and collecting are short calls, which is why those two rows look the way they do.</p>
@@ -409,7 +491,7 @@ RECOVER = '''
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You already earned it.<br> <span class="lit">Somebody should ask for it.</span></h1>
         <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called, because calling is uncomfortable and you are busy and it always feels like next week is fine. Recover makes the call, in your name, on your caller ID, and writes down exactly what was promised.</p>
         <div class="hero-actions rv d3">
-          <a class="btn btn-primary" href="/#early">Get early access</a>
+          <a class="btn btn-primary" href="/#early">Turn it on</a>
           <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
         </div>
         <p class="src hero-note rv d3">Nothing recovered, nothing owed. The fee is a function of dollars that actually land, never of calls placed.</p>
@@ -478,19 +560,19 @@ RECOVER = '''
 
 <section class="pad seam">
   <div class="wrap narrow">
-    <p class="eyebrow rv">Where the law draws the line, and where we draw it</p>
-    <h2 class="h2 rv d1" style="margin-top:16px">We launch the half that needs no licence, and we say so.</h2>
-    <p class="lede rv d2" style="margin-top:20px">Following up on your own invoice, in your own name, before it has defaulted, is you doing your own accounts receivable with help. That is what ships first, everywhere.</p>
-    <p class="lede rv d2" style="margin-top:16px">Working a genuinely defaulted consumer invoice for a share of what comes back is licensed, bonded, regulated collections. We are getting licensed state by state, from the statute text rather than from a blog post, and until we hold the licence in your state you will not be shown that offer at all. Not a disclaimer under it. It will not render.</p>
-    <p class="src rv d3" style="margin-top:20px">Eligibility is gated server side on your verified business location, never on your IP address and never on your own say so. Washington licenses even the act of soliciting a claim, so an ungated page would itself be the violation.</p>
+    <p class="eyebrow rv">It calls in your name</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Your customer hears your company, not a collections agency.</h2>
+    <p class="lede rv d2" style="margin-top:20px">Every call goes out as you. Your business name, your number, your tone. It is your own front office following up on your own invoice, which is exactly what it should sound like.</p>
+    <p class="lede rv d2" style="margin-top:16px">That is why it works. A friendly call from the company that did the work gets paid. A letter from a stranger gets ignored, and it costs you the customer.</p>
+    <p class="src rv d3" style="margin-top:20px">We only get paid when you do. Fifteen percent of what actually lands in your account, never a fee on calls placed or letters sent.</p>
   </div>
 </section>
 
 <section class="paper seam pad">
   <div class="wrap narrow" style="text-align:center">
-    <p class="eyebrow rv" style="justify-content:center">Early access</p>
+    <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:16px">Put the quiet invoices on the list.</h2>
-    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get early access</a></p>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Turn it on</a></p>
   </div>
 </section>
 '''
@@ -567,9 +649,9 @@ TRUST = '''
 
 <section class="paper seam pad">
   <div class="wrap narrow" style="text-align:center">
-    <p class="eyebrow rv" style="justify-content:center">Early access</p>
+    <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:16px">Audit it for a week before you trust it with a Tuesday.</h2>
-    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get early access</a></p>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Turn it on</a></p>
   </div>
 </section>
 '''
@@ -675,7 +757,7 @@ print('pricing.html ctas:', _p.count('pc-cta'), 'econ:', _p.count('pc-econ'))
 _r = (ROOT / 'recover.html').read_text(encoding='utf-8')
 if 'class="pcard' not in _r:
     _blk = _price_block(_RECOVER, 'Nothing recovered, nothing owed.',
-        'The fee is a share of dollars that actually land in your account, never a fee on calls placed or letters sent. Collections agencies publish 20 to 50% for the same work. Where we do not yet hold the licence, the contingency offer does not render at all.')
+        'The fee is a share of dollars that actually land in your account, never a fee on calls placed or letters sent. Collections agencies publish 20 to 50% for the same work. We charge 15%.')
     _i = _r.rfind('<section class="paper seam pad">')
     _r = _r[:_i] + _blk + _r[_i:]
     (ROOT / 'recover.html').write_text(_r, encoding='utf-8')

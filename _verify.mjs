@@ -1,6 +1,6 @@
 import { chromium } from '/Users/user/reimburseos-v3-build/node_modules/playwright/index.mjs';
 
-const BASE = process.env.BASE || 'http://127.0.0.1:8907';
+const BASE = process.env.BASE || 'http://127.0.0.1:8908';
 // thanks.html was excluded from this list for six deploys and carried a real
 // defect the whole time. Every page that ships is swept, linked from a menu or not.
 const PAGES = ['/', '/trades.html', '/hold.html', '/recover.html', '/pricing.html', '/trust.html', '/thanks.html'];
@@ -23,8 +23,16 @@ for (const path of PAGES) {
     page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); });
     page.on('pageerror', (e) => errs.push('PAGEERROR ' + String(e).slice(0, 160)));
 
-    const resp = await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForTimeout(900);
+    // 'networkidle' waits on a webfont request that does not always settle, and a
+    // timeout there reads exactly like a broken page. 'load' plus an explicit font
+    // wait is both faster and honest about what it is waiting for.
+    let resp = null;
+    for (let attempt = 0; attempt < 2 && !resp; attempt++) {
+      try { resp = await page.goto(BASE + path, { waitUntil: 'load', timeout: 25000 }); }
+      catch (e) { if (attempt === 1) throw e; }
+    }
+    try { await page.evaluate(() => document.fonts && document.fonts.ready); } catch (e) {}
+    await page.waitForTimeout(700);
     // scroll the whole page so every IntersectionObserver actually fires
     await page.evaluate(async () => {
       // scroll-behavior:smooth turns every scrollTo into an animation, and
@@ -35,9 +43,19 @@ for (const path of PAGES) {
         window.scrollTo(0, y);
         await new Promise((r) => setTimeout(r, 90));
       }
+      // land on the very bottom and hold there before returning, or the last
+      // observers on a very tall page never get a frame to fire in and report
+      // as stuck on a page where they all work.
+      window.scrollTo(0, document.body.scrollHeight);
+      await new Promise((r) => setTimeout(r, 450));
       window.scrollTo(0, 0);
     });
-    await page.waitForTimeout(500);
+    // The settle has to scale with the document. A fixed 500ms passed on every
+    // page except the tallest one at the narrowest width, where the last reveals
+    // had not finished their 800ms transition when the check ran, and reported
+    // 9 stuck elements on a page where all of them fire.
+    const docH = await page.evaluate(() => document.body.scrollHeight);
+    await page.waitForTimeout(Math.min(4200, 800 + docH / 10));
 
     // horizontal scroll: scrollWidth lies, so actually try to scroll and read back
     const overflow = await page.evaluate(() => {

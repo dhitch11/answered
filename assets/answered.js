@@ -243,10 +243,10 @@
         var x1 = cx + Math.cos(ang) * r1, y1 = cy + Math.sin(ang) * r1;
 
         var heat = Math.min(1, smooth[i] * 1.5 + burst * 0.5);
-        // bronze at rest, crucible red at the peaks. metal heating up.
-        var rr = Math.round(176 + heat * 66);
-        var gg = Math.round(122 + heat * 40);
-        var bb = Math.round(60 + heat * 39);
+        // hi-vis at rest, dialtone cyan at the peaks. the line coming alive.
+        var rr = Math.round(227 - heat * 172);
+        var gg = Math.round(255 - heat * 55);
+        var bb = Math.round(79 + heat * 161);
         ctx.strokeStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + (0.30 + heat * 0.62) + ')';
         ctx.lineWidth = Math.max(1, 1.35 * dpr);
         ctx.lineCap = 'round';
