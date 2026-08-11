@@ -159,6 +159,7 @@ PRICING = '''
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
         <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <div class="pc-meter"><span>Your bill stops at <b>$549</b> a month, and the cap is yours to move</span><span>A line that goes quiet settles at <b>$39</b> a month, credited against bookings</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
           <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
@@ -213,6 +214,7 @@ PRICING = '''
         </div>
       </article>
     </div>
+    <p class="lede rv d2" style="margin-top:26px;max-width:66ch">Two things sit under the Answered meter, and both exist to protect you rather than us. <b>The cap</b> means a busy month can never surprise you, and you set where it sits. <b>The quiet-line rate</b> only ever applies to a line that has gone quiet, it is credited back against your bookings, and it means a line stays answered for a price that is honest instead of nothing.</p>
     <p class="src rv d3" style="margin-top:26px;max-width:90ch">Every contribution figure above is <b>modeled on published vendor rates, not measured in production.</b> The full arithmetic and every source are below.</p>
     <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below.</p>
   </div>
@@ -789,6 +791,17 @@ for _slug, _card, _h, _l in (
         _s = _s[:_i] + _price_block(_card, _h, _l) + _s[_i:]
         (ROOT / _slug).write_text(_s, encoding='utf-8')
         print(_slug, 'priced, ctas:', _s.count('pc-cta'))
+    else:
+        # REFRESH, do not skip. Scoped strictly to the <article> blocks so the
+        # surrounding hand-written page, including the hero audio player, is
+        # never touched.
+        _fresh = _with_cta(_clean(_card), False)
+        _fresh = _fresh.replace('class="pcard lead"', 'class="pcard lead rv"').replace('class="pcard"', 'class="pcard rv"')
+        _n = len(_re.findall(r'<article class="pcard.*?</article>', _s, _re.S))
+        _s2 = _re.sub(r'<article class="pcard.*?</article>', lambda m: _fresh, _s, count=1, flags=_re.S)
+        if _n == 1 and _s2 != _s:
+            (ROOT / _slug).write_text(_s2, encoding='utf-8')
+            print(_slug, 'card refreshed from source')
 
 
 # ── RULING GUARD ──────────────────────────────────────────────────────────────
@@ -973,3 +986,39 @@ def _upstream_guard():
         print('upstream guard: upstream artifacts clean')
 
 _upstream_guard()
+
+
+# ── the home page's three cards were injected once by a one-off script and never
+# entered the generator, so they froze: the $549 cap and $39 quiet line reached
+# /pricing and never reached the home card. A generator that only inserts is a
+# one-time copy, not a source of truth. This refreshes all three, in order,
+# scoped strictly to the <article> blocks so the hand-written page around them,
+# including the hero audio player, is never touched.
+def _refresh_home_cards():
+    p = ROOT / 'index.html'
+    s = p.read_text(encoding='utf-8')
+    blocks = _re.findall(r'<article class="pcard.*?</article>', s, _re.S)
+    if len(blocks) != 3:
+        print('home cards: expected 3, found %d, leaving alone' % len(blocks))
+        return
+    fresh = []
+    for card in (_ANSWERED, _HOLD, _RECOVER):
+        f = _with_cta(_clean(card), False)
+        f = f.replace('class="pcard lead"', 'class="pcard lead rv"').replace('class="pcard"', 'class="pcard rv"')
+        fresh.append(f)
+    # order must match, or we would silently swap products between cards
+    def _name(x):
+        m = _re.search(r'<div class="pc-name">([^<]+)</div>', x)
+        return m.group(1).strip() if m else '?'
+    if [_name(b) for b in blocks] != [_name(f) for f in fresh]:
+        print('home cards: order differs from source, refusing to refresh')
+        return
+    out, i = s, 0
+    for old in blocks:
+        out = out.replace(old, fresh[i], 1)
+        i += 1
+    if out != s:
+        p.write_text(out, encoding='utf-8')
+        print('home cards refreshed from source (3)')
+
+_refresh_home_cards()
