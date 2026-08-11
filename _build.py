@@ -148,7 +148,7 @@ PRICING = '''
 <section class="pad" data-aud="consumer business both" style="padding-top:calc(var(--nav-h) + clamp(30px,4vw,56px))">
   <div class="wrap">
     <div class="aud-chip">Showing prices for <b class="aud-name">everyone</b> <button type="button" class="aud-change">change</button></div>
-    <p class="eyebrow rv" style="margin-top:26px">Pricing and unit economics</p>
+    <p class="eyebrow rv" style="margin-top:26px">What it costs</p>
     <p class="display h2 rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px" role="heading" aria-level="2">Three products.<br> Three meters. <span class="lit">One rule.</span></p>
     <p class="lede rv d2" style="margin-top:22px;max-width:62ch">The rule is that money only moves when something good happened. A job got booked. A human got reached. A dollar got recovered. There is no subscription anywhere in this company and no per minute price anywhere in this company, which means the incentive on our side of the table is identical to the incentive on yours.</p>
 
@@ -213,7 +213,7 @@ PRICING = '''
         </div>
       </article>
     </div>
-    <p class="src rv d3" style="margin-top:26px;max-width:88ch">Contribution figures are modeled on published vendor rates, not on measured production data. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
+    <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
   </div>
 </section>
 
@@ -298,7 +298,7 @@ PRICING = '''
 <section class="paper seam pad-s" data-aud="business both">
   <div class="wrap">
     <p class="eyebrow rv">What the customer gets for it</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">The price sits at about four percent of the thing it produced.</h2>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">You pay about four cents for every dollar it makes you.</h2>
     <div class="ptable rv d2">
       <div class="prow head"><span>What Answered produced</span><span>Its price as a share of that</span></div>
       <div class="prow"><span>A booked service call, $350 to $500 average ticket</span><span class="num">4 to 5%</span></div>
@@ -313,7 +313,7 @@ PRICING = '''
 
 <section class="pad seam" data-aud="both">
   <div class="wrap">
-    <p class="eyebrow rv">The unit economics</p>
+    <p class="eyebrow rv">Where the money goes</p>
     <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Where each dollar goes.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:64ch">Every bar below is <b>one dollar of revenue from one event</b>, split into what that event costs us to run and what is left. Same scale on every row, so they can be read against each other. The dollar figures on the right are the size of that single event, not a monthly or annual total.</p>
 
@@ -371,8 +371,8 @@ PRICING = '''
 
 <section class="paper seam pad-s" data-aud="both">
   <div class="wrap">
-    <p class="eyebrow rv">The arithmetic, step by step</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us a dollar fifty.</h2>
+    <p class="eyebrow rv">The math, step by step</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us about a dollar fifty.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labelled as ours.</p>
 
     <div class="chain rv d2">
@@ -403,7 +403,7 @@ PRICING = '''
       </div>
     </div>
 
-    <p class="src rv d3" style="margin-top:22px;max-width:88ch">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 componentized, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
+    <p class="src rv d3" style="margin-top:22px;max-width:88ch">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 priced by part, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
   </div>
 </section>
 
@@ -570,6 +570,16 @@ RECOVER = '''
   </div>
 </section>
 
+
+<section class="pad-s seam">
+  <div class="wrap">
+    <div class="mn" style="max-width:74ch;margin-inline:auto">
+      <b>This works the same way for you personally.</b>
+      <p style="margin-top:8px">It is not only for invoices. The friend who still owes you for the trip. The deposit a landlord never sent back. The refund a store keeps promising and never sends. Same voice, same rule. It gets nothing back, you owe nothing.</p>
+      <a class="card-go" href="/#track" style="margin-top:12px">See the personal side <span aria-hidden="true">&rarr;</span></a>
+    </div>
+  </div>
+</section>
 <section class="paper seam pad">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
@@ -619,10 +629,10 @@ TRUST = '''
     <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">From the truck, in a text, without opening an app.</h2>
     <div class="steps">
       <div class="step rv" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Every call, transcribed to you</h3><p style="color:rgba(30,27,23,.76)">The transcript, a one line summary, and the caller's number, inside a minute of the call ending. You read every call the way you would read a message from your best dispatcher.</p></div>
-      <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">It reports its own mistakes first</h3><p style="color:rgba(30,27,23,.76)">A nightly job flags calls that went wrong: a hang up mid sentence, an address it probably misheard, a callback promised and never logged. You hear it from us before you hear it from the customer.</p></div>
+      <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">It reports its own mistakes first</h3><p style="color:rgba(30,27,23,.76)">Every night it flags its own bad calls. A hang up mid sentence. An address it probably misheard. A callback it promised and never logged. You hear it from us before you hear it from the customer.</p></div>
       <div class="step rv d2" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Four numbers, no vanity metrics</h3><p style="color:rgba(30,27,23,.76)">Answer rate. Median pickup, in rings. Escalations actually delivered to your cell. Price guardrail violations, which should read zero, and we show the zero.</p></div>
     </div>
-    <p class="src rv d3" style="margin-top:28px;max-width:80ch">If the transcript pipeline goes down, call handling pauses for your account instead of continuing unaudited, and you get a text saying exactly that. A silent degradation is worse than an outage, because you keep trusting it.</p>
+    <p class="src rv d3" style="margin-top:28px;max-width:80ch">If the recording system goes down, we stop taking your calls rather than take them unwatched. You get a text that says exactly that. A silent degradation is worse than an outage, because you keep trusting it.</p>
   </div>
 </section>
 
@@ -636,11 +646,11 @@ TRUST = '''
     </details>
     <details class="disc rv d2">
       <summary>Recording is announced on every call, everywhere.</summary>
-      <div class="disc-body"><p>Eleven states require every party to consent. We could look up the caller's state and behave differently. We do not, because a lookup that fails silently in one direction is a wiretap claim, and the disclosure costs about five seconds and a fraction of a cent.</p></div>
+      <div class="disc-body"><p>Eleven states require every party to consent. We could look up the caller's state and behave differently. We do not. A lookup like that can fail without telling you, and a failure there is a wiretap claim. Saying it out loud costs five seconds and a fraction of a cent.</p></div>
     </details>
     <details class="disc rv d3">
       <summary>Answering a call is not the same as making one, legally or ethically.</summary>
-      <div class="disc-body"><p>Inbound answering is untouched by the rules that govern outbound dialing. Where we do call out, on your invoices or on your behalf, consent is a code path with a human fallback, not a paragraph in a policy.</p></div>
+      <div class="disc-body"><p>Inbound answering is untouched by the rules that govern outbound dialing. When we call out for you, consent is written into the code, with a person to fall back on. It is not a paragraph buried in a policy.</p></div>
     </details>
     <details class="disc rv d3">
       <summary>Capability, always. Guarantees, never.</summary>
@@ -658,7 +668,7 @@ TRUST = '''
 </section>
 '''
 
-page('pricing.html', 'Answered pricing and unit economics. Three products, three meters, one rule.',
+page('pricing.html', 'Answered pricing. You only pay when it works.',
      'No subscription and no per minute price. $19 a booked job, $49 after hours, $20 when a human is reached, 15% of what is recovered, and $0 when nothing is produced.', PRICING)
 page('recover.html', 'Recover. You already earned it. Now somebody asks for it.',
      'Follow up on the invoices that went quiet at day 31, in your own name and on your own caller ID. Nothing recovered, nothing owed.', RECOVER)
