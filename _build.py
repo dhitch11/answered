@@ -835,12 +835,30 @@ def _guard():
     if '15%' not in text:
         problems.append('The 15% recovery share is not on the pricing page. David ruled it stays.')
 
-    # a SECOND number presented as the recovery share is worse than a hedge:
-    # it makes the 15% look unreliable without ever hedging it in words
-    for m in _re.finditer(r'(\d{1,2})\s*%\s*(?:of|share)[^.]{0,40}recover', text, _re.I):
-        if m.group(1) != '15':
-            problems.append('CONTRADICTION: recovery share stated as %s%% -> ...%s...'
-                            % (m.group(1), text[max(0, m.start()-60):m.end()+60].strip()))
+    # A SECOND HEADLINE rate is worse than a hedge, because it makes the 15% look
+    # unreliable without ever hedging it in words. But the war room's AGE TIERS
+    # (10/15/20 by age, 8/13/18 for subscribers) are the BUILD TARGET, not a
+    # contradiction, and 15 is the middle tier rather than a replacement for them.
+    #
+    # An earlier version of this rule failed on any share that was not 15. That
+    # would have HARD FAILED a correct tiered build, and the tempting fix is to
+    # delete the tiers from the page rather than fix this gate, which would erase
+    # the room's architecture for a second time. If you are adding a sanctioned
+    # tier and this fires, THE GATE IS WRONG, NOT YOUR PAGE: add it to SANCTIONED.
+    SANCTIONED = {'8', '10', '13', '15', '18', '20'}
+    # read each card in its own scope; flattening the page bridged two cards and
+    # reported Hold's "about 55%" contribution as a recovery share
+    for scope in (_re.findall(r'<article class="pcard.*?</article>', pricing, _re.S) or [pricing]):
+        st = _re.sub(r'<[^>]+>', ' ', scope)
+        # The gap must not contain another %, or the match anchors on the FIRST
+        # percentage and bridges straight over the offending one. Measured: with
+        # [^.] the gate read "15% ... We take 35% of dollars" as share=15 and
+        # passed a page stating an unsanctioned rate.
+        for m in _re.finditer(r'(\d{1,3})\s*%[^.%]{0,30}(?:of dollars|actually recovered|recovery share)', st, _re.I):
+            if m.group(1) not in SANCTIONED:
+                problems.append('CONTRADICTION: recovery share stated as %s%%, which is outside the '
+                                'sanctioned tier set %s -> ...%s...'
+                                % (m.group(1), sorted(SANCTIONED), st[max(0, m.start()-60):m.end()+50].strip()))
 
     if problems:
         print('\n*** BUILD REFUSED: the 15% ruling is not intact ***', file=_sys.stderr)
@@ -894,8 +912,10 @@ def _upstream_guard():
 
     import re as _re
     hedged = bool(_re.search(r'sized in pilot|being sized|not final|provisional', ours, _re.I))
-    # our own price stated as something other than a flat 15
-    contradicts = bool(_re.search(r'\b8/13/18\b|\b10/15/20\b|8\s*(?:to|-)\s*18\s*%', ours, _re.I))
+    # The tiers are NOT a contradiction. David redirected: build what the room
+    # specified at full scale. 10/15/20 and 8/13/18 in this artifact are the
+    # BUILD TARGET. Only the HEDGE on the price is banned upstream.
+    contradicts = False
 
     if (hedged or contradicts) and not ruling:
         print('\n*** BUILD REFUSED: upstream artifact contradicts the live price and is NOT annotated ***',
