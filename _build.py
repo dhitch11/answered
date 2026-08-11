@@ -1,0 +1,696 @@
+#!/usr/bin/env python3
+"""Emit the product pages and normalise nav/footer across every page.
+
+One source of truth for the chrome. A menu that drifts between pages is the
+single most common tell of a site assembled by hand, and this site now has six.
+"""
+import re, pathlib
+
+ROOT = pathlib.Path(__file__).parent
+
+MARK = ('<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">'
+        '<circle cx="16" cy="14" r="9" fill="none" stroke="#D9A263" stroke-width="2.2" '
+        'stroke-dasharray="42 15" stroke-linecap="round" transform="rotate(-42 16 14)"/>'
+        '<circle cx="16" cy="27" r="2.6" fill="#C9553B"/></svg>')
+
+NAVITEMS = [
+    ('/trades.html',  'Answered', 'Answers your line'),
+    ('/hold.html',    'Hold',     'Waits on hold for you'),
+    ('/recover.html', 'Recover',  'Chases what you are owed'),
+    ('/pricing.html', 'Pricing',  'Outcomes only, never minutes'),
+    ('/trust.html',   'Trust',    'How you audit every call'),
+]
+
+CUR = ' aria-current="page"'
+
+def nav(active):
+    links = ''.join(
+        '<a href="%s"%s>%s</a>' % (h, CUR if h == active else '', l)
+        for h, l, _ in NAVITEMS)
+    sheet = ''.join(
+        f'<a href="{h}"><span class="sh-l">{l}</span><span class="sh-d">{d}</span></a>'
+        for h, l, d in NAVITEMS)
+    return f'''<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>Answered</b></span></a>
+    <nav class="nav-links" aria-label="Primary">{links}</nav>
+    <a class="nav-cta" href="/#early">Get early access</a>
+    <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
+  </div>
+</header>
+<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Get early access</a></div>'''
+
+FOOT = f'''<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>Answered</b></span></a>
+        <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+      </div>
+      <div>
+        <h4>Products</h4>
+        <ul>
+          <li><a href="/trades.html">Answered, for your line</a></li>
+          <li><a href="/hold.html">Hold, for everyone</a></li>
+          <li><a href="/recover.html">Recover, for your invoices</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/pricing.html">Pricing</a></li>
+          <li><a href="/trust.html">Trust and guardrails</a></li>
+          <li><a href="/#honesty">What we will not say</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-base">
+      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
+      <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
+    </div>
+  </div>
+</footer>'''
+
+HEAD = '''<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title}</title>
+<meta name="description" content="{desc}">
+<meta name="theme-color" content="#0F0D0B">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{desc}">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F0D0B'/%3E%3Ccircle cx='16' cy='15' r='8' fill='none' stroke='%23D9A263' stroke-width='2.4' stroke-dasharray='38 12' stroke-linecap='round' transform='rotate(-42 16 15)'/%3E%3Ccircle cx='16' cy='26' r='2.3' fill='%23C9553B'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/answered.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+'''
+
+TAIL = '</main>\n' + FOOT + '\n<script src="/assets/answered.js" defer></script>\n</body>\n</html>\n'
+
+
+def page(slug, title, desc, body):
+    html = HEAD.format(title=title, desc=desc) + nav('/' + slug) + '\n<main id="main">\n' + body + '\n' + TAIL
+    (ROOT / slug).write_text(html, encoding='utf-8')
+    print('wrote', slug, len(html), 'bytes')
+
+
+# ── /pricing ──────────────────────────────────────────────────────────────────
+PRICING = '''
+
+<section class="gate pad-s" id="choose">
+  <div class="wrap">
+    <p class="eyebrow rv">Before the numbers</p>
+    <h1 class="display rv d1" style="font-size:clamp(32px,4.2vw,58px);text-wrap:balance;margin-top:16px">Who is the phone<br> <span class="lit">ringing for?</span></h1>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Three products, three different meters, and you almost certainly only care about one of them. Pick the one that is you and the page will show that.</p>
+
+    <div class="gate-grid">
+      <button class="gc rv" type="button" data-pick="consumer">
+        <span class="gc-i">01</span>
+        <span class="gc-t">It rings for me</span>
+        <span class="gc-d">You are a person with a phone and a problem. A carrier, a bank, an airline, an agency. You want somebody else to do the waiting and the arguing.</span>
+        <span class="gc-w">Shows Hold</span>
+        <span class="gc-go">See what that costs</span>
+      </button>
+
+      <button class="gc rv d1" type="button" data-pick="business">
+        <span class="gc-i">02</span>
+        <span class="gc-t">It rings for my business</span>
+        <span class="gc-d">You run a shop, a crew or a truck. Calls come in while your hands are full, and invoices go quiet after you have already done the work.</span>
+        <span class="gc-w">Shows Answered and Recover</span>
+        <span class="gc-go">See what that costs</span>
+      </button>
+
+      <button class="gc rv d2" type="button" data-pick="both">
+        <span class="gc-i">03</span>
+        <span class="gc-t">Both, honestly</span>
+        <span class="gc-d">You own the business and you are also the person on hold with the utility company at nine at night. Most owners are both.</span>
+        <span class="gc-w">Shows everything, including the economics</span>
+        <span class="gc-go">See all of it</span>
+      </button>
+    </div>
+
+    <p class="src rv d3" style="margin-top:26px;max-width:70ch">This only changes what the page shows you. Nothing is hidden or protected by it, and you can switch at any time from the line at the top of the page.</p>
+  </div>
+</section>
+
+<section class="pad" data-aud="consumer business both" style="padding-top:calc(var(--nav-h) + clamp(30px,4vw,56px))">
+  <div class="wrap">
+    <div class="aud-chip">Showing prices for <b class="aud-name">everyone</b> <button type="button" class="aud-change">change</button></div>
+    <p class="eyebrow rv" style="margin-top:26px">Pricing and unit economics</p>
+    <p class="display h2 rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px" role="heading" aria-level="2">Three products.<br> Three meters. <span class="lit">One rule.</span></p>
+    <p class="lede rv d2" style="margin-top:22px;max-width:62ch">The rule is that money only moves when something good happened. A job got booked. A human got reached. A dollar got recovered. There is no subscription anywhere in this company and no per minute price anywhere in this company, which means the incentive on our side of the table is identical to the incentive on yours.</p>
+
+    <div class="pcards">
+      <article class="pcard lead rv" data-aud="business both">
+        <div class="pc-for">01 / Inbound</div>
+        <div class="pc-name">Answered</div>
+        <div class="pc-price num">$19</div>
+        <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
+        <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <ul class="pc-list">
+          <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
+          <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
+          <li>Warm transfers a genuine emergency to your cell in five seconds</li>
+          <li>Texts you the transcript and the recording inside a minute of the call ending</li>
+          <li>Never quotes a price, enforced in three independent layers</li>
+          <li>Live in about 60 seconds on one carrier code, off again in ten</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Answered#interest">I want this on my line</a>
+          <div class="pc-econ">Modeled per booked job<br> Revenue <b>$19.00</b><br> Cost of the calls behind it <b>$1.50</b><br> Contribution <b>$17.50, about 92%</b></div>
+        </div>
+      </article>
+
+      <article class="pcard rv d1" data-aud="consumer both">
+        <div class="pc-for">02 / Consumer</div>
+        <div class="pc-name">Hold</div>
+        <div class="pc-price num">$20</div>
+        <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
+        <div class="pc-free">$0 if nobody ever picks up &middot; no subscription, ever</div>
+        <ul class="pc-list">
+          <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
+          <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
+          <li>Rings your phone the moment a person is actually on the line</li>
+          <li>Makes your case on the record when you ask it to</li>
+          <li>Ends every session with the hold receipt: the clock, the queue, the recording</li>
+          <li>Nothing to install and no account to create before the first one</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Hold#interest">I want it waiting for me</a>
+          <div class="pc-econ">Modeled per connection<br> Revenue <b>$20.00</b><br> Cost of a 60 minute hold <b>$9.00</b><br> Contribution <b>$11.00, about 55%</b></div>
+        </div>
+      </article>
+
+      <article class="pcard rv d2" data-aud="business both">
+        <div class="pc-for">03 / Receivables</div>
+        <div class="pc-name">Recover</div>
+        <div class="pc-price num">15%</div>
+        <div class="pc-unit">of dollars actually recovered, where we hold the licence.<br> Flat fee for pre default follow up.</div>
+        <div class="pc-free">Nothing recovered means nothing owed</div>
+        <ul class="pc-list">
+          <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
+          <li>Already knows the job, the address and the date, because it booked the work</li>
+          <li>Writes down every promise to pay with a date, and follows up on that date</li>
+          <li>One number for the whole aged list, moving in one direction</li>
+          <li>Collections agencies publish 20 to 50% for the same work</li>
+          <li>Contingency is gated server side on your verified business location</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Recover#interest">I want my invoices chased</a>
+          <div class="pc-econ">Modeled on a $10,000 recovery<br> Revenue <b>$1,500.00</b><br> Cost of the calls behind it <b>$4.50</b><br> Contribution <b>$1,495.50, about 99.7%</b></div>
+        </div>
+      </article>
+    </div>
+    <p class="src rv d3" style="margin-top:26px;max-width:88ch">Contribution figures are modeled on published vendor rates, not on measured production data. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="business both">
+  <div class="wrap">
+    <p class="eyebrow rv">What the customer gets for it</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">The price sits at about four percent of the thing it produced.</h2>
+    <div class="ptable rv d2">
+      <div class="prow head"><span>What Answered produced</span><span>Its price as a share of that</span></div>
+      <div class="prow"><span>A booked service call, $350 to $500 average ticket</span><span class="num">4 to 5%</span></div>
+      <div class="prow"><span>A booked after hours call, about $1,400</span><span class="num">3.5%</span></div>
+      <div class="prow"><span>A saved water heater lead, $1,193 ticket</span><span class="num">1.6%</span></div>
+      <div class="prow hi"><span>A saved roof lead, $9,504 ticket</span><span class="num">0.5%</span></div>
+      <div class="prow"><span>An afternoon of your life, back</span><span class="num">$20</span></div>
+    </div>
+    <p class="src rv d3" style="margin-top:20px;max-width:84ch">Ticket figures from Thumbtack average cost data, 2026. Lead values apply Invoca's measured 45% on call close rate (70M calls, July 2026) to those tickets. Human answering services for the same work publish $250 to $2,100 a month.</p>
+  </div>
+</section>
+
+<section class="pad seam" data-aud="both">
+  <div class="wrap">
+    <p class="eyebrow rv">The unit economics</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Where each dollar goes.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">Every bar below is <b>one dollar of revenue from one event</b>, split into what that event costs us to run and what is left. Same scale on every row, so they can be read against each other. The dollar figures on the right are the size of that single event, not a monthly or annual total.</p>
+
+    <div class="dollars rv d2">
+      <div class="drow">
+        <div class="dname">Answered, standard<span>one booked job</span></div>
+        <div class="dtrack" data-rev="19" data-cost="1.5" data-cost-label="$1.50">
+          <div class="dcost"><span class="dlab">$1.50</span></div>
+          <div class="dkeep" data-cost="$1.50"><span class="dlab">$17.50 left &middot; 92%</span></div>
+        </div>
+        <div class="dtotal">$19.00<span>the job</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Answered, after hours<span>one booked job, nights and weekends</span></div>
+        <div class="dtrack" data-rev="49" data-cost="1.5" data-cost-label="$1.50">
+          <div class="dcost"><span class="dlab">$1.50</span></div>
+          <div class="dkeep" data-cost="$1.50"><span class="dlab">$47.50 left &middot; 97%</span></div>
+        </div>
+        <div class="dtotal">$49.00<span>the job</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Hold, government<span>one human reached, about an hour of queue</span></div>
+        <div class="dtrack" data-rev="20" data-cost="9" data-cost-label="$9.00">
+          <div class="dcost"><span class="dlab">$9.00</span></div>
+          <div class="dkeep" data-cost="$9.00"><span class="dlab">$11.00 left &middot; 55%</span></div>
+        </div>
+        <div class="dtotal">$20.00<span>the connection</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Hold, commercial<span>one human reached, about twenty minutes</span></div>
+        <div class="dtrack" data-rev="10" data-cost="3" data-cost-label="$3.00">
+          <div class="dcost"><span class="dlab">$3.00</span></div>
+          <div class="dkeep" data-cost="$3.00"><span class="dlab">$7.00 left &middot; 70%</span></div>
+        </div>
+        <div class="dtotal">$10.00<span>the connection</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Recover<span>one $10,000 invoice collected</span></div>
+        <div class="dtrack" data-rev="1500" data-cost="4.5" data-cost-label="$4.50">
+          <div class="dcost"><span class="dlab">$4.50</span></div>
+          <div class="dkeep" data-cost="$4.50"><span class="dlab">$1,495.50 left &middot; 99.7%</span></div>
+        </div>
+        <div class="dtotal">$1,500.00<span>the fee</span></div>
+      </div>
+    </div>
+
+    <div class="dkey rv d3">
+      <i><b style="background:linear-gradient(180deg,var(--red-2),var(--red))"></b> what the calls cost us</i>
+      <i><b style="background:rgba(217,162,99,.30)"></b> what is left after them</i>
+    </div>
+
+    <p class="src rv d3" style="margin-top:22px;max-width:86ch">Hold costs more per event because holding is the product: the line stays connected for the whole wait, so an hour of queue is an hour of telephony. Answering and collecting are short calls, which is why those two rows look the way they do.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="both">
+  <div class="wrap">
+    <p class="eyebrow rv">The arithmetic, step by step</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us a dollar fifty.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labelled as ours.</p>
+
+    <div class="chain rv d2">
+      <div class="step-row">
+        <span class="op">1</span>
+        <div class="step-t"><b>A connected minute of conversational voice</b><span>Published vendor rates run $0.13 to $0.17 all in. We plan on $0.15.</span></div>
+        <div class="step-v">$0.15 / min</div>
+      </div>
+      <div class="step-row">
+        <span class="op">&times;</span>
+        <div class="step-t"><b>A typical answered call runs about three and a half minutes</b><span>Long enough to qualify a caller and book a slot.</span></div>
+        <div class="step-v">3.5 min</div>
+      </div>
+      <div class="step-row">
+        <span class="op">=</span>
+        <div class="step-t"><b>So one answered call costs us</b><span>Whether or not it turns into anything. Those calls are free to the customer.</span></div>
+        <div class="step-v">$0.53</div>
+      </div>
+      <div class="step-row">
+        <span class="op">&divide;</span>
+        <div class="step-t"><b>Roughly one call in three books a job</b><span>35%, our own planning assumption, not yet measured in production.</span></div>
+        <div class="step-v">35%</div>
+      </div>
+      <div class="step-row out">
+        <span class="op">=</span>
+        <div class="step-t"><b>Which puts about $1.50 of calls behind every booked job</b><span>Against $19.00 charged for that job, leaving $17.50.</span></div>
+        <div class="step-v">$1.50</div>
+      </div>
+    </div>
+
+    <p class="src rv d3" style="margin-top:22px;max-width:88ch">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 componentized, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="consumer business both">
+  <div class="wrap">
+    <p class="eyebrow rv">Why the shape matters more than the number</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">A per minute vendor wants a longer call. We want a booked job.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">That is not a slogan, it is an accounting fact. When the meter runs on talk time, every extra minute is margin, so the product has no reason to be efficient and every reason to be chatty. When the meter runs on the outcome, a shorter call that still books the job is strictly better for both sides.</p>
+    <p class="lede rv d2" style="margin-top:16px;max-width:64ch">It also makes the free part genuinely free. Wrong numbers, sales calls, somebody's cousin looking for a different business, the call at 2 AM that turns out to be nothing: all of it costs us and none of it costs you. Nobody selling minutes can copy that without breaking their own revenue model.</p>
+  </div>
+</section>
+
+<section class="pad seam" data-aud="business both">
+  <div class="wrap narrow">
+    <p class="eyebrow rv">Your protection</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Every charge, provable.<br> Every dispute, yours.</h2>
+    <details class="disc rv d2" style="margin-top:30px" open>
+      <summary>Every charge shows you the call it came from.</summary>
+      <div class="disc-body"><p>The recording where consent permits, the transcript, and the appointment record. If you cannot see why you were charged, you should not be charged, so you will always be able to see it.</p></div>
+    </details>
+    <details class="disc rv d2">
+      <summary>One tap disputes any charge, and you keep the benefit of the doubt.</summary>
+      <div class="disc-body"><p>We would rather lose the $19 than have you spend a Tuesday arguing about it. Repeat disputes are a signal that our booking definition is wrong, and that gets fixed at the source.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Quality failures refund themselves before you notice.</summary>
+      <div class="disc-body"><p>A nightly check re-reads every booking. A wrong address, a slot that was already taken, a callback promised and never logged. Those reverse automatically and text you what happened.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Fleets and franchises are a conversation, not a listed price.</summary>
+      <div class="disc-body"><p>Multiple trucks, multiple locations and multiple numbers change the shape of the meter, so those get scheduled properly rather than guessed at on a page.</p></div>
+    </details>
+  </div>
+</section>
+
+
+<section class="paper seam pad" id="interest" data-aud="consumer business both">
+  <div class="wrap narrow">
+    <p class="eyebrow rv" style="justify-content:center">Tell us what you need</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;text-align:center">No checkout. Just tell us,<br> and we will build it around you.</h2>
+    <p class="lede rv d2" style="margin-top:20px;text-align:center;margin-inline:auto;max-width:54ch">There is nothing to buy on this page on purpose. The first group goes live free and stays free until it produces something, so the only thing worth doing right now is telling us which part you want and letting us set it up with you.</p>
+
+    <form class="iform rv d2" name="interest" method="POST" action="/api/interest">
+      <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
+
+      <div class="ifield">
+        <label for="i-name">Your name</label>
+        <input id="i-name" name="name" type="text" autocomplete="name" placeholder="Mike Rivera" required>
+      </div>
+      <div class="ifield">
+        <label for="i-email">Email</label>
+        <input id="i-email" name="email" type="email" autocomplete="email" placeholder="mike@riveraplumbing.com" required>
+      </div>
+      <div class="ifield">
+        <label for="i-product">Which part</label>
+        <select id="i-product" name="product">
+          <option>Answered, answer my line</option>
+          <option>Hold, wait on hold for me</option>
+          <option>Recover, chase my invoices</option>
+          <option>All three</option>
+          <option>I am an investor or a partner</option>
+        </select>
+      </div>
+      <div class="ifield">
+        <label for="i-phone">Phone, if you want us to call</label>
+        <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
+      </div>
+      <div class="ifield full">
+        <label for="i-note">Anything we should know</label>
+        <textarea id="i-note" name="note" placeholder="What you do, how many calls a week, what you are losing to the phone right now."></textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Send it</button>
+    </form>
+    <p class="src rv d3" style="margin-top:16px;text-align:center">One reply from a person, not a drip sequence. Fleets, franchises and portfolios get a scheduled call rather than a listed price.</p>
+  </div>
+</section>
+'''
+
+# ── /recover ──────────────────────────────────────────────────────────────────
+RECOVER = '''
+<section class="hero" style="min-height:auto;padding-bottom:clamp(48px,7vw,90px)">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <p class="eyebrow rv">Recover. For the work you already did.</p>
+        <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You already earned it.<br> <span class="lit">Somebody should ask for it.</span></h1>
+        <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called, because calling is uncomfortable and you are busy and it always feels like next week is fine. Recover makes the call, in your name, on your caller ID, and writes down exactly what was promised.</p>
+        <div class="hero-actions rv d3">
+          <a class="btn btn-primary" href="/#early">Get early access</a>
+          <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
+        </div>
+        <p class="src hero-note rv d3">Nothing recovered, nothing owed. The fee is a function of dollars that actually land, never of calls placed.</p>
+      </div>
+      <div class="rv d2">
+        <div class="ring-stage" style="max-width:420px">
+          <div class="ring-glow" aria-hidden="true"></div>
+          <canvas aria-hidden="true"></canvas>
+          <div class="ring-center"><div class="ring-state">Ringing</div><div class="ring-count">0.0s</div></div>
+        </div>
+        <div class="mic-row"><button class="mic-btn" type="button"><span class="dot" aria-hidden="true"></span><span class="lbl">Let it hear you</span></button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap" style="padding-inline:0">
+    <div class="band-grid">
+      <div class="band-cell rv"><div class="band-v num">$299B</div><div class="band-k">of US construction payments ran late in one year.</div><div class="band-s src">Rabbet Construction Payments Report, 2025. Commercial contractor to subcontractor payments.</div></div>
+      <div class="band-cell rv d1"><div class="band-v num">20-50%</div><div class="band-k">is what collections agencies publish for this work.</div><div class="band-s src">PSI Collect publishes 22% on $5,000 to $50,000 accounts, accessed 2026-08-10.</div></div>
+      <div class="band-cell rv d2"><div class="band-v num">Day 31</div><div class="band-k">is when an invoice stops being late and starts being a project.</div><div class="band-s src">The window Recover works, before default and before an agency.</div></div>
+      <div class="band-cell rv d3"><div class="band-v num">$0</div><div class="band-k">if nothing lands. The fee only exists on recovered dollars.</div><div class="band-s src">Answered pricing law.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pad">
+  <div class="wrap">
+    <p class="eyebrow rv">Why this one works when a collections letter does not</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">It is not a stranger calling. It is you, following up.</h2>
+    <div class="steps">
+      <div class="step rv"><h3 class="h3">Your name, your number</h3><p>The call comes from your business, on your caller ID, in the tone you would use. Nothing about it says the account has been sold or handed to an agency, because it has not been.</p></div>
+      <div class="step rv d1"><h3 class="h3">It remembers the job</h3><p>It already answered the call that created this work. It knows the address, the date, and what was done. That is why the conversation goes somewhere instead of going in circles.</p></div>
+      <div class="step rv d2"><h3 class="h3">Every promise written down</h3><p>Who said they would pay, how much, and by when. Next Thursday becomes a record instead of a memory, and the follow up on Thursday happens whether or not you remember it.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="pad seam">
+  <div class="wrap">
+    <div style="display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:clamp(28px,5vw,68px);align-items:center" class="two">
+      <div>
+        <p class="eyebrow rv">Watch it work</p>
+        <h2 class="h2 rv d1" style="margin-top:16px;max-width:18ch">The aged list, going down instead of sideways.</h2>
+        <p class="lede rv d2" style="margin-top:20px">Every invoice past day thirty gets a call in your name. Every promise to pay is written down with a date. The number at the top is what you are still owed, and it only moves in one direction.</p>
+        
+      </div>
+      <div class="rv d2"><div class="showcase" data-show="recover">
+  <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Recover, working the aged list <span class="sc-num">Day 31 and over</span></div>
+  <div class="sc-body">
+    <div class="meter-lab">Money out there</div>
+    <div class="meter-big">$23,410</div>
+    <div class="inv">
+      <div class="inv-row" data-amt="1193"><span class="name">Rivera, water heater</span><span class="age">34d</span><span class="amt">$1,193</span></div>
+      <div class="inv-row" data-amt="2850"><span class="name">Okafor, panel upgrade</span><span class="age">41d</span><span class="amt">$2,850</span></div>
+      <div class="inv-row" data-amt="11400"><span class="name">Delgado GC, phase two</span><span class="age">63d</span><span class="amt">$11,400</span></div>
+      <div class="inv-row" data-amt="7967"><span class="name">Whitmore, roof section</span><span class="age">88d</span><span class="amt">$7,967</span></div>
+    </div>
+  </div>
+  <div class="sc-note">Concept rendering of the product running. Not a customer record and not a projection of results. Every promise to pay captured on a call is written to this ledger as it happens.</div>
+</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pad seam">
+  <div class="wrap narrow">
+    <p class="eyebrow rv">Where the law draws the line, and where we draw it</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">We launch the half that needs no licence, and we say so.</h2>
+    <p class="lede rv d2" style="margin-top:20px">Following up on your own invoice, in your own name, before it has defaulted, is you doing your own accounts receivable with help. That is what ships first, everywhere.</p>
+    <p class="lede rv d2" style="margin-top:16px">Working a genuinely defaulted consumer invoice for a share of what comes back is licensed, bonded, regulated collections. We are getting licensed state by state, from the statute text rather than from a blog post, and until we hold the licence in your state you will not be shown that offer at all. Not a disclaimer under it. It will not render.</p>
+    <p class="src rv d3" style="margin-top:20px">Eligibility is gated server side on your verified business location, never on your IP address and never on your own say so. Washington licenses even the act of soliciting a claim, so an ungated page would itself be the violation.</p>
+  </div>
+</section>
+
+<section class="paper seam pad">
+  <div class="wrap narrow" style="text-align:center">
+    <p class="eyebrow rv" style="justify-content:center">Early access</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Put the quiet invoices on the list.</h2>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get early access</a></p>
+  </div>
+</section>
+'''
+
+# ── /trust ────────────────────────────────────────────────────────────────────
+TRUST = '''
+<section class="pad" style="padding-top:calc(var(--nav-h) + clamp(48px,7vw,96px))">
+  <div class="wrap">
+    <p class="eyebrow rv">Trust</p>
+    <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px">Audit every word<br> <span class="lit">from the truck.</span></h1>
+    <p class="lede rv d2" style="margin-top:22px;max-width:60ch">Your phone is your business, so you get to see exactly what happens on it. Every call transcribed to you inside a minute. Every charge linked to the call that made it. Guardrails you can watch working, and four numbers that tell you the truth every day.</p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap" style="padding-inline:0">
+    <div class="band-grid">
+      <div class="band-cell rv"><div class="band-v num">60s</div><div class="band-k">from hang up to the transcript in your hand, by text.</div><div class="band-s src">Design target. If the pipeline is down, calls pause rather than run unaudited.</div></div>
+      <div class="band-cell rv d1"><div class="band-v num">5s</div><div class="band-k">from a caller asking for a human to your cell ringing.</div><div class="band-s src">Warm transfer attempt. 20 seconds without a pickup and it takes a callback and texts you.</div></div>
+      <div class="band-cell rv d2"><div class="band-v num">0</div><div class="band-k">prices quoted. Ever. It is not allowed to say a number.</div><div class="band-s src">Three stacked guardrails, below. The counter is published per account.</div></div>
+      <div class="band-cell rv d3"><div class="band-v num">1st</div><div class="band-k">sentence of every call is the AI saying it is an AI.</div><div class="band-s src">On every call, in every state, whether or not the law requires it.</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pad">
+  <div class="wrap">
+    <p class="eyebrow rv">The guardrail that matters most</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">It will never quote a price. That is enforced in three places, not one.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Pricing is yours to give, and it stays yours. The agent books the visit, captures everything you need, and tells the caller you will confirm the number personally. That promise is enforced in three independent places, so it holds every single time.</p>
+    <div class="cards">
+      <article class="card rv"><div class="card-tag">Layer 1</div><h3 class="h3">The instruction</h3><p>It is told exactly what to say instead: that it cannot quote, that you will call back with a real number today, and then it books the visit anyway.</p></article>
+      <article class="card rv d1"><div class="card-tag">Layer 2</div><h3 class="h3">The filter</h3><p>Every sentence is checked for dollar amounts and price language before it is ever spoken aloud. A number that slips the instruction is cut before it reaches the caller's ear.</p></article>
+      <article class="card rv d2"><div class="card-tag">Layer 3</div><h3 class="h3">The nightly replay</h3><p>Fifty recorded calls where a caller pushes hard for a price are replayed against the current build every night. A regression is caught by us, before it is caught by your customer.</p></article>
+    </div>
+  </div>
+</section>
+
+<section class="paper seam pad">
+  <div class="wrap">
+    <p class="eyebrow rv">How you audit it</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">From the truck, in a text, without opening an app.</h2>
+    <div class="steps">
+      <div class="step rv" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Every call, transcribed to you</h3><p style="color:rgba(30,27,23,.76)">The transcript, a one line summary, and the caller's number, inside a minute of the call ending. You read every call the way you would read a message from your best dispatcher.</p></div>
+      <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">It reports its own mistakes first</h3><p style="color:rgba(30,27,23,.76)">A nightly job flags calls that went wrong: a hang up mid sentence, an address it probably misheard, a callback promised and never logged. You hear it from us before you hear it from the customer.</p></div>
+      <div class="step rv d2" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Four numbers, no vanity metrics</h3><p style="color:rgba(30,27,23,.76)">Answer rate. Median pickup, in rings. Escalations actually delivered to your cell. Price guardrail violations, which should read zero, and we show the zero.</p></div>
+    </div>
+    <p class="src rv d3" style="margin-top:28px;max-width:80ch">If the transcript pipeline goes down, call handling pauses for your account instead of continuing unaudited, and you get a text saying exactly that. A silent degradation is worse than an outage, because you keep trusting it.</p>
+  </div>
+</section>
+
+<section class="pad seam">
+  <div class="wrap narrow">
+    <p class="eyebrow rv">Disclosure and recording</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">One behaviour, everywhere, so it is right in all fifty states.</h2>
+    <details class="disc rv d2" style="margin-top:30px" open>
+      <summary>It identifies itself as an AI in its first sentence.</summary>
+      <div class="disc-body"><p>Not buried later in the call. First sentence, every call, every state. Several states now require a version of this and more will. Building it as the default means we never have to ship a version that hides.</p></div>
+    </details>
+    <details class="disc rv d2">
+      <summary>Recording is announced on every call, in every state.</summary>
+      <div class="disc-body"><p>Eleven states require every party to consent. We could look up the caller's state and behave differently. We do not, because a lookup that fails silently in one direction is a wiretap claim, and the disclosure costs about five seconds and a fraction of a cent.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Answering a call is not the same as making one, legally or ethically.</summary>
+      <div class="disc-body"><p>Inbound answering is untouched by the rules that govern outbound dialing. Where we do call out, on your invoices or on your behalf, consent is a code path with a human fallback, not a paragraph in a policy.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Capability, always. Guarantees, never.</summary>
+      <div class="disc-body"><p>Everything on this site is something the product actually does, and every figure carries the source it came from. In a category full of promises, being the one you can check is the strongest position available.</p></div>
+    </details>
+  </div>
+</section>
+
+<section class="paper seam pad">
+  <div class="wrap narrow" style="text-align:center">
+    <p class="eyebrow rv" style="justify-content:center">Early access</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Audit it for a week before you trust it with a Tuesday.</h2>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get early access</a></p>
+  </div>
+</section>
+'''
+
+page('pricing.html', 'Answered pricing and unit economics. Three products, three meters, one rule.',
+     'No subscription and no per minute price. $19 a booked job, $49 after hours, $20 when a human is reached, 15% of what is recovered, and $0 when nothing is produced.', PRICING)
+page('recover.html', 'Recover. You already earned it. Now somebody asks for it.',
+     'Follow up on the invoices that went quiet at day 31, in your own name and on your own caller ID. Nothing recovered, nothing owed.', RECOVER)
+THANKS = '''
+<section class="hero" style="min-height:calc(100svh - var(--nav-h))">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="wrap narrow" style="position:relative;z-index:2;text-align:center">
+    <div class="ring-stage" style="max-width:280px;margin-bottom:34px">
+      <div class="ring-glow" aria-hidden="true"></div>
+      <canvas aria-hidden="true"></canvas>
+      <div class="ring-center"><div class="ring-state">Ringing</div><div class="ring-count">0.0s</div></div>
+    </div>
+    <p class="eyebrow rv" style="justify-content:center">Received</p>
+    <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);margin-top:16px">A person has it,<br> <span class="lit">not a drip sequence.</span></h1>
+    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:46ch">We read every one of these ourselves. You will hear back from a human being, and it will be about the thing you actually asked for.</p>
+    <div class="hero-actions rv d3" style="justify-content:center;margin-top:32px">
+      <a class="btn btn-ghost" href="/">Back to the site</a>
+      <a class="btn btn-ghost" href="/pricing.html">See what each part costs</a>
+    </div>
+  </div>
+</section>
+'''
+
+page('trust.html', 'Trust. Audit every call from the truck.',
+     'It never quotes a price, it hands a caller to a human in five seconds, it transcribes every call to you inside a minute, and it reports its own mistakes first.', TRUST)
+page('thanks.html', 'Thank you. A person has it.',
+     'Your note reached a person at Answered. We read every one of these ourselves and you will hear back from a human being.', THANKS)
+
+
+# ── normalise the chrome on the three hand-written pages ──────────────────────
+for slug, active in (('index.html', '/'), ('trades.html', '/trades.html'), ('hold.html', '/hold.html')):
+    p = ROOT / slug
+    s = p.read_text(encoding='utf-8')
+    s = re.sub(r'<header class="nav">.*?</header>\s*<div class="sheet" id="sheet">.*?</div>\n',
+               nav(active) + '\n', s, count=1, flags=re.S)
+    s = re.sub(r'<footer class="foot">.*?</footer>', FOOT, s, count=1, flags=re.S)
+    p.write_text(s, encoding='utf-8')
+    print('chrome normalised in', slug)
+
+
+# ── post-step: pricing cards and CTAs, applied to EVERY page from one source ──
+# Hand-injecting these into generated pages meant every rebuild silently wiped
+# them. Twice. So the generator owns them now and the result is idempotent.
+import re as _re
+
+_src = (ROOT / 'pricing.html').read_text(encoding='utf-8')
+_cards = _re.findall(r'<article class="pcard[^"]*"[^>]*>.*?</article>', _src, _re.S)
+assert len(_cards) == 3, 'expected 3 pricing cards in pricing.html, found %d' % len(_cards)
+_ANSWERED, _HOLD, _RECOVER = _cards
+
+_CTA_LABEL = {'Answered': 'I want this on my line',
+              'Hold': 'I want it waiting for me',
+              'Recover': 'I want my invoices chased'}
+
+def _clean(card):
+    """Strip the investor economics block AND any existing CTA.
+
+    The PRICING source now ships its own same-page CTA, so a product page that
+    reused the card verbatim got an anchor to a form that does not exist there.
+    Strip both, then re-add the right one for the page being built."""
+    card = _re.sub(r'\s*<div class="pc-econ">.*?</div>', '', card, flags=_re.S)
+    card = _re.sub(r'\s*<div class="pc-foot">\s*</div>', '', card, flags=_re.S)
+    card = _re.sub(r'\s*<a class="pc-cta"[^>]*>.*?</a>', '', card, flags=_re.S)
+    return card
+
+def _with_cta(card, same_page):
+    if 'pc-cta' in card:
+        return card
+    n = _re.search(r'<div class="pc-name">([^<]+)</div>', card).group(1).strip()
+    href = ('?p=%s#interest' % n) if same_page else ('/pricing.html?p=%s#interest' % n)
+    return card[:card.rfind('</article>')] + '<a class="pc-cta" href="%s">%s</a>' % (href, _CTA_LABEL[n]) + '</article>'
+
+def _price_block(card, heading, lede):
+    return '''<section class="pad-s seam" id="price">
+  <div class="wrap">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.86fr);gap:clamp(28px,5vw,68px);align-items:center" class="two">
+      <div>
+        <p class="eyebrow rv">What it costs</p>
+        <h2 class="h2 rv d1" style="margin-top:16px;max-width:17ch">%s</h2>
+        <p class="lede rv d2" style="margin-top:20px">%s</p>
+        <p class="rv d3" style="margin-top:26px"><a class="btn btn-ghost" href="/pricing.html">See all three meters and the economics</a></p>
+      </div>
+      <div class="rv d2" style="max-width:420px;width:100%%;justify-self:end">%s</div>
+    </div>
+  </div>
+</section>
+
+''' % (heading, lede, _with_cta(_clean(card), False).replace('class="pcard lead"', 'class="pcard lead rv"').replace('class="pcard"', 'class="pcard rv"'))
+
+# pricing.html: cards keep their economics and anchor to the form on the same page
+_p = _src
+for _c in _cards:
+    _p = _p.replace(_c, _with_cta(_c, True))
+(ROOT / 'pricing.html').write_text(_p, encoding='utf-8')
+print('pricing.html ctas:', _p.count('pc-cta'), 'econ:', _p.count('pc-econ'))
+
+# recover.html: its own card, no economics, in the same slot as every other product page
+_r = (ROOT / 'recover.html').read_text(encoding='utf-8')
+if 'class="pcard' not in _r:
+    _blk = _price_block(_RECOVER, 'Nothing recovered, nothing owed.',
+        'The fee is a share of dollars that actually land in your account, never a fee on calls placed or letters sent. Collections agencies publish 20 to 50% for the same work. Where we do not yet hold the licence, the contingency offer does not render at all.')
+    _i = _r.rfind('<section class="paper seam pad">')
+    _r = _r[:_i] + _blk + _r[_i:]
+    (ROOT / 'recover.html').write_text(_r, encoding='utf-8')
+    print('recover.html priced, ctas:', _r.count('pc-cta'))
+
+# trades.html and hold.html are hand written, so their card is injected here too
+for _slug, _card, _h, _l in (
+    ('trades.html', _ANSWERED, 'Free until it books you work.',
+     'No subscription and no per minute charge. The line can ring all day, and the meter does not move until a real job is on your calendar with a name, an address, a callback number and a confirmed window against it.'),
+    ('hold.html', _HOLD, 'You pay for a person, not for the waiting.',
+     'Two hours of hold music costs you nothing. The charge exists only at the moment an actual human being is on the line, and if one never is, there is no charge at all. There is no subscription and there never will be.'),
+):
+    _s = (ROOT / _slug).read_text(encoding='utf-8')
+    if 'class="pcard' not in _s:
+        _i = _s.rfind('<section class="paper seam pad">')
+        _s = _s[:_i] + _price_block(_card, _h, _l) + _s[_i:]
+        (ROOT / _slug).write_text(_s, encoding='utf-8')
+        print(_slug, 'priced, ctas:', _s.count('pc-cta'))

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Answered pricing and unit economics. Three products, three meters, one rule.</title>
+<meta name="description" content="No subscription and no per minute price. $19 a booked job, $49 after hours, $20 when a human is reached, 15% of what is recovered, and $0 when nothing is produced.">
+<meta name="theme-color" content="#0F0D0B">
+<meta property="og:title" content="Answered pricing and unit economics. Three products, three meters, one rule.">
+<meta property="og:description" content="No subscription and no per minute price. $19 a booked job, $49 after hours, $20 when a human is reached, 15% of what is recovered, and $0 when nothing is produced.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230F0D0B'/%3E%3Ccircle cx='16' cy='15' r='8' fill='none' stroke='%23D9A263' stroke-width='2.4' stroke-dasharray='38 12' stroke-linecap='round' transform='rotate(-42 16 15)'/%3E%3Ccircle cx='16' cy='26' r='2.3' fill='%23C9553B'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/answered.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="14" r="9" fill="none" stroke="#D9A263" stroke-width="2.2" stroke-dasharray="42 15" stroke-linecap="round" transform="rotate(-42 16 14)"/><circle cx="16" cy="27" r="2.6" fill="#C9553B"/></svg><span class="brand-name"><b>Answered</b></span></a>
+    <nav class="nav-links" aria-label="Primary"><a href="/trades.html">Answered</a><a href="/hold.html">Hold</a><a href="/recover.html">Recover</a><a href="/pricing.html" aria-current="page">Pricing</a><a href="/trust.html">Trust</a></nav>
+    <a class="nav-cta" href="/#early">Get early access</a>
+    <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
+  </div>
+</header>
+<div class="sheet" id="sheet"><a href="/trades.html"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold.html"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover.html"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing.html"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust.html"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Get early access</a></div>
+<main id="main">
+
+
+<section class="gate pad-s" id="choose">
+  <div class="wrap">
+    <p class="eyebrow rv">Before the numbers</p>
+    <h1 class="display rv d1" style="font-size:clamp(32px,4.2vw,58px);text-wrap:balance;margin-top:16px">Who is the phone<br> <span class="lit">ringing for?</span></h1>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Three products, three different meters, and you almost certainly only care about one of them. Pick the one that is you and the page will show that.</p>
+
+    <div class="gate-grid">
+      <button class="gc rv" type="button" data-pick="consumer">
+        <span class="gc-i">01</span>
+        <span class="gc-t">It rings for me</span>
+        <span class="gc-d">You are a person with a phone and a problem. A carrier, a bank, an airline, an agency. You want somebody else to do the waiting and the arguing.</span>
+        <span class="gc-w">Shows Hold</span>
+        <span class="gc-go">See what that costs</span>
+      </button>
+
+      <button class="gc rv d1" type="button" data-pick="business">
+        <span class="gc-i">02</span>
+        <span class="gc-t">It rings for my business</span>
+        <span class="gc-d">You run a shop, a crew or a truck. Calls come in while your hands are full, and invoices go quiet after you have already done the work.</span>
+        <span class="gc-w">Shows Answered and Recover</span>
+        <span class="gc-go">See what that costs</span>
+      </button>
+
+      <button class="gc rv d2" type="button" data-pick="both">
+        <span class="gc-i">03</span>
+        <span class="gc-t">Both, honestly</span>
+        <span class="gc-d">You own the business and you are also the person on hold with the utility company at nine at night. Most owners are both.</span>
+        <span class="gc-w">Shows everything, including the economics</span>
+        <span class="gc-go">See all of it</span>
+      </button>
+    </div>
+
+    <p class="src rv d3" style="margin-top:26px;max-width:70ch">This only changes what the page shows you. Nothing is hidden or protected by it, and you can switch at any time from the line at the top of the page.</p>
+  </div>
+</section>
+
+<section class="pad" data-aud="consumer business both" style="padding-top:calc(var(--nav-h) + clamp(30px,4vw,56px))">
+  <div class="wrap">
+    <div class="aud-chip">Showing prices for <b class="aud-name">everyone</b> <button type="button" class="aud-change">change</button></div>
+    <p class="eyebrow rv" style="margin-top:26px">Pricing and unit economics</p>
+    <p class="display h2 rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px" role="heading" aria-level="2">Three products.<br> Three meters. <span class="lit">One rule.</span></p>
+    <p class="lede rv d2" style="margin-top:22px;max-width:62ch">The rule is that money only moves when something good happened. A job got booked. A human got reached. A dollar got recovered. There is no subscription anywhere in this company and no per minute price anywhere in this company, which means the incentive on our side of the table is identical to the incentive on yours.</p>
+
+    <div class="pcards">
+      <article class="pcard lead rv" data-aud="business both">
+        <div class="pc-for">01 / Inbound</div>
+        <div class="pc-name">Answered</div>
+        <div class="pc-price num">$19</div>
+        <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
+        <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <ul class="pc-list">
+          <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
+          <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
+          <li>Warm transfers a genuine emergency to your cell in five seconds</li>
+          <li>Texts you the transcript and the recording inside a minute of the call ending</li>
+          <li>Never quotes a price, enforced in three independent layers</li>
+          <li>Live in about 60 seconds on one carrier code, off again in ten</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Answered#interest">I want this on my line</a>
+          <div class="pc-econ">Modeled per booked job<br> Revenue <b>$19.00</b><br> Cost of the calls behind it <b>$1.50</b><br> Contribution <b>$17.50, about 92%</b></div>
+        </div>
+      </article>
+
+      <article class="pcard rv d1" data-aud="consumer both">
+        <div class="pc-for">02 / Consumer</div>
+        <div class="pc-name">Hold</div>
+        <div class="pc-price num">$20</div>
+        <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
+        <div class="pc-free">$0 if nobody ever picks up &middot; no subscription, ever</div>
+        <ul class="pc-list">
+          <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
+          <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
+          <li>Rings your phone the moment a person is actually on the line</li>
+          <li>Makes your case on the record when you ask it to</li>
+          <li>Ends every session with the hold receipt: the clock, the queue, the recording</li>
+          <li>Nothing to install and no account to create before the first one</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Hold#interest">I want it waiting for me</a>
+          <div class="pc-econ">Modeled per connection<br> Revenue <b>$20.00</b><br> Cost of a 60 minute hold <b>$9.00</b><br> Contribution <b>$11.00, about 55%</b></div>
+        </div>
+      </article>
+
+      <article class="pcard rv d2" data-aud="business both">
+        <div class="pc-for">03 / Receivables</div>
+        <div class="pc-name">Recover</div>
+        <div class="pc-price num">15%</div>
+        <div class="pc-unit">of dollars actually recovered, where we hold the licence.<br> Flat fee for pre default follow up.</div>
+        <div class="pc-free">Nothing recovered means nothing owed</div>
+        <ul class="pc-list">
+          <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
+          <li>Already knows the job, the address and the date, because it booked the work</li>
+          <li>Writes down every promise to pay with a date, and follows up on that date</li>
+          <li>One number for the whole aged list, moving in one direction</li>
+          <li>Collections agencies publish 20 to 50% for the same work</li>
+          <li>Contingency is gated server side on your verified business location</li>
+        </ul>
+        <div class="pc-foot">
+          <a class="pc-cta" href="?p=Recover#interest">I want my invoices chased</a>
+          <div class="pc-econ">Modeled on a $10,000 recovery<br> Revenue <b>$1,500.00</b><br> Cost of the calls behind it <b>$4.50</b><br> Contribution <b>$1,495.50, about 99.7%</b></div>
+        </div>
+      </article>
+    </div>
+    <p class="src rv d3" style="margin-top:26px;max-width:88ch">Contribution figures are modeled on published vendor rates, not on measured production data. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="business both">
+  <div class="wrap">
+    <p class="eyebrow rv">What the customer gets for it</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">The price sits at about four percent of the thing it produced.</h2>
+    <div class="ptable rv d2">
+      <div class="prow head"><span>What Answered produced</span><span>Its price as a share of that</span></div>
+      <div class="prow"><span>A booked service call, $350 to $500 average ticket</span><span class="num">4 to 5%</span></div>
+      <div class="prow"><span>A booked after hours call, about $1,400</span><span class="num">3.5%</span></div>
+      <div class="prow"><span>A saved water heater lead, $1,193 ticket</span><span class="num">1.6%</span></div>
+      <div class="prow hi"><span>A saved roof lead, $9,504 ticket</span><span class="num">0.5%</span></div>
+      <div class="prow"><span>An afternoon of your life, back</span><span class="num">$20</span></div>
+    </div>
+    <p class="src rv d3" style="margin-top:20px;max-width:84ch">Ticket figures from Thumbtack average cost data, 2026. Lead values apply Invoca's measured 45% on call close rate (70M calls, July 2026) to those tickets. Human answering services for the same work publish $250 to $2,100 a month.</p>
+  </div>
+</section>
+
+<section class="pad seam" data-aud="both">
+  <div class="wrap">
+    <p class="eyebrow rv">The unit economics</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Where each dollar goes.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">Every bar below is <b>one dollar of revenue from one event</b>, split into what that event costs us to run and what is left. Same scale on every row, so they can be read against each other. The dollar figures on the right are the size of that single event, not a monthly or annual total.</p>
+
+    <div class="dollars rv d2">
+      <div class="drow">
+        <div class="dname">Answered, standard<span>one booked job</span></div>
+        <div class="dtrack" data-rev="19" data-cost="1.5" data-cost-label="$1.50">
+          <div class="dcost"><span class="dlab">$1.50</span></div>
+          <div class="dkeep" data-cost="$1.50"><span class="dlab">$17.50 left &middot; 92%</span></div>
+        </div>
+        <div class="dtotal">$19.00<span>the job</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Answered, after hours<span>one booked job, nights and weekends</span></div>
+        <div class="dtrack" data-rev="49" data-cost="1.5" data-cost-label="$1.50">
+          <div class="dcost"><span class="dlab">$1.50</span></div>
+          <div class="dkeep" data-cost="$1.50"><span class="dlab">$47.50 left &middot; 97%</span></div>
+        </div>
+        <div class="dtotal">$49.00<span>the job</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Hold, government<span>one human reached, about an hour of queue</span></div>
+        <div class="dtrack" data-rev="20" data-cost="9" data-cost-label="$9.00">
+          <div class="dcost"><span class="dlab">$9.00</span></div>
+          <div class="dkeep" data-cost="$9.00"><span class="dlab">$11.00 left &middot; 55%</span></div>
+        </div>
+        <div class="dtotal">$20.00<span>the connection</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Hold, commercial<span>one human reached, about twenty minutes</span></div>
+        <div class="dtrack" data-rev="10" data-cost="3" data-cost-label="$3.00">
+          <div class="dcost"><span class="dlab">$3.00</span></div>
+          <div class="dkeep" data-cost="$3.00"><span class="dlab">$7.00 left &middot; 70%</span></div>
+        </div>
+        <div class="dtotal">$10.00<span>the connection</span></div>
+      </div>
+      <div class="drow">
+        <div class="dname">Recover<span>one $10,000 invoice collected</span></div>
+        <div class="dtrack" data-rev="1500" data-cost="4.5" data-cost-label="$4.50">
+          <div class="dcost"><span class="dlab">$4.50</span></div>
+          <div class="dkeep" data-cost="$4.50"><span class="dlab">$1,495.50 left &middot; 99.7%</span></div>
+        </div>
+        <div class="dtotal">$1,500.00<span>the fee</span></div>
+      </div>
+    </div>
+
+    <div class="dkey rv d3">
+      <i><b style="background:linear-gradient(180deg,var(--red-2),var(--red))"></b> what the calls cost us</i>
+      <i><b style="background:rgba(217,162,99,.30)"></b> what is left after them</i>
+    </div>
+
+    <p class="src rv d3" style="margin-top:22px;max-width:86ch">Hold costs more per event because holding is the product: the line stays connected for the whole wait, so an hour of queue is an hour of telephony. Answering and collecting are short calls, which is why those two rows look the way they do.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="both">
+  <div class="wrap">
+    <p class="eyebrow rv">The arithmetic, step by step</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us a dollar fifty.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labelled as ours.</p>
+
+    <div class="chain rv d2">
+      <div class="step-row">
+        <span class="op">1</span>
+        <div class="step-t"><b>A connected minute of conversational voice</b><span>Published vendor rates run $0.13 to $0.17 all in. We plan on $0.15.</span></div>
+        <div class="step-v">$0.15 / min</div>
+      </div>
+      <div class="step-row">
+        <span class="op">&times;</span>
+        <div class="step-t"><b>A typical answered call runs about three and a half minutes</b><span>Long enough to qualify a caller and book a slot.</span></div>
+        <div class="step-v">3.5 min</div>
+      </div>
+      <div class="step-row">
+        <span class="op">=</span>
+        <div class="step-t"><b>So one answered call costs us</b><span>Whether or not it turns into anything. Those calls are free to the customer.</span></div>
+        <div class="step-v">$0.53</div>
+      </div>
+      <div class="step-row">
+        <span class="op">&divide;</span>
+        <div class="step-t"><b>Roughly one call in three books a job</b><span>35%, our own planning assumption, not yet measured in production.</span></div>
+        <div class="step-v">35%</div>
+      </div>
+      <div class="step-row out">
+        <span class="op">=</span>
+        <div class="step-t"><b>Which puts about $1.50 of calls behind every booked job</b><span>Against $19.00 charged for that job, leaving $17.50.</span></div>
+        <div class="step-v">$1.50</div>
+      </div>
+    </div>
+
+    <p class="src rv d3" style="margin-top:22px;max-width:88ch">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 componentized, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
+  </div>
+</section>
+
+<section class="paper seam pad-s" data-aud="consumer business both">
+  <div class="wrap">
+    <p class="eyebrow rv">Why the shape matters more than the number</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">A per minute vendor wants a longer call. We want a booked job.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">That is not a slogan, it is an accounting fact. When the meter runs on talk time, every extra minute is margin, so the product has no reason to be efficient and every reason to be chatty. When the meter runs on the outcome, a shorter call that still books the job is strictly better for both sides.</p>
+    <p class="lede rv d2" style="margin-top:16px;max-width:64ch">It also makes the free part genuinely free. Wrong numbers, sales calls, somebody's cousin looking for a different business, the call at 2 AM that turns out to be nothing: all of it costs us and none of it costs you. Nobody selling minutes can copy that without breaking their own revenue model.</p>
+  </div>
+</section>
+
+<section class="pad seam" data-aud="business both">
+  <div class="wrap narrow">
+    <p class="eyebrow rv">Your protection</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Every charge, provable.<br> Every dispute, yours.</h2>
+    <details class="disc rv d2" style="margin-top:30px" open>
+      <summary>Every charge shows you the call it came from.</summary>
+      <div class="disc-body"><p>The recording where consent permits, the transcript, and the appointment record. If you cannot see why you were charged, you should not be charged, so you will always be able to see it.</p></div>
+    </details>
+    <details class="disc rv d2">
+      <summary>One tap disputes any charge, and you keep the benefit of the doubt.</summary>
+      <div class="disc-body"><p>We would rather lose the $19 than have you spend a Tuesday arguing about it. Repeat disputes are a signal that our booking definition is wrong, and that gets fixed at the source.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Quality failures refund themselves before you notice.</summary>
+      <div class="disc-body"><p>A nightly check re-reads every booking. A wrong address, a slot that was already taken, a callback promised and never logged. Those reverse automatically and text you what happened.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Fleets and franchises are a conversation, not a listed price.</summary>
+      <div class="disc-body"><p>Multiple trucks, multiple locations and multiple numbers change the shape of the meter, so those get scheduled properly rather than guessed at on a page.</p></div>
+    </details>
+  </div>
+</section>
+
+
+<section class="paper seam pad" id="interest" data-aud="consumer business both">
+  <div class="wrap narrow">
+    <p class="eyebrow rv" style="justify-content:center">Tell us what you need</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;text-align:center">No checkout. Just tell us,<br> and we will build it around you.</h2>
+    <p class="lede rv d2" style="margin-top:20px;text-align:center;margin-inline:auto;max-width:54ch">There is nothing to buy on this page on purpose. The first group goes live free and stays free until it produces something, so the only thing worth doing right now is telling us which part you want and letting us set it up with you.</p>
+
+    <form class="iform rv d2" name="interest" method="POST" action="/api/interest">
+      <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
+
+      <div class="ifield">
+        <label for="i-name">Your name</label>
+        <input id="i-name" name="name" type="text" autocomplete="name" placeholder="Mike Rivera" required>
+      </div>
+      <div class="ifield">
+        <label for="i-email">Email</label>
+        <input id="i-email" name="email" type="email" autocomplete="email" placeholder="mike@riveraplumbing.com" required>
+      </div>
+      <div class="ifield">
+        <label for="i-product">Which part</label>
+        <select id="i-product" name="product">
+          <option>Answered, answer my line</option>
+          <option>Hold, wait on hold for me</option>
+          <option>Recover, chase my invoices</option>
+          <option>All three</option>
+          <option>I am an investor or a partner</option>
+        </select>
+      </div>
+      <div class="ifield">
+        <label for="i-phone">Phone, if you want us to call</label>
+        <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
+      </div>
+      <div class="ifield full">
+        <label for="i-note">Anything we should know</label>
+        <textarea id="i-note" name="note" placeholder="What you do, how many calls a week, what you are losing to the phone right now."></textarea>
+      </div>
+      <button class="btn btn-primary" type="submit">Send it</button>
+    </form>
+    <p class="src rv d3" style="margin-top:16px;text-align:center">One reply from a person, not a drip sequence. Fleets, franchises and portfolios get a scheduled call rather than a listed price.</p>
+  </div>
+</section>
+
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="14" r="9" fill="none" stroke="#D9A263" stroke-width="2.2" stroke-dasharray="42 15" stroke-linecap="round" transform="rotate(-42 16 14)"/><circle cx="16" cy="27" r="2.6" fill="#C9553B"/></svg><span class="brand-name"><b>Answered</b></span></a>
+        <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+      </div>
+      <div>
+        <h4>Products</h4>
+        <ul>
+          <li><a href="/trades.html">Answered, for your line</a></li>
+          <li><a href="/hold.html">Hold, for everyone</a></li>
+          <li><a href="/recover.html">Recover, for your invoices</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/pricing.html">Pricing</a></li>
+          <li><a href="/trust.html">Trust and guardrails</a></li>
+          <li><a href="/#honesty">What we will not say</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-base">
+      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
+      <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
+    </div>
+  </div>
+</footer>
+<script src="/assets/answered.js" defer></script>
+</body>
+</html>
