@@ -169,7 +169,7 @@ body::after {
 .nav .wrap { display: flex; align-items: center; gap: 28px; }
 
 .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; }
-.brand-mark { width: 26px; height: 26px; flex: 0 0 auto; }
+.brand-mark { width: 30px; height: 30px; flex: 0 0 auto; }
 .brand-name {
   font-family: var(--sans);
   font-weight: 800;
@@ -180,18 +180,12 @@ body::after {
   gap: 0;
 }
 /* the logo IS the word: ANSWERE + a drawn D broken open so sound comes out */
-.brand-name b { font-weight: 800; color: var(--t1); letter-spacing: 0.02em; }
-.brand-d {
-  height: 0.86em;
-  width: auto;
-  margin-left: 0.055em;
-  transform: translateY(0.055em);
-  flex: 0 0 auto;
-}
+.brand-name b { font-weight: 800; color: var(--bone); letter-spacing: .045em; }
+.brand-name b { letter-spacing: .045em; }
 /* the mark's outer arc is dropped at small sizes so the glyph never turns to mud */
 @media (max-width: 480px) {
   .brand-mark .bm-arc2 { display: none; }
-}
+  }
 
 .nav-links { display: flex; align-items: center; gap: 4px; }
 .nav-links a {
