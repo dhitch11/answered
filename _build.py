@@ -821,10 +821,69 @@ def _guard():
     pricing = (ROOT / 'pricing.html').read_text(encoding='utf-8')
     text = _re.sub(r'<[^>]+>', ' ', pricing)
 
-    for pat in _HEDGE:
-        for m in _re.finditer(pat, text, _re.I):
-            problems.append('HEDGE on the 15%%: "%s" -> ...%s...'
-                            % (pat, text[max(0, m.start()-70):m.end()+70].strip()))
+    got = sum(1 for r in _REQUIRED if r.lower() in text.lower())
+    if got == 0:
+        problems.append('MISSING the modeled-not-measured label on the contribution figures. '
+                        'That label is required: a contribution figure is a measurement claim. '
+                        '"15% stays" is not licence to remove it.')
+
+    if '15%' not in text:
+        problems.append('The 15% recovery share is not on the pricing page. David ruled it stays.')
+
+    # A SECOND HEADLINE rate is worse than a hedge, because it makes the 15% look
+    # unreliable without ever hedging it in words. But the war room's AGE TIERS
+    # (10/15/20 by age, 8/13/18 for subscribers) are the BUILD TARGET, not a
+    # contradiction, and 15 is the middle tier rather than a replacement.
+    #
+    # If you are adding a sanctioned tier and this fires, THE GATE IS WRONG, NOT
+    # YOUR PAGE: add it to SANCTIONED.
+    #
+    # SCOPE HISTORY, because both mistakes are instructive:
+    #   v1 read the whole page flattened -> bridged two cards and reported Hold's
+    #      "about 55%" contribution as a recovery share. False positive.
+    #   v2 scoped to pcard articles on pricing.html only -> killed that false
+    #      positive AND opened a real hole: an unsanctioned rate on recover.html,
+    #      or anywhere OUTSIDE a card, was invisible. Reproduced: a 35% share in
+    #      the Recover hero-note reached the live page with the gate printing
+    #      "intact". The `or [pricing]` fallback hid it, because it only fires
+    #      when there are no cards at all, and there are always three.
+    #   v3 (this) scans EVERY generated page, and within each page scans each card
+    #      as its own scope PLUS the non-card remainder as another scope. Keeps the
+    #      per-card isolation without leaving the space between cards dark.
+    SANCTIONED = {'8', '10', '13', '15', '18', '20'}
+    PAGES = ['index.html', 'trades.html', 'hold.html', 'recover.html',
+             'pricing.html', 'trust.html', 'thanks.html']
+
+    def _scopes(html):
+        cards = _re.findall(r'<article class="pcard.*?</article>', html, _re.S)
+        remainder = html
+        for c in cards:
+            remainder = remainder.replace(c, ' ')
+        return cards + [remainder]
+
+    for pg in PAGES:
+        f = ROOT / pg
+        if not f.exists():
+            continue
+        html = f.read_text(encoding='utf-8')
+        for scope in _scopes(html):
+            st = _re.sub(r'<[^>]+>', ' ', scope)
+            # the gap must not contain another %, or the match anchors on the
+            # FIRST percentage and bridges over the offending one: measured, with
+            # [^.] the gate read "15% ... We take 35% of dollars" as share=15.
+            for m in _re.finditer(r'(\d{1,3})\s*%[^.%]{0,30}(?:of dollars|actually recovered|recovery share)', st, _re.I):
+                if m.group(1) not in SANCTIONED:
+                    problems.append('CONTRADICTION in %s: recovery share stated as %s%%, outside the '
+                                    'sanctioned tier set %s -> ...%s...'
+                                    % (pg, m.group(1), sorted(SANCTIONED),
+                                       st[max(0, m.start()-60):m.end()+50].strip()))
+            # a hedge on the price is banned on EVERY page, not just pricing
+            for pat in _HEDGE:
+                for hm in _re.finditer(pat, st, _re.I):
+                    window = st[max(0, hm.start()-140):hm.end()+140]
+                    if _re.search(r'%|\bfee\b|\bprice\b|\brecover', window, _re.I):
+                        problems.append('HEDGE on the price in %s: "%s" -> ...%s...'
+                                        % (pg, pat, window.strip()[:170]))
 
     got = sum(1 for r in _REQUIRED if r.lower() in text.lower())
     if got == 0:
