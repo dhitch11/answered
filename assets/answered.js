@@ -561,3 +561,88 @@
     if (on) { var t = thumb.style.transition; thumb.style.transition = 'none'; moveThumb(on); void thumb.offsetWidth; thumb.style.transition = t; }
   });
 })();
+
+/* ══ THE NARRATION PLAYER ══════════════════════════════════════════════════
+   The rule, from HANDOFF.md and IDENTITY-V2.md: an audio control on this site
+   plays real audio or it does not render. This estate shipped a play button
+   once whose media was gitignored, so it sat there dead.
+   Therefore the markup ships hidden and NOTHING reveals it except the browser
+   telling us it has actually loaded enough of the file to play. We do not HEAD
+   the URL: a 200 on a HEAD proves the bytes exist, not that they decode.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  var wrap = document.getElementById('vo');
+  if (!wrap) return;
+  var a = document.getElementById('vo-audio');
+  var btn = document.getElementById('vo-btn');
+  var bar = document.getElementById('vo-bar');
+  var fill = document.getElementById('vo-fill');
+  var time = document.getElementById('vo-time');
+  var lbl = document.getElementById('vo-lbl');
+  if (!a || !btn) return;
+
+  function fmt(s) {
+    if (!isFinite(s) || s < 0) s = 0;
+    var m = Math.floor(s / 60);
+    var r = Math.floor(s % 60);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  // reveal ONLY on real decodable metadata, and only with a sane duration
+  a.addEventListener('loadedmetadata', function () {
+    if (!isFinite(a.duration) || a.duration < 5) return;   // a broken/empty file
+    time.textContent = fmt(a.duration);
+    wrap.hidden = false;
+  });
+  a.addEventListener('error', function () { wrap.hidden = true; });
+
+  // preload="none" means metadata only arrives once we ask for it
+  a.preload = 'metadata';
+  a.load();
+
+  btn.addEventListener('click', function () {
+    if (a.paused) {
+      a.play().then(function () {
+        wrap.classList.add('playing');
+        lbl.textContent = 'Playing the walkthrough';
+      }).catch(function () {
+        // autoplay/decode refusal must not leave a control claiming to play
+        wrap.classList.remove('playing');
+        lbl.textContent = 'Could not play here';
+      });
+    } else {
+      a.pause();
+    }
+  });
+
+  a.addEventListener('pause', function () {
+    wrap.classList.remove('playing');
+    lbl.textContent = 'Hear the whole thing';
+  });
+  a.addEventListener('ended', function () {
+    wrap.classList.remove('playing');
+    lbl.textContent = 'Play it again';
+    fill.style.width = '0';
+    bar.setAttribute('aria-valuenow', '0');
+  });
+
+  a.addEventListener('timeupdate', function () {
+    if (!isFinite(a.duration) || !a.duration) return;
+    var pct = (a.currentTime / a.duration) * 100;
+    fill.style.width = pct + '%';
+    bar.setAttribute('aria-valuenow', Math.round(pct));
+    time.textContent = fmt(a.duration - a.currentTime);
+  });
+
+  function seek(clientX) {
+    var r = bar.getBoundingClientRect();
+    if (!isFinite(a.duration) || !r.width) return;
+    a.currentTime = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * a.duration;
+  }
+  bar.addEventListener('click', function (e) { seek(e.clientX); });
+  bar.addEventListener('keydown', function (e) {
+    if (!isFinite(a.duration)) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); a.currentTime = Math.min(a.duration, a.currentTime + 15); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); a.currentTime = Math.max(0, a.currentTime - 15); }
+  });
+})();

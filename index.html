@@ -50,6 +50,24 @@
           <a class="btn btn-primary" href="#early">Turn it on</a>
           <a class="btn btn-ghost" href="#setup">See the 60 second setup</a>
         </div>
+        <!-- ══ THE NARRATION. Renders ONLY if the audio actually loads. ══ -->
+        <div class="vo rv d3" id="vo" hidden>
+          <button class="vo-btn" type="button" id="vo-btn" aria-label="Play the full walkthrough">
+            <span class="vo-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="vo-play"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+              <svg viewBox="0 0 24 24" class="vo-pause"><rect x="7" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/></svg>
+            </span>
+            <span class="vo-txt">
+              <b id="vo-lbl">Hear the whole thing</b>
+              <i>The full walkthrough, every product, 7 minutes</i>
+            </span>
+          </button>
+          <div class="vo-bar" id="vo-bar" role="progressbar" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+            <span class="vo-fill" id="vo-fill"></span>
+          </div>
+          <span class="vo-time" id="vo-time">0:00</span>
+          <audio id="vo-audio" preload="none" src="/assets/audio/answered-buildout.mp3"></audio>
+        </div>
         <p class="src hero-note rv d3">No monthly fee. No per minute charge. You are billed for a booked job, a human reached on the line, or a dollar recovered. Nothing else moves the meter.</p>
       </div>
 
