@@ -214,7 +214,7 @@ PRICING = '''
       </article>
     </div>
     <p class="src rv d3" style="margin-top:26px;max-width:90ch">Every contribution figure above is <b>modeled on published vendor rates, not measured in production.</b> The full arithmetic and every source are below.</p>
-    <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below. The contingency share and the flat fee are being sized with the first pilot customers.</p>
+    <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below.</p>
   </div>
 </section>
 
@@ -789,3 +789,133 @@ for _slug, _card, _h, _l in (
         _s = _s[:_i] + _price_block(_card, _h, _l) + _s[_i:]
         (ROOT / _slug).write_text(_s, encoding='utf-8')
         print(_slug, 'priced, ctas:', _s.count('pc-cta'))
+
+
+# ── RULING GUARD ──────────────────────────────────────────────────────────────
+# David ruled, verbatim: "15% stays!"  The hedge on that price has now entered
+# this page TWICE, both times through a REWRITE rather than a decision, and the
+# second time in different words ("are being sized with the first pilot
+# customers"), which is why a grep for the first wording reported clean.
+#
+# A ruling that depends on everyone remembering it is not enforced. This fails
+# the build instead. It matches INTENT, not one phrase, so a third rewording
+# trips it too.
+#
+# The modeled-not-measured label is the OPPOSITE case and is REQUIRED: a
+# contribution figure is a measurement claim about the world, a price is an
+# offer. "15% stays" is not licence to strip the modeled labels.
+import sys as _sys
+
+_HEDGE = [
+    r'shape of the deal', r'not a final number', r'\bstill being sized\b',
+    r'\bbeing sized\b', r'\bsized with\b', r'\bsized in pilot\b',
+    r'\bprovisional\b', r'\bindicative\b', r'\bballpark\b',
+    r'subject to change', r'\bto be determined\b', r'\bTBD\b',
+    r'not yet final', r'we are still working out', r'may change',
+]
+_REQUIRED = ['worked out from published vendor rates', 'not measured from our own running system']
+
+def _guard():
+    import re as _re
+    problems = []
+    pricing = (ROOT / 'pricing.html').read_text(encoding='utf-8')
+    text = _re.sub(r'<[^>]+>', ' ', pricing)
+
+    for pat in _HEDGE:
+        for m in _re.finditer(pat, text, _re.I):
+            problems.append('HEDGE on the 15%%: "%s" -> ...%s...'
+                            % (pat, text[max(0, m.start()-70):m.end()+70].strip()))
+
+    got = sum(1 for r in _REQUIRED if r.lower() in text.lower())
+    if got == 0:
+        problems.append('MISSING the modeled-not-measured label on the contribution figures. '
+                        'That label is required: a contribution figure is a measurement claim. '
+                        '"15% stays" is not licence to remove it.')
+
+    if '15%' not in text:
+        problems.append('The 15% recovery share is not on the pricing page. David ruled it stays.')
+
+    # a SECOND number presented as the recovery share is worse than a hedge:
+    # it makes the 15% look unreliable without ever hedging it in words
+    for m in _re.finditer(r'(\d{1,2})\s*%\s*(?:of|share)[^.]{0,40}recover', text, _re.I):
+        if m.group(1) != '15':
+            problems.append('CONTRADICTION: recovery share stated as %s%% -> ...%s...'
+                            % (m.group(1), text[max(0, m.start()-60):m.end()+60].strip()))
+
+    if problems:
+        print('\n*** BUILD REFUSED: the 15% ruling is not intact ***', file=_sys.stderr)
+        for p in problems:
+            print('  - ' + p, file=_sys.stderr)
+        _sys.exit(1)
+    print('ruling guard: 15% intact, unhedged, modeled label present')
+
+_guard()
+
+
+# ── UPSTREAM GUARD ────────────────────────────────────────────────────────────
+# The site guard above cannot see the artifacts the site is REBUILT FROM, and
+# that is where the root actually lives. artifacts/final.json still records the
+# war room's 10/15/20 age tiers and "flat fee, sized in pilot", and HANDOFF.md
+# cites that file BY NAME next to the fee. That is why deleting the words kept
+# failing: we each deleted a downstream copy while the source stayed intact.
+#
+# We do NOT rewrite those artifacts. They are the war room's actual verdict and
+# this estate forbids deleting project history; overwriting a room's conclusion
+# to match a later ruling falsifies the record. So the rule is: the contradiction
+# may exist in the record ONLY while a founder ruling sits alongside it saying
+# which paths it supersedes. Lose the annotation and the build stops.
+#
+# Deliberately NARROW. It reads only paths that state OUR price. It must never
+# fire on competitor rates (incumbents publish 20-50%, PSI Collect 22%), on
+# ESTIMATED measurement claims, or on generic playbook advice, because an
+# over-reporting gate destroys trust in its real findings.
+_ART = pathlib.Path('/Users/user/answered-handoff')
+
+def _upstream_guard():
+    import json as _json
+    fj = _ART / 'artifacts' / 'final.json'
+    if not fj.exists():
+        print('upstream guard: artifacts not present, skipped')
+        return
+    try:
+        d = _json.loads(fj.read_text(encoding='utf-8'))
+    except Exception as e:
+        print('upstream guard: could not parse final.json (%s), skipped' % e)
+        return
+
+    ruling = d.get('founder_ruling_2026_08_10')
+    fin = d.get('final', {})
+    surfaces = fin.get('three_surfaces') or []
+    ours = ' '.join([
+        str(surfaces[1].get('pricing', '')) if len(surfaces) > 1 else '',
+        str(fin.get('moat', '')),
+        ' '.join(str(s.get('why', '')) for s in (fin.get('subscores') or [])),
+    ])
+
+    import re as _re
+    hedged = bool(_re.search(r'sized in pilot|being sized|not final|provisional', ours, _re.I))
+    # our own price stated as something other than a flat 15
+    contradicts = bool(_re.search(r'\b8/13/18\b|\b10/15/20\b|8\s*(?:to|-)\s*18\s*%', ours, _re.I))
+
+    if (hedged or contradicts) and not ruling:
+        print('\n*** BUILD REFUSED: upstream artifact contradicts the live price and is NOT annotated ***',
+              file=_sys.stderr)
+        print('  artifacts/final.json states our recovery price with a hedge or with tiers, and carries no',
+              file=_sys.stderr)
+        print('  founder_ruling_2026_08_10 key saying which paths that ruling supersedes. A rebuild reading',
+              file=_sys.stderr)
+        print('  this file will reconstruct a page that contradicts the founder and four live surfaces.',
+              file=_sys.stderr)
+        print('  Do NOT delete the tiers: they are the war room\'s reasoning. ADD the ruling alongside them.',
+              file=_sys.stderr)
+        _sys.exit(1)
+
+    if hedged or contradicts:
+        sup = str(ruling.get('supersedes', ''))
+        ok = 'three_surfaces' in sup and 'moat' in sup
+        print('upstream guard: artifact carries the old tiers, annotated by founder ruling%s'
+              % ('' if ok else ' (WARNING: supersedes list does not name the paths that carry them)'))
+    else:
+        print('upstream guard: upstream artifacts clean')
+
+_upstream_guard()
