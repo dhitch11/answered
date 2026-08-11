@@ -79,8 +79,14 @@ for (const path of PAGES) {
 
     // any element still invisible after the full scroll = a permanently blank block
     const stuck = await page.evaluate(() => {
+      // An element inside a display:none ancestor can NEVER fire an
+      // IntersectionObserver, so it is permanently un-revealed by design, not
+      // stuck. The two-sided home hides one track at a time, and counting its
+      // hidden side reported 14 failures at all five widths on a page where
+      // every visible reveal fires. Only rendered elements can be stuck.
       let n = 0;
       document.querySelectorAll('.rv').forEach((el) => {
+        if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
         if (parseFloat(getComputedStyle(el).opacity) < 0.9) n++;
       });
       return n;
