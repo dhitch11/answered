@@ -593,7 +593,7 @@ TRUST = '''
       <div class="band-cell rv"><div class="band-v num">60s</div><div class="band-k">from hang up to the transcript in your hand, by text.</div><div class="band-s src">Design target. If the pipeline is down, calls pause rather than run unaudited.</div></div>
       <div class="band-cell rv d1"><div class="band-v num">5s</div><div class="band-k">from a caller asking for a human to your cell ringing.</div><div class="band-s src">Warm transfer attempt. 20 seconds without a pickup and it takes a callback and texts you.</div></div>
       <div class="band-cell rv d2"><div class="band-v num">0</div><div class="band-k">prices quoted. Ever. It is not allowed to say a number.</div><div class="band-s src">Three stacked guardrails, below. The counter is published per account.</div></div>
-      <div class="band-cell rv d3"><div class="band-v num">1st</div><div class="band-k">sentence of every call is the AI saying it is an AI.</div><div class="band-s src">On every call, in every state, whether or not the law requires it.</div></div>
+      <div class="band-cell rv d3"><div class="band-v num">1st</div><div class="band-k">sentence of every call is the AI saying it is an AI.</div><div class="band-s src">On every call, everywhere, whether or not the law requires it.</div></div>
     </div>
   </div>
 </section>
@@ -627,13 +627,13 @@ TRUST = '''
 <section class="pad seam">
   <div class="wrap narrow">
     <p class="eyebrow rv">Disclosure and recording</p>
-    <h2 class="h2 rv d1" style="margin-top:16px">One behaviour, everywhere, so it is right in all fifty states.</h2>
+    <h2 class="h2 rv d1" style="margin-top:16px">One behaviour, everywhere, held to the strictest rule in the country.</h2>
     <details class="disc rv d2" style="margin-top:30px" open>
       <summary>It identifies itself as an AI in its first sentence.</summary>
-      <div class="disc-body"><p>Not buried later in the call. First sentence, every call, every state. Several states now require a version of this and more will. Building it as the default means we never have to ship a version that hides.</p></div>
+      <div class="disc-body"><p>Not buried later in the call. First sentence, every call, everywhere. It is the strictest version of the rule found anywhere in the country, so it is the only version we build. We never ship a version that hides.</p></div>
     </details>
     <details class="disc rv d2">
-      <summary>Recording is announced on every call, in every state.</summary>
+      <summary>Recording is announced on every call, everywhere.</summary>
       <div class="disc-body"><p>Eleven states require every party to consent. We could look up the caller's state and behave differently. We do not, because a lookup that fails silently in one direction is a wiretap claim, and the disclosure costs about five seconds and a fraction of a cent.</p></div>
     </details>
     <details class="disc rv d3">

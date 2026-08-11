@@ -499,3 +499,65 @@
   var y = document.querySelectorAll('[data-year]');
   for (var m = 0; m < y.length; m++) { y[m].textContent = String(new Date().getFullYear()); }
 })();
+
+/* ══ TRACK SWITCH ══════════════════════════════════════════════════
+   Two audiences, one page. The markup ships with body.track-me so the
+   consumer track is what a person sees with JS off or still loading.
+   The choice is remembered, because coming back to the wrong side of
+   the page is the fastest way to lose somebody.
+   ══════════════════════════════════════════════════════════════════ */
+(function () {
+  var seg = document.querySelector('.seg');
+  if (!seg) return;
+  var btns  = [].slice.call(seg.querySelectorAll('[data-track-to]'));
+  var thumb = seg.querySelector('.seg-thumb');
+  var body  = document.body;
+
+  function moveThumb(btn) {
+    if (!thumb || !btn) return;
+    thumb.style.width = btn.offsetWidth + 'px';
+    thumb.style.transform = 'translateX(' + (btn.offsetLeft - seg.clientLeft - 5) + 'px)';
+  }
+
+  function apply(track, animate) {
+    body.classList.toggle('track-me',  track === 'me');
+    body.classList.toggle('track-biz', track === 'biz');
+    btns.forEach(function (b) {
+      var on = b.getAttribute('data-track-to') === track;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on) moveThumb(b);
+    });
+    if (animate) {
+      [].slice.call(document.querySelectorAll('[data-track="' + track + '"]')).forEach(function (el) {
+        el.classList.remove('track-swap');
+        void el.offsetWidth;            // restart the animation
+        el.classList.add('track-swap');
+      });
+    }
+    try { localStorage.setItem('answered_track', track); } catch (e) {}
+  }
+
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () { apply(b.getAttribute('data-track-to'), true); });
+  });
+
+  // arrow keys, because it is a real tablist
+  seg.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var i = btns.indexOf(document.activeElement);
+    if (i < 0) return;
+    e.preventDefault();
+    var n = btns[(i + (e.key === 'ArrowRight' ? 1 : btns.length - 1)) % btns.length];
+    n.focus(); apply(n.getAttribute('data-track-to'), true);
+  });
+
+  var saved = null;
+  try { saved = localStorage.getItem('answered_track'); } catch (e) {}
+  if (location.hash === '#business' || location.hash === '#biz') saved = 'biz';
+  apply(saved === 'biz' ? 'biz' : 'me', false);
+
+  addEventListener('resize', function () {
+    var on = seg.querySelector('[aria-selected="true"]');
+    if (on) { var t = thumb.style.transition; thumb.style.transition = 'none'; moveThumb(on); void thumb.offsetWidth; thumb.style.transition = t; }
+  });
+})();

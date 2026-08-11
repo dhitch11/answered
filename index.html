@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/answered.css">
 </head>
-<body>
+<body class="track-me">
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
@@ -37,13 +37,13 @@
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow rv">Live in 60 seconds. One code, from your own phone.</p>
-        <h1 class="display rv d1">An AI that works<br> the phone <span class="lit">for you.</span></h1>
-        <p class="lede hero-sub rv d2">It answers the calls you would have missed. It waits on hold so that you never have to. It follows up on the money you are already owed. And it only charges you when it actually produces one of those things.</p>
+        <p class="eyebrow rv">For you, and for your business. Live in 60 seconds.</p>
+        <h1 class="display rv d1">Nobody should<br> have to <span class="lit">wait on hold.</span></h1>
+        <p class="lede hero-sub rv d2">Answered is a voice that works the phone for you. It sits on hold. It picks up when you cannot. It calls people back about money you are owed. You only pay when it actually gets one of those done.</p>
         <ul class="chips rv d2">
-          <li><span class="chip-n">1</span> Answers your line, 24 hours a day</li>
-          <li><span class="chip-n">2</span> Waits on hold in your place</li>
-          <li><span class="chip-n">3</span> Follows up on every invoice</li>
+          <li><span class="chip-n">1</span> It holds. You go live your life.</li>
+          <li><span class="chip-n">2</span> It picks up. You never miss a call.</li>
+          <li><span class="chip-n">3</span> It asks for your money back.</li>
         </ul>
         <p class="setup-flash rv d2"><b>No app. No porting. No new hardware.</b> You dial one short code on the phone already in your pocket, and you are live. Cancel it in ten seconds with another.</p>
         <div class="hero-actions rv d3">
@@ -71,8 +71,56 @@
   </div>
 </section>
 
+
+<!-- ══ WHO ARE YOU. the whole page answers to this. ══ -->
+<section class="trackbar" id="track">
+  <div class="wrap">
+    <div class="tb-inner">
+      <p class="tb-q">Who is this for?</p>
+      <div class="seg" role="tablist" aria-label="Choose who this is for">
+        <button class="seg-b" role="tab" id="tab-me" aria-controls="panel-me" aria-selected="true" data-track-to="me" type="button">
+          <span class="seg-i" aria-hidden="true">🙂</span><span class="seg-t">For me</span>
+        </button>
+        <button class="seg-b" role="tab" id="tab-biz" aria-controls="panel-biz" aria-selected="false" data-track-to="biz" type="button">
+          <span class="seg-i" aria-hidden="true">🏠</span><span class="seg-t">For my business</span>
+        </button>
+        <span class="seg-thumb" aria-hidden="true"></span>
+      </div>
+      <p class="tb-note" data-track="me">You have a phone and a life. Good enough.</p>
+      <p class="tb-note" data-track="biz">You have customers calling and invoices sitting.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ══ STAT BAND ══ -->
-<section class="band">
+<section class="band" data-track="me">
+  <div class="wrap" style="padding-inline:0">
+    <div class="band-grid">
+      <div class="band-cell rv">
+        <div class="band-v num">$0</div>
+        <div class="band-k">if nobody ever picks up. You are never charged for waiting.</div>
+        <div class="band-s src">Answered pricing law. The meter only moves on a human.</div>
+      </div>
+      <div class="band-cell rv d1">
+        <div class="band-v num">0</div>
+        <div class="band-k">apps to install. It runs on the phone already in your pocket.</div>
+        <div class="band-s src">One dial code from your handset. No porting, no new number.</div>
+      </div>
+      <div class="band-cell rv d2">
+        <div class="band-v num">30<span style="font-size:.6em">s</span></div>
+        <div class="band-k">to switch it on. Ten seconds to switch it back off.</div>
+        <div class="band-s src">Carrier call forwarding codes, Verizon and T-Mobile primary documentation, accessed 2026-08-10.</div>
+      </div>
+      <div class="band-cell rv d3">
+        <div class="band-v num">1</div>
+        <div class="band-k">voice that does all of it. One account, one bill, three problems gone.</div>
+        <div class="band-s src">Same engine on both ends of the call.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" data-track="biz">
   <div class="wrap" style="padding-inline:0">
     <div class="band-grid">
       <div class="band-cell rv">
@@ -99,14 +147,14 @@
   </div>
 </section>
 
-<section class="pad seam">
+<section class="pad seam" data-track="biz">
   <div class="wrap">
     <div style="display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:clamp(28px,5vw,68px);align-items:center" class="two">
       <div>
         <p class="eyebrow rv">See it work</p>
         <h2 class="h2 rv d1" style="margin-top:16px;max-width:18ch">Two in the morning, and somebody picked up.</h2>
-        <p class="lede rv d2" style="margin-top:20px">This is a real call arriving at a plumbing company at 2:14 AM, the hour when the caller is standing in water and dialling whoever answers first. The agent qualifies, books, and hands over a record you can check.</p>
-        <p class="src rv d3" style="margin-top:18px">Concept rendering. Every figure elsewhere on this site carries its own source.</p>
+        <p class="lede rv d2" style="margin-top:20px">This is what a 2:14 AM call looks like when it reaches a plumbing company, the hour when the caller is standing in water and dialling whoever answers first. The agent qualifies, books, and hands over a record you can check.</p>
+        <p class="src rv d3" style="margin-top:18px">Concept rendering of the product running, not a customer record. Every figure elsewhere on this site carries its own source.</p>
       </div>
       <div class="rv d2"><div class="showcase" data-show="call">
   <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num">2:14 AM</span></div>
@@ -133,6 +181,40 @@
 </section>
 
 <!-- ══ THE 60 SECOND SETUP. the thing that makes it real. ══ -->
+<!-- ══ CONSUMER DEMO. the call you missed. ══ -->
+<section class="pad seam" data-track="me">
+  <div class="wrap">
+    <div class="two" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,80px);align-items:center">
+      <div>
+        <p class="eyebrow rv">See it work</p>
+        <h2 class="h2 rv d1" style="margin-top:18px;max-width:17ch">You were driving. Mom called anyway.</h2>
+        <p class="lede rv d2" style="margin-top:20px">Voicemail is where a message goes to be ignored. So instead of voicemail, a calm voice picks up, asks what is going on, and sends you the whole thing as one text you can read at a light. If it is actually urgent, your phone rings right through and you take it.</p>
+        <ul class="chips rv d2" style="margin-top:22px">
+          <li><span class="chip-n">1</span> It picks up on the second ring</li>
+          <li><span class="chip-n">2</span> It finds out what is going on</li>
+          <li><span class="chip-n">3</span> You get one text, not a voicemail</li>
+        </ul>
+        <p class="src rv d3" style="margin-top:18px">Concept rendering of the product running, not a customer record. On every call the agent says it is an AI in its first sentence.</p>
+      </div>
+      <div class="rv d2">
+        <div class="phone">
+          <div class="phone-top"><span class="phone-dot" aria-hidden="true"></span> Mom <span class="phone-time">4:41 PM</span></div>
+          <div class="phone-body">
+            <div class="pb pb-them"><span class="pb-who">Answered</span>Hi, this is an AI assistant picking up for Dave. He is driving right now. Is everything alright?</div>
+            <div class="pb pb-cal"><span class="pb-who">Mom</span>Oh, hello. No, nothing wrong. I just wanted to know if he is still coming Sunday, and whether to make the pot roast.</div>
+            <div class="pb pb-them"><span class="pb-who">Answered</span>I will make sure he sees it the second he stops. Sunday, and the pot roast. Anything else you want me to pass along?</div>
+            <div class="pb pb-cal"><span class="pb-who">Mom</span>Tell him to call me back. And tell him I said drive safe.</div>
+          </div>
+          <div class="phone-sms">
+            <div class="sms-h">Text to you, 4:42 PM</div>
+            <div class="sms-b">Mom called. Nothing wrong. She wants to know if you are still on for Sunday and whether to make the pot roast. Asked you to call her back. Says drive safe.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="pad seam" id="setup">
   <div class="wrap">
     <p class="eyebrow rv">Sixty seconds, start to finish</p>
@@ -171,10 +253,34 @@
 <section class="pad" id="what">
   <div class="wrap">
     <p class="eyebrow rv">What it actually does</p>
-    <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">One voice, working both ends of every phone call in your life.</h2>
-    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">When somebody calls you, it picks up. When you have to call someone, it does the waiting. When somebody owes you, it follows up. Same voice, same account, three completely different problems solved.</p>
+    <h2 class="h2 rv d1" data-track="me" style="margin-top:18px;max-width:20ch">Three phone calls you never have to make again.</h2><h2 class="h2 rv d1" data-track="biz" style="margin-top:18px;max-width:20ch">One voice, working both ends of every call your business gets.</h2>
+    <p class="lede rv d2" data-track="me" style="margin-top:20px;max-width:62ch">The one where you hold. The one you missed. The one where you have to ask for your money back. It takes all three off your plate.</p><p class="lede rv d2" data-track="biz" style="margin-top:20px;max-width:62ch">When somebody calls you, it picks up. When you have to call someone, it does the waiting. When somebody owes you, it follows up. Same voice, same account, three completely different problems solved.</p>
 
-    <div class="cards">
+    <div class="cards" data-track="me">
+      <article class="card rv">
+        <div class="card-tag">01 / The hold</div>
+        <h3 class="h3">It waits on hold. You do not.</h3>
+        <p>Your insurance. The airline. The bank. The DMV. Tell it who to call and why. It works the phone menu, it holds for as long as it takes, and it rings you the moment a real person is on the line. You walk away and get your afternoon back.</p>
+        <div class="price"><b>$20</b> when a human is reached on a government line. <b>$10</b> commercial. <b>$0</b> if nobody ever picks up.</div>
+        <a class="card-go" href="/hold.html">See how the hold works <span aria-hidden="true">&rarr;</span></a>
+      </article>
+      <article class="card rv d1">
+        <div class="card-tag">02 / The one you missed</div>
+        <h3 class="h3">It picks up when you cannot.</h3>
+        <p>You are driving, in a meeting, or asleep. Your mom calls. Your kid&rsquo;s school calls. Instead of voicemail nobody checks, a friendly voice picks up, finds out what is going on, and texts you the whole thing in one line. If it is urgent, your phone rings straight through.</p>
+        <div class="price"><b>Free</b> on your personal line. It is how you meet the rest of it.</div>
+        <a class="card-go" href="/hold.html#missed">See what a missed call looks like <span aria-hidden="true">&rarr;</span></a>
+      </article>
+      <article class="card rv d2">
+        <div class="card-tag">03 / The awkward one</div>
+        <h3 class="h3">It makes the call you keep putting off.</h3>
+        <p>Cancel the thing you stopped using. Ask why the bill went up. Get the late fee taken off. Chase the friend who still owes you for the trip. It stays polite, it stays patient, and it does not get talked out of it. You get a recording and exactly what was agreed.</p>
+        <div class="price"><b>15%</b> of what it saves you or gets back. It saves you nothing, you owe nothing.</div>
+        <a class="card-go" href="/recover.html">See how the money comes back <span aria-hidden="true">&rarr;</span></a>
+      </article>
+    </div>
+
+    <div class="cards" data-track="biz">
       <article class="card rv">
         <div class="card-tag">01 / Inbound</div>
         <h3 class="h3">Answered picks up</h3>
@@ -185,7 +291,7 @@
         <div class="card-tag">02 / Outbound</div>
         <h3 class="h3">Recover follows the money</h3>
         <p>The same voice that answered the phone calls back on the invoice that went quiet at day 31. In your name, on your caller ID, with every promise to pay written down.</p>
-        <div class="price">A share of <b>what is actually recovered</b>. Nothing recovered, nothing owed.</div>
+        <div class="price"><b>15%</b> of what actually lands in your account. Nothing recovered, nothing owed.</div>
       </article>
       <article class="card rv d2">
         <div class="card-tag">03 / Consumer</div>
@@ -202,7 +308,7 @@
   <div class="wrap">
     <p class="eyebrow rv">What we build</p>
     <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">Anyone can rent a voice. The intelligence is the company.</h2>
-    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">The parts that make a phone speak are available to everybody, and they get cheaper every quarter. That is good news, because it means the whole contest is fought somewhere else: on whether the call actually arrives, whether the agent behaves, whether the thing you were billed for really happened, and whether all of it is legal in fifty states. That is what we build, and it compounds with every call.</p>
+    <p class="lede rv d2" style="margin-top:20px;max-width:64ch">The parts that make a phone speak are available to everybody, and they get cheaper every quarter. That is good news, because it means the whole contest is fought somewhere else: on whether the call actually arrives, whether the agent behaves, whether the thing you were billed for really happened, and whether all of it clears the strictest rule in the country. That is what we build, and it compounds with every call.</p>
 
     <div class="cards four">
       <article class="card rv">
@@ -222,8 +328,8 @@
       </article>
       <article class="card rv d3">
         <div class="card-tag">04 / Compliance, in code</div>
-        <h3 class="h3">Built right for all fifty states</h3>
-        <p>The agent says it is an AI in its first sentence. Recording is announced on every call, everywhere, as though every state required it. Written as code paths on day one rather than as a policy page later.</p>
+        <h3 class="h3">Held to the strictest rule in the country</h3>
+        <p>The agent says it is an AI in its first sentence. Recording is announced on every call, everywhere, as though the strictest rule applied. Written as code paths on day one rather than as a policy page later.</p>
       </article>
     </div>
 
@@ -232,7 +338,7 @@
 </section>
 
 <!-- ══ WHY IT MATTERS ══ -->
-<section class="pad-s">
+<section class="pad-s" data-track="biz">
   <div class="wrap">
     <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,5vw,80px);align-items:start" class="two">
       <div>
@@ -290,7 +396,7 @@
 </section>
 
 <!-- ══ THE RECEIPT ══ -->
-<section class="pad-s" style="background:linear-gradient(180deg,var(--ink-950),var(--ink-900))">
+<section class="pad-s" style="background:linear-gradient(180deg,var(--ink-950),var(--ink-900))" data-track="me">
   <div class="wrap">
     <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(28px,5vw,72px);align-items:center" class="two">
       <div>
@@ -340,7 +446,7 @@
       <div class="disc-body"><p>Not because a law made us, although several now do. Because a receptionist that lies about being a person is a liability the first time it matters, and because the trades run on people knowing who they are talking to.</p></div>
     </details>
     <details class="disc rv d2">
-      <summary>Recording is announced, everywhere, as if every state were a two party state.</summary>
+      <summary>Recording is announced on every call, everywhere, with no exceptions.</summary>
       <div class="disc-body"><p>Eleven states require all party consent. Building two behaviours means shipping the wrong one eventually. So there is one behaviour.</p></div>
     </details>
     <details class="disc rv d3">

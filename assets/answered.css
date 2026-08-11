@@ -1360,3 +1360,104 @@ html { scrollbar-color: rgba(227,255,79,.34) transparent; scrollbar-width: thin;
 .bp-cap { position: absolute; right: 16px; bottom: 12px; font-family: var(--mono);
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
 @media (prefers-reduced-motion: reduce) { .bp.run .bp-flow { animation: none; stroke-dashoffset: 0; stroke-dasharray: none; } }
+
+/* ══════════════════════════════════════════════════════════════════
+   TRACK SWITCH. the page has two audiences and answers to one at a time.
+   default in the markup is track-me, so this works with JS off.
+   ══════════════════════════════════════════════════════════════════ */
+[data-track] { display: none; }
+body.track-me [data-track="me"],
+body.track-biz [data-track="biz"] { display: revert; }
+body.track-me .cards[data-track="me"],
+body.track-biz .cards[data-track="biz"] { display: grid; }
+
+.trackbar { padding: 34px 0 6px; position: relative; z-index: 3; }
+.tb-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.tb-q { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--static); margin: 0; }
+.tb-note { margin: 0; color: var(--static); font-size: 15px; }
+
+.seg {
+  position: relative; display: inline-flex; gap: 4px; padding: 5px;
+  border-radius: 999px; background: rgba(242,244,240,.05);
+  border: 1px solid rgba(242,244,240,.10);
+}
+.seg-b {
+  position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 9px;
+  border: 0; background: none; cursor: pointer; color: var(--static);
+  font: inherit; font-size: 15.5px; font-weight: 600;
+  padding: 12px 22px; border-radius: 999px; min-height: 48px;
+  transition: color .28s cubic-bezier(.2,.7,.3,1);
+  -webkit-tap-highlight-color: transparent;
+}
+.seg-b[aria-selected="true"] { color: var(--ink-1000); }
+.seg-b:focus-visible { outline: 2px solid var(--bronze); outline-offset: 3px; }
+.seg-i { font-size: 17px; line-height: 1; }
+.seg-thumb {
+  position: absolute; z-index: 1; top: 5px; bottom: 5px; left: 5px;
+  border-radius: 999px; background: var(--bronze);
+  box-shadow: 0 6px 22px rgba(227,255,79,.28);
+  transition: transform .42s cubic-bezier(.2,.8,.2,1), width .42s cubic-bezier(.2,.8,.2,1);
+  width: 0;
+}
+@media (prefers-reduced-motion: reduce) { .seg-thumb { transition: none; } }
+
+/* the swap should feel like the page turned to face you */
+.track-swap { animation: trackIn .5s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes trackIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .track-swap { animation: none; } }
+
+.card-go {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 14px;
+  color: var(--bronze); text-decoration: none; font-weight: 600; font-size: 15px;
+  min-height: 44px;
+}
+.card-go span { transition: transform .3s cubic-bezier(.2,.7,.3,1); }
+.card-go:hover span { transform: translateX(4px); }
+
+@media (max-width: 480px) {
+  .seg { width: 100%; }
+  .seg-b { flex: 1 1 0; justify-content: center; padding: 12px 10px; font-size: 14.5px; }
+  .seg-t { white-space: nowrap; }
+}
+
+/* ══ THE MISSED CALL. a phone, a conversation, and the one text you get. ══ */
+.phone {
+  border: 1px solid rgba(242,244,240,.10); border-radius: 22px; overflow: hidden;
+  background: linear-gradient(180deg, var(--ink-900), var(--ink-1000));
+  box-shadow: 0 30px 80px rgba(0,0,0,.55);
+}
+.phone-top {
+  display: flex; align-items: center; gap: 9px; padding: 15px 18px;
+  border-bottom: 1px solid rgba(242,244,240,.08);
+  font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--t1);
+}
+.phone-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex: 0 0 auto;
+  animation: pdot 2s ease-in-out infinite; }
+@keyframes pdot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .phone-dot { animation: none; } }
+.phone-time { margin-left: auto; color: var(--static); letter-spacing: .06em; }
+.phone-body { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.pb {
+  padding: 13px 15px; border-radius: 14px; font-size: 15px; line-height: 1.6;
+  max-width: 92%; color: var(--t1);
+}
+.pb-who {
+  display: block; font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  margin-bottom: 6px; color: var(--static);
+}
+.pb-them { background: rgba(227,255,79,.09); border: 1px solid rgba(227,255,79,.24); align-self: flex-start; }
+.pb-them .pb-who { color: var(--bronze); }
+.pb-cal  { background: rgba(242,244,240,.05); border: 1px solid rgba(242,244,240,.10); align-self: flex-end; }
+.phone-sms {
+  border-top: 1px solid rgba(242,244,240,.08); padding: 16px 18px 20px;
+  background: rgba(55,200,240,.05);
+}
+.sms-h {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 10.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--dialtone); margin-bottom: 8px;
+}
+.sms-b { font-size: 15.5px; line-height: 1.62; color: var(--t1); }
+
+@media (max-width: 760px) { .pb { max-width: 100%; } }
