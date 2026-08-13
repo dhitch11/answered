@@ -46,3 +46,9 @@
 # ElevenLabs appends to a custom LLM server URL). Declaring a custom path
 # removes the default /.netlify/functions/answered-brain route, so a forced
 # redirect pointing there would shadow the live route with a dead target.
+
+[[redirects]]
+  from = "/internal"
+  to = "/.netlify/functions/site-directory"
+  status = 200
+  force = true
