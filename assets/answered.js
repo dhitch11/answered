@@ -11,13 +11,30 @@
 
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  /* ── the vignette. one fixed layer, appended rather than authored into every
-     page, so it can never drift between them. */
-  var vig = document.createElement('div');
-  vig.className = 'vig';
-  vig.setAttribute('aria-hidden', 'true');
-  document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(vig); });
-  if (document.body) document.body.appendChild(vig);
+  /* ── THE LOAD MOMENT. The page does not load, it answers. 700ms total: the
+     mark's arcs fire twice on the ring cadence while the interface unfolds
+     upward from the stem baseline. Any scroll or input interrupts it
+     permanently. Under prefers-reduced-motion it never runs at all. */
+  (function () {
+    var root = document.documentElement;
+    if (reduced.matches || !document.querySelector('.bt')) {
+      root.classList.add('answered-in');
+      return;
+    }
+    var done = false;
+    var t = setTimeout(finish, 700);
+    function finish() {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      root.classList.remove('answering');
+      root.classList.add('answered-in');
+    }
+    root.classList.add('answering');
+    ['scroll', 'wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (ev) {
+      window.addEventListener(ev, finish, { once: true, passive: true });
+    });
+  })();
 
   /* ── nav ────────────────────────────────────────────────────────────── */
   var nav = document.querySelector('.nav');
@@ -85,17 +102,25 @@
     }
   }
 
-  /* ── the light follows the cursor ───────────────────────────────────────── */
-  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches && !reduced.matches) {
-    var lit = document.querySelectorAll('.card, .pcard, .mode');
-    var onMove = function (e) {
-      var r = this.getBoundingClientRect();
-      this.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
-      this.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
-    };
-    for (var li = 0; li < lit.length; li++) {
-      lit[li].addEventListener('mousemove', onMove, { passive: true });
-    }
+  /* ── THE PRESS ARC. Every button press emits ONE concentric arc from the
+     press point on the mark's own axis. 420ms, opacity .5 to 0, transform and
+     opacity only. This ties every interaction back to the logo without ever
+     showing the logo. */
+  if (!reduced.matches) {
+    document.addEventListener('pointerdown', function (e) {
+      var b = e.target && e.target.closest
+        ? e.target.closest('.btn, .nav-cta, .pc-cta, .seg-b, .card-go')
+        : null;
+      if (!b) return;
+      var r = b.getBoundingClientRect();
+      var s = document.createElement('span');
+      s.className = 'parc';
+      s.setAttribute('aria-hidden', 'true');
+      s.style.left = (e.clientX - r.left) + 'px';
+      s.style.top = (e.clientY - r.top) + 'px';
+      b.appendChild(s);
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 460);
+    }, { passive: true });
   }
 
   /* ── reading progress ───────────────────────────────────────────────────── */
@@ -556,10 +581,14 @@
   if (location.hash === '#business' || location.hash === '#biz') saved = 'biz';
   apply(saved === 'biz' ? 'biz' : 'me', false);
 
-  addEventListener('resize', function () {
+  function remeasure() {
     var on = seg.querySelector('[aria-selected="true"]');
     if (on) { var t = thumb.style.transition; thumb.style.transition = 'none'; moveThumb(on); void thumb.offsetWidth; thumb.style.transition = t; }
-  });
+  }
+  addEventListener('resize', remeasure);
+  // the buttons are measured before the webfont swaps in, so the thumb keeps a
+  // fallback-font width forever unless it is measured again once fonts settle
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(remeasure); }
 })();
 
 /* ══ THE NARRATION PLAYER ══════════════════════════════════════════════════
@@ -676,4 +705,68 @@
   document.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-pick]') : null; if (b) answeredEvent('aud_choice', { pick: b.getAttribute('data-pick') }); });
   // interest form submit, fired before the POST navigates (sendBeacon outlives the page)
   document.addEventListener('submit', function (e) { var f = e.target; if (f && f.getAttribute && f.getAttribute('action') === '/api/interest') answeredEvent('interest_submitted', { form: f.getAttribute('name') || '' }); }, true);
+})();
+
+/* ══ THE HEALTH GATE ═══════════════════════════════════════════════════════
+   The hero's primary slot server-renders as a ghost "Get on the list". This
+   module asks /api/demo-health once per page load, and ONLY on healthy:true
+   does it upgrade the slot to the Hi-Vis call control. The demo number is
+   NEVER in the initial HTML. On red or on any failure the upgrade simply
+   never happens: the ghost CTA stays, no dead control ever renders, and at
+   most one info line reaches the console.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var slot = document.getElementById('cta-primary');
+  if (!slot || !window.fetch) return;
+
+  var NUM_TEL = '+19163504869';
+  var NUM_TEXT = '+1 (916) 350-4869';
+
+  function upgrade() {
+    var coarse = window.matchMedia('(pointer: coarse)').matches;
+    if (coarse) {
+      // a phone in a hand: the whole control dials
+      var a = document.createElement('a');
+      a.className = 'btn btn-primary btn-call';
+      a.href = 'tel:' + NUM_TEL;
+      a.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
+      slot.replaceChildren(a);
+    } else {
+      // a desktop: the number is text, with a copy control beside it
+      var wrap = document.createElement('span');
+      wrap.className = 'btn btn-primary btn-call is-text';
+      wrap.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
+      var copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'btn btn-ghost btn-copy';
+      copy.textContent = 'Copy the number';
+      copy.addEventListener('click', function () {
+        var write = navigator.clipboard && navigator.clipboard.writeText
+          ? navigator.clipboard.writeText(NUM_TEL)
+          : Promise.reject();
+        write.then(function () {
+          copy.textContent = 'Copied';
+          setTimeout(function () { copy.textContent = 'Copy the number'; }, 1600);
+        }).catch(function () {
+          // clipboard refused: show the number as selectable text instead
+          copy.textContent = NUM_TEXT;
+        });
+      });
+      slot.replaceChildren(wrap, copy);
+    }
+    if (typeof window.answeredEvent === 'function') {
+      window.answeredEvent('demo_button_rendered');
+    }
+  }
+
+  fetch('/api/demo-health', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (j && j.healthy === true) { upgrade(); return; }
+      console.info('Answered: demo line is not green right now; keeping the list CTA.');
+    })
+    .catch(function () {
+      console.info('Answered: demo health unreachable; keeping the list CTA.');
+    });
 })();

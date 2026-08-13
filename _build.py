@@ -22,16 +22,31 @@ OG_CARD = {
     'thanks.html':  'home',
 }
 
+# THE STANDALONE MARK, IDENTITY-V2 section B, on its 24-grid, all Hi-Vis:
+# stem x3 y2 w5.2 h20 r2.2 · inner arc c(8.2,12) r6.6 stroke4.8 ±60°
+# · outer arc r11.2 stroke3.0 ±47°. The wordmark beside it keeps a NORMAL D:
+# two acid D's never appear in one lockup.
 MARK = (
-    '<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
-    '<rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/>'
-    '<path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" '
-    'stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/>'
-    '<path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" '
+    '<svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    '<rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/>'
+    '<path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" '
+    'stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/>'
+    '<path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" '
     'stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/>'
-    '<path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" '
-    'stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/>'
     '</svg>')
+
+# The two-state segmented control. Nav-resident, text only, no emoji. It is
+# emitted ONLY on the page that carries the track state machine (the home
+# page); a control that changes nothing on the page it sits on is a dead
+# control, and this site does not render dead controls.
+SEG = (
+    '<div class="seg nav-seg" role="tablist" aria-label="Who is this for">'
+    '<button class="seg-b" role="tab" id="tab-me" aria-selected="true" data-track-to="me" type="button">'
+    '<span class="seg-t">For me</span></button>'
+    '<button class="seg-b" role="tab" id="tab-biz" aria-selected="false" data-track-to="biz" type="button">'
+    '<span class="seg-t">For my business</span></button>'
+    '<span class="seg-thumb" aria-hidden="true"></span>'
+    '</div>')
 
 NAVITEMS = [
     ('/trades.html',  'Answered', 'Answers your line'),
@@ -50,21 +65,22 @@ def nav(active):
     sheet = ''.join(
         f'<a href="{h}"><span class="sh-l">{l}</span><span class="sh-d">{d}</span></a>'
         for h, l, d in NAVITEMS)
+    seg = SEG if active == '/' else ''
     return f'''<header class="nav">
   <div class="wrap">
     <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERED</b></span></a>
     <nav class="nav-links" aria-label="Primary">{links}</nav>
-    <a class="nav-cta" href="/#early">Turn it on</a>
+    {seg}<a class="nav-cta" href="/#early">Get on the list</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Turn it on</a></div>'''
+<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Get on the list</a></div>'''
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b aria-hidden="true" style="user-select:none">ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg><span class="vh">ANSWERED</span></span></a>
+        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERED</b></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
       </div>
       <div>
@@ -108,9 +124,7 @@ HEAD = '''<!doctype html>
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{og}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/answered.css">
 </head>
 <body>

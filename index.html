@@ -16,9 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/answered.css">
 </head>
 <body class="track-me">
@@ -26,94 +24,53 @@
 
 <header class="nav">
   <div class="wrap">
-    <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/><path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/><path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/><path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
+    <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
     <nav class="nav-links" aria-label="Primary"><a href="/trades">Answered</a><a href="/hold">Hold</a><a href="/recover">Recover</a><a href="/pricing">Pricing</a><a href="/trust">Trust</a></nav>
-    <a class="nav-cta" href="/#early">Turn it on</a>
+    <div class="seg nav-seg" role="tablist" aria-label="Who is this for"><button class="seg-b" role="tab" id="tab-me" aria-selected="true" data-track-to="me" type="button"><span class="seg-t">For me</span></button><button class="seg-b" role="tab" id="tab-biz" aria-selected="false" data-track-to="biz" type="button"><span class="seg-t">For my business</span></button><span class="seg-thumb" aria-hidden="true"></span></div><a class="nav-cta" href="/#early">Get on the list</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Turn it on</a></div>
+<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Get on the list</a></div>
 
 <main id="main">
 
-<!-- ══ HERO ══ -->
+<!-- ══ HERO. both tracks share the shell; the nav control flips them. ══ -->
 <section class="hero">
-  <div class="hero-bg" aria-hidden="true"></div>
   <div class="wrap">
     <div class="hero-grid">
       <div>
-        <p class="eyebrow rv">For you, and for your business. Live in 60 seconds.</p>
-        <h1 class="display rv d1">Nobody should<br> have to <span class="lit">wait on hold.</span></h1>
-        <p class="lede hero-sub rv d2">Answered is a voice that works the phone for you. It sits on hold. It picks up when you cannot. It calls people back about money you are owed. You only pay when it actually gets one of those done.</p>
-        <ul class="chips rv d2">
-          <li><span class="chip-n">1</span> It holds. You go live your life.</li>
-          <li><span class="chip-n">2</span> It picks up. You never miss a call.</li>
-          <li><span class="chip-n">3</span> It asks for your money back.</li>
-        </ul>
-        <p class="setup-flash rv d2"><b>No app. No porting. No new hardware.</b> You dial one short code on the phone already in your pocket, and you are live. Cancel it in ten seconds with another.</p>
-        <div class="hero-actions rv d3">
-          <a class="btn btn-primary" href="#early">Turn it on</a>
-          <a class="btn btn-ghost" href="#setup">See the 60 second setup</a>
+        <p class="eyebrow quiet bt b1">ONE AI. BOTH SIDES OF THE PHONE.</p>
+        <h1 class="display bt b2" data-track="me">You <span class="lit">never</span> have to be on the phone again.</h1>
+        <h1 class="display bt b2" data-track="biz">Every call answered. Every job on the books.</h1>
+        <p class="lede hero-sub bt b3" data-track="me">It picks up when you cannot, asks the caller what they actually want, and rings you through only if it is real. Then it calls the IRS, your bank and your airline for you, eats the hold, and argues for your refund.</p>
+        <p class="lede hero-sub bt b3" data-track="biz">It answers your line day and night, finds out what the caller needs, and books the job into your calendar. A real emergency goes straight through to your cell. Every booking is written down where you can check it.</p>
+        <p class="price-law bt b4">YOU PAY WHEN IT PRODUCES AN OUTCOME. NO SUBSCRIPTION. NO PER-MINUTE CHARGE.</p>
+        <div class="hero-actions bt b5">
+          <!-- THE HEALTH GATE: this slot upgrades to the live call control ONLY
+               when /api/demo-health answers healthy:true. The demo number is
+               never in this file. -->
+          <span class="cta-slot" id="cta-primary"><a class="btn btn-ghost" href="#early">Get on the list</a></span>
+          <a class="btn btn-ghost" href="#price">See what it costs</a>
         </div>
-        <!-- ══ THE NARRATION. Renders ONLY if the audio actually loads. ══ -->
-        <div class="vo rv d3" id="vo" hidden>
-          <button class="vo-btn" type="button" id="vo-btn" aria-label="Play the full walkthrough">
-            <span class="vo-ic" aria-hidden="true">
-              <svg viewBox="0 0 24 24" class="vo-play"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
-              <svg viewBox="0 0 24 24" class="vo-pause"><rect x="7" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/></svg>
-            </span>
-            <span class="vo-txt">
-              <b id="vo-lbl">Hear the whole thing</b>
-              <i>The full walkthrough, every product, 7 minutes</i>
-            </span>
-          </button>
-          <div class="vo-bar" id="vo-bar" role="progressbar" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
-            <span class="vo-fill" id="vo-fill"></span>
-          </div>
-          <span class="vo-time" id="vo-time">0:00</span>
-          <audio id="vo-audio" preload="none" src="/assets/audio/answered-buildout.mp3"></audio>
-        </div>
-        <p class="src hero-note rv d3">No monthly fee. No per minute charge. You are billed for a booked job, a human reached on the line, or a dollar recovered. Nothing else moves the meter.</p>
       </div>
 
-      <div class="rv d2">
+      <div class="bt b6">
         <div class="ring-stage">
-          <div class="ring-glow" aria-hidden="true"></div>
           <canvas aria-hidden="true"></canvas>
           <div class="ring-center">
             <div class="ring-state">Ringing</div>
             <div class="ring-count">4.8s</div>
           </div>
         </div>
-        <div class="mic-row">
-          <button class="mic-btn" type="button"><span class="dot" aria-hidden="true"></span><span class="lbl">Let it hear you</span></button>
-        </div>
-        <p class="src" style="text-align:center;margin-top:12px;max-width:34ch;margin-inline:auto">The ring runs the North American cadence, two seconds on and four off. Grant the mic and the same form is driven by your own voice.</p>
+        <p class="src" style="text-align:center;margin-top:12px;max-width:34ch;margin-inline:auto">The ring runs the North American cadence, two seconds on and four off.</p>
       </div>
     </div>
   </div>
 </section>
 
-
-<!-- ══ WHO ARE YOU. the whole page answers to this. ══ -->
-<section class="trackbar" id="track">
-  <div class="wrap">
-    <div class="tb-inner">
-      <p class="tb-q">Who is this for?</p>
-      <div class="seg" role="tablist" aria-label="Choose who this is for">
-        <button class="seg-b" role="tab" id="tab-me" aria-controls="panel-me" aria-selected="true" data-track-to="me" type="button">
-          <span class="seg-i" aria-hidden="true">🙂</span><span class="seg-t">For me</span>
-        </button>
-        <button class="seg-b" role="tab" id="tab-biz" aria-controls="panel-biz" aria-selected="false" data-track-to="biz" type="button">
-          <span class="seg-i" aria-hidden="true">🏠</span><span class="seg-t">For my business</span>
-        </button>
-        <span class="seg-thumb" aria-hidden="true"></span>
-      </div>
-      <p class="tb-note" data-track="me">You have a phone and a life. Good enough.</p>
-      <p class="tb-note" data-track="biz">You have customers calling and invoices sitting.</p>
-    </div>
-  </div>
-</section>
+<!-- the old mid-page trackbar is gone: the nav control is the control.
+     this anchor keeps every #track link landing somewhere sane. -->
+<div id="track" aria-hidden="true"></div>
 
 <!-- ══ STAT BAND ══ -->
 <section class="band" data-track="me">
@@ -327,7 +284,7 @@
 </section>
 
 <!-- ══ THE MOAT. what we actually build. ══ -->
-<section class="pad-s seam" style="background:linear-gradient(180deg,var(--ink-900),var(--ink-950))">
+<section class="pad-s seam">
   <div class="wrap">
     <p class="eyebrow rv">What we build</p>
     <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">Anyone can rent a voice. The intelligence is the company.</h2>
@@ -419,7 +376,7 @@
 </section>
 
 <!-- ══ THE RECEIPT ══ -->
-<section class="pad-s" style="background:linear-gradient(180deg,var(--ink-950),var(--ink-900))" data-track="me">
+<section class="pad-s seam" data-track="me">
   <div class="wrap">
     <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(28px,5vw,72px);align-items:center" class="two">
       <div>
@@ -559,13 +516,38 @@
   </div>
 </section>
 
+<!-- ══ THE QUIET ROW. the 7-minute walkthrough, demoted out of the hero.
+     Renders ONLY if the audio actually loads. ══ -->
+<section class="pad-s seam listen" id="listen">
+  <div class="wrap">
+    <p class="eyebrow rv">The whole company, in seven minutes</p>
+    <div class="vo" id="vo" hidden>
+      <button class="vo-btn" type="button" id="vo-btn" aria-label="Play the full walkthrough">
+        <span class="vo-ic" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="vo-play"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 24 24" class="vo-pause"><rect x="7" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/><rect x="13.4" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor"/></svg>
+        </span>
+        <span class="vo-txt">
+          <b id="vo-lbl">Hear the whole thing</b>
+          <i>The full walkthrough, every product, 7 minutes</i>
+        </span>
+      </button>
+      <div class="vo-bar" id="vo-bar" role="progressbar" aria-label="Playback position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+        <span class="vo-fill" id="vo-fill"></span>
+      </div>
+      <span class="vo-time" id="vo-time">0:00</span>
+      <audio id="vo-audio" preload="none" src="/assets/audio/answered-buildout.mp3"></audio>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/><path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/><path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/><path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/></svg><span class="brand-name"><b aria-hidden="true" style="user-select:none">ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg><span class="vh">ANSWERED</span></span></a>
+        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
       </div>
       <div>
