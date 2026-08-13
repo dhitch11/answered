@@ -50,7 +50,7 @@ FOOT = f'''<footer class="foot">
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg></span></a>
+        <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b aria-hidden="true" style="user-select:none">ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg><span class="vh">ANSWERED</span></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
       </div>
       <div>
@@ -215,7 +215,6 @@ PRICING = '''
       </article>
     </div>
     <p class="lede rv d2" style="margin-top:26px;max-width:66ch">Two things sit under the Answered meter, and both exist to protect you rather than us. <b>The cap</b> means a busy month can never surprise you, and you set where it sits. <b>The quiet-line rate</b> only ever applies to a line that has gone quiet, it is credited back against your bookings, and it means a line stays answered for a price that is honest instead of nothing.</p>
-    <p class="src rv d3" style="margin-top:26px;max-width:90ch">Every contribution figure above is <b>modeled on published vendor rates, not measured in production.</b> The full arithmetic and every source are below.</p>
     <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below.</p>
   </div>
 </section>
@@ -505,9 +504,8 @@ RECOVER = '''
         <div class="ring-stage" style="max-width:420px">
           <div class="ring-glow" aria-hidden="true"></div>
           <canvas aria-hidden="true"></canvas>
-          <div class="ring-center"><div class="ring-state">Ringing</div><div class="ring-count">0.0s</div></div>
+          <div class="ring-center"><div class="ring-state">Picked up on the first ring</div><div class="ring-count" style="font-size:clamp(22px,2.6vw,32px)">Answered</div></div>
         </div>
-        <div class="mic-row"><button class="mic-btn" type="button"><span class="dot" aria-hidden="true"></span><span class="lbl">Let it hear you</span></button></div>
       </div>
     </div>
   </div>
@@ -682,7 +680,7 @@ THANKS = '''
     <div class="ring-stage" style="max-width:280px;margin-bottom:34px">
       <div class="ring-glow" aria-hidden="true"></div>
       <canvas aria-hidden="true"></canvas>
-      <div class="ring-center"><div class="ring-state">Ringing</div><div class="ring-count">0.0s</div></div>
+      <div class="ring-center"><div class="ring-state">Picked up on the first ring</div><div class="ring-count" style="font-size:clamp(22px,2.6vw,32px)">Answered</div></div>
     </div>
     <p class="eyebrow rv" style="justify-content:center">Received</p>
     <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);margin-top:16px">A person has it,<br> <span class="lit">not a drip sequence.</span></h1>
@@ -822,6 +820,8 @@ import sys as _sys
 _HEDGE = [
     r'shape of the deal', r'not a final number', r'\bstill being sized\b',
     r'\bbeing sized\b', r'\bsized with\b', r'\bsized in pilot\b',
+    r'\bpriced in pilot\b', r'\bpriced in the pilot\b', r'\bpriced later\b',
+    r'\bpriced on launch\b', r'\bpricing to come\b',
     r'\bprovisional\b', r'\bindicative\b', r'\bballpark\b',
     r'subject to change', r'\bto be determined\b', r'\bTBD\b',
     r'not yet final', r'we are still working out', r'may change',
@@ -906,6 +906,20 @@ def _guard():
 
     if '15%' not in text:
         problems.append('The 15% recovery share is not on the pricing page. David ruled it stays.')
+
+    # the narration transcript is a pricing surface too: on 08-12 the audio was
+    # found selling tiers while the pages printed flat 15, and a hedge in the
+    # spoken track is as much an offer defect as one in HTML. Scan it with the
+    # same hedge patterns; scope to price-context windows like the page scan.
+    _nar = ROOT / 'assets' / 'audio' / 'answered-buildout.txt'
+    if _nar.exists():
+        nt = _nar.read_text(encoding='utf-8')
+        for pat in _HEDGE:
+            for hm in _re.finditer(pat, nt, _re.I):
+                window = nt[max(0, hm.start()-140):hm.end()+140]
+                if _re.search(r'%|percent|\bfee\b|\bprice\b|\bdollar', window, _re.I):
+                    problems.append('HEDGE on the price in the NARRATION transcript: "%s" -> ...%s...'
+                                    % (pat, window.strip()[:170]))
 
     if problems:
         print('\n*** BUILD REFUSED: the 15% ruling is not intact ***', file=_sys.stderr)
@@ -1022,3 +1036,30 @@ def _refresh_home_cards():
         print('home cards refreshed from source (3)')
 
 _refresh_home_cards()
+
+
+# ── EXTENSIONLESS LINKS ───────────────────────────────────────────────────────
+# Prod has served extensionless internal links (href="/trades") since the first
+# deploy, but the rewrite lived only in a one-off step outside this repo, so a
+# naive rebuild+deploy would silently revert live link style. The transform now
+# lives HERE so the repo reproduces prod on this axis. Netlify serves /trades
+# from trades.html (pretty URLs); "/index" collapses to "/".
+def _extensionless():
+    import re as _re
+    pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
+             'pricing.html', 'trust.html', 'thanks.html']
+    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks)\.html([?#][^"]*)?"')
+    def repl(m):
+        slug, rest = m.group(1), m.group(2) or ''
+        return 'href="%s%s"' % ('/' if slug == 'index' else '/' + slug, rest)
+    n = 0
+    for pg in pages:
+        p = ROOT / pg
+        s = p.read_text(encoding='utf-8')
+        out, k = pat.subn(repl, s)
+        if k:
+            p.write_text(out, encoding='utf-8')
+            n += k
+    print('extensionless links: %d rewritten' % n)
+
+_extensionless()

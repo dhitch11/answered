@@ -254,7 +254,7 @@
       }
 
       // the inner hairline: the line itself
-      ctx.strokeStyle = 'rgba(246,239,224,' + (0.10 + burst * 0.16) + ')';
+      ctx.strokeStyle = 'rgba(242,244,240,' + (0.10 + burst * 0.16) + ')';
       ctx.lineWidth = Math.max(1, 1 * dpr);
       ctx.beginPath(); ctx.arc(cx, cy, baseR * 0.9, 0, Math.PI * 2); ctx.stroke();
     };

@@ -19,12 +19,12 @@
 <header class="nav">
   <div class="wrap">
     <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/><path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/><path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/><path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
-    <nav class="nav-links" aria-label="Primary"><a href="/trades.html">Answered</a><a href="/hold.html">Hold</a><a href="/recover.html" aria-current="page">Recover</a><a href="/pricing.html">Pricing</a><a href="/trust.html">Trust</a></nav>
+    <nav class="nav-links" aria-label="Primary"><a href="/trades">Answered</a><a href="/hold">Hold</a><a href="/recover" aria-current="page">Recover</a><a href="/pricing">Pricing</a><a href="/trust">Trust</a></nav>
     <a class="nav-cta" href="/#early">Turn it on</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet"><a href="/trades.html"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold.html"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover.html"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing.html"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust.html"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Turn it on</a></div>
+<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Turn it on</a></div>
 <main id="main">
 
 <section class="hero" style="min-height:auto;padding-bottom:clamp(48px,7vw,90px)">
@@ -37,7 +37,7 @@
         <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called, because calling is uncomfortable and you are busy and it always feels like next week is fine. Recover makes the call, in your name, on your caller ID, and writes down exactly what was promised.</p>
         <div class="hero-actions rv d3">
           <a class="btn btn-primary" href="/#early">Turn it on</a>
-          <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
+          <a class="btn btn-ghost" href="/pricing">See what it costs</a>
         </div>
         <p class="src hero-note rv d3">Nothing recovered, nothing owed. The fee is a function of dollars that actually land, never of calls placed.</p>
       </div>
@@ -45,9 +45,8 @@
         <div class="ring-stage" style="max-width:420px">
           <div class="ring-glow" aria-hidden="true"></div>
           <canvas aria-hidden="true"></canvas>
-          <div class="ring-center"><div class="ring-state">Ringing</div><div class="ring-count">0.0s</div></div>
+          <div class="ring-center"><div class="ring-state">Picked up on the first ring</div><div class="ring-count" style="font-size:clamp(22px,2.6vw,32px)">Answered</div></div>
         </div>
-        <div class="mic-row"><button class="mic-btn" type="button"><span class="dot" aria-hidden="true"></span><span class="lbl">Let it hear you</span></button></div>
       </div>
     </div>
   </div>
@@ -130,7 +129,7 @@
         <p class="eyebrow rv">What it costs</p>
         <h2 class="h2 rv d1" style="margin-top:16px;max-width:17ch">Nothing recovered, nothing owed.</h2>
         <p class="lede rv d2" style="margin-top:20px">The fee is a share of dollars that actually land in your account, never a fee on calls placed or letters sent. Collections agencies publish 20 to 50% for the same work. We charge 15%.</p>
-        <p class="rv d3" style="margin-top:26px"><a class="btn btn-ghost" href="/pricing.html">See all three meters and the economics</a></p>
+        <p class="rv d3" style="margin-top:26px"><a class="btn btn-ghost" href="/pricing">See all three meters and the economics</a></p>
       </div>
       <div class="rv d2" style="max-width:420px;width:100%;justify-self:end"><article class="pcard rv d2" data-aud="business both">
         <div class="pc-for">03 / Receivables</div>
@@ -148,7 +147,7 @@
         </ul>
         <div class="pc-foot">
         </div>
-      <a class="pc-cta" href="/pricing.html?p=Recover#interest">I want my invoices chased</a></article></div>
+      <a class="pc-cta" href="/pricing?p=Recover#interest">I want my invoices chased</a></article></div>
     </div>
   </div>
 </section>
@@ -166,22 +165,22 @@
   <div class="wrap">
     <div class="foot-grid">
       <div>
-        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/><path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/><path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/><path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg></span></a>
+        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/><path class="bm-bowl" d="M 12 7.6 A 8.6 8.6 0 0 1 12 24.4" fill="none" stroke="var(--bronze)" stroke-width="5.4" stroke-linecap="round"/><path class="bm-arc1" d="M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/><path class="bm-arc2" d="M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1" fill="none" stroke="var(--bronze)" stroke-width="2.1" stroke-linecap="round"/></svg><span class="brand-name"><b aria-hidden="true" style="user-select:none">ANSWERE</b><svg class="brand-d" viewBox="0 0 72 104" aria-hidden="true" focusable="false"><rect x="0" y="2" width="17" height="100" rx="3" fill="var(--bronze)"/><path d="M 31.33 10.4 A 44 44 0 0 1 31.33 93.6" fill="none" stroke="var(--bronze)" stroke-width="17" stroke-linecap="round"/></svg><span class="vh">ANSWERED</span></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
       </div>
       <div>
         <h4>Products</h4>
         <ul>
-          <li><a href="/trades.html">Answered, for your line</a></li>
-          <li><a href="/hold.html">Hold, for everyone</a></li>
-          <li><a href="/recover.html">Recover, for your invoices</a></li>
+          <li><a href="/trades">Answered, for your line</a></li>
+          <li><a href="/hold">Hold, for everyone</a></li>
+          <li><a href="/recover">Recover, for your invoices</a></li>
         </ul>
       </div>
       <div>
         <h4>Company</h4>
         <ul>
-          <li><a href="/pricing.html">Pricing</a></li>
-          <li><a href="/trust.html">Trust and guardrails</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/trust">Trust and guardrails</a></li>
           <li><a href="/#honesty">What we will not say</a></li>
         </ul>
       </div>

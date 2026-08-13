@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    ANSWERED — warm dark cinema.
-   Forge Iron ground, bronze as the only light source, bone paper for proof.
+   LIVEWIRE: Obsidian ground, Hi-Vis as the one accent, Halogen text, paper for proof.
    Every text token measured against its own ground for AA. Nothing below 4.5:1.
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1349,7 +1349,10 @@ html { scrollbar-color: rgba(227,255,79,.34) transparent; scrollbar-width: thin;
   text-transform: uppercase; fill: rgba(242,244,240,.72); }
 .bp-sub { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: .08em;
   fill: rgba(242,244,240,.44); }
-.bp-t { font-family: 'Instrument Sans', sans-serif; font-size: 13px; font-weight: 600; fill: #F6EFE0; }
+.bp-t { font-family: 'Instrument Sans', sans-serif; font-size: 13px; font-weight: 600; fill: #F2F4F0; }
+/* visually hidden, machine readable: the footer wordmark draws its D as art,
+   so the real letters live here for copy-paste and screen readers */
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .bp-tick { stroke: rgba(227,255,79,.34); stroke-width: 1; }
 .bp-cap { position: absolute; right: 16px; bottom: 12px; font-family: var(--mono);
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
