@@ -16,7 +16,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/pricing.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=859cb7d1">
+<link rel="stylesheet" href="/assets/answered.css?v=0b83571b">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -82,7 +82,7 @@
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
         <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
-        <div class="pc-meter"><span>Your bill stops at <b>$549</b> a month, and the cap is yours to move</span><span>A line that goes quiet settles at <b>$39</b> a month, credited against bookings</span></div>
+        <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
           <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
@@ -102,7 +102,7 @@
         <div class="pc-name">Hold</div>
         <div class="pc-price num">$20</div>
         <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
-        <div class="pc-free">$0 if nobody ever picks up &middot; no subscription, ever</div>
+        <div class="pc-free">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
         <ul class="pc-list">
           <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
           <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
@@ -130,6 +130,7 @@
           <li>One number for the whole aged list, moving in one direction</li>
           <li>Collections agencies publish 20 to 50% for the same work</li>
           <li>Contingency is gated server side on your verified business location</li>
+          <li>Autopilot: it follows up on every invoice in your name, flat, $19 per invoice paid</li>
         </ul>
         <div class="pc-foot">
           <a class="pc-cta" href="?p=Recover#interest">I want my invoices chased</a>
@@ -298,7 +299,7 @@
   <div class="wrap">
     <p class="eyebrow rv">The math, step by step</p>
     <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us about a dollar fifty.</h2>
-    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labelled as ours.</p>
+    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labeled as ours.</p>
 
     <div class="chain rv d2">
       <div class="step-row">
@@ -395,6 +396,7 @@
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
+        <p class="src" style="margin-top:8px">Adding your number means we may text you the things you ask for here. Message and data rates may apply. Reply STOP anytime to stop. See how we handle your number in our <a href="/privacy">Privacy page</a>.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -413,6 +415,7 @@
       <div>
         <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+        <p class="src" style="margin-top:10px;max-width:38ch">Every number sourced. Every call auditable. Every price an offer, not an estimate.</p>
       </div>
       <div>
         <h4>Products</h4>
@@ -428,6 +431,9 @@
           <li><a href="/pricing">Pricing</a></li>
           <li><a href="/trust">Trust and guardrails</a></li>
           <li><a href="/#honesty">What we will not say</a></li>
+          <li><a href="/terms">The terms, in plain words</a></li>
+          <li><a href="/privacy">Privacy and texting</a></li>
+          <li><a href="/recording">If your call was recorded</a></li>
         </ul>
       </div>
     </div>
@@ -437,6 +443,6 @@
     </div>
   </div>
 </footer>
-<script src="/assets/answered.js?v=6452c13c" defer></script>
+<script src="/assets/answered.js?v=540a9276" defer></script>
 </body>
 </html>

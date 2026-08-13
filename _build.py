@@ -82,6 +82,7 @@ FOOT = f'''<footer class="foot">
       <div>
         <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERED</b></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+        <p class="src" style="margin-top:10px;max-width:38ch">Every number sourced. Every call auditable. Every price an offer, not an estimate.</p>
       </div>
       <div>
         <h4>Products</h4>
@@ -97,6 +98,9 @@ FOOT = f'''<footer class="foot">
           <li><a href="/pricing.html">Pricing</a></li>
           <li><a href="/trust.html">Trust and guardrails</a></li>
           <li><a href="/#honesty">What we will not say</a></li>
+          <li><a href="/terms.html">The terms, in plain words</a></li>
+          <li><a href="/privacy.html">Privacy and texting</a></li>
+          <li><a href="/recording.html">If your call was recorded</a></li>
         </ul>
       </div>
     </div>
@@ -200,7 +204,7 @@ PRICING = '''
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
         <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
-        <div class="pc-meter"><span>Your bill stops at <b>$549</b> a month, and the cap is yours to move</span><span>A line that goes quiet settles at <b>$39</b> a month, credited against bookings</span></div>
+        <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
           <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
@@ -220,7 +224,7 @@ PRICING = '''
         <div class="pc-name">Hold</div>
         <div class="pc-price num">$20</div>
         <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
-        <div class="pc-free">$0 if nobody ever picks up &middot; no subscription, ever</div>
+        <div class="pc-free">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
         <ul class="pc-list">
           <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
           <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
@@ -248,6 +252,7 @@ PRICING = '''
           <li>One number for the whole aged list, moving in one direction</li>
           <li>Collections agencies publish 20 to 50% for the same work</li>
           <li>Contingency is gated server side on your verified business location</li>
+          <li>Autopilot: it follows up on every invoice in your name, flat, $19 per invoice paid</li>
         </ul>
         <div class="pc-foot">
           <a class="pc-cta" href="?p=Recover#interest">I want my invoices chased</a>
@@ -416,7 +421,7 @@ PRICING = '''
   <div class="wrap">
     <p class="eyebrow rv">The math, step by step</p>
     <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us about a dollar fifty.</h2>
-    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labelled as ours.</p>
+    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labeled as ours.</p>
 
     <div class="chain rv d2">
       <div class="step-row">
@@ -513,6 +518,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
+        <p class="src" style="margin-top:8px">Adding your number means we may text you the things you ask for here. Message and data rates may apply. Reply STOP anytime to stop. See how we handle your number in our <a href="/privacy">Privacy page</a>.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -536,7 +542,7 @@ RECOVER = '''
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You already earned it.<br> <span class="lit">Somebody should ask for it.</span></h1>
         <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called, because calling is uncomfortable and you are busy and it always feels like next week is fine. Recover makes the call, in your name, on your caller ID, and writes down exactly what was promised.</p>
         <div class="hero-actions rv d3">
-          <a class="btn btn-primary" href="/#early">Turn it on</a>
+          <a class="btn btn-primary" href="/#early">Get on the list</a>
           <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
         </div>
         <p class="src hero-note rv d3">Nothing recovered, nothing owed. The fee is a function of dollars that actually land, never of calls placed.</p>
@@ -626,7 +632,7 @@ RECOVER = '''
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:16px">Put the quiet invoices on the list.</h2>
-    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Turn it on</a></p>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get on the list</a></p>
   </div>
 </section>
 '''
@@ -681,7 +687,7 @@ TRUST = '''
 <section class="pad seam">
   <div class="wrap narrow">
     <p class="eyebrow rv">Disclosure and recording</p>
-    <h2 class="h2 rv d1" style="margin-top:16px">One behaviour, everywhere, held to the strictest rule in the country.</h2>
+    <h2 class="h2 rv d1" style="margin-top:16px">One behavior, everywhere, held to the strictest rule in the country.</h2>
     <details class="disc rv d2" style="margin-top:30px" open>
       <summary>It identifies itself as an AI in its first sentence.</summary>
       <div class="disc-body"><p>Not buried later in the call. First sentence, every call, everywhere. It is the strictest version of the rule found anywhere in the country, so it is the only version we build. We never ship a version that hides.</p></div>
@@ -705,7 +711,7 @@ TRUST = '''
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:16px">Audit it for a week before you trust it with a Tuesday.</h2>
-    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Turn it on</a></p>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get on the list</a></p>
   </div>
 </section>
 '''
@@ -906,7 +912,8 @@ def _guard():
     #      per-card isolation without leaving the space between cards dark.
     SANCTIONED = {'8', '10', '13', '15', '18', '20'}
     PAGES = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html']
+             'pricing.html', 'trust.html', 'thanks.html',
+             'terms.html', 'privacy.html', 'recording.html']
 
     def _scopes(html):
         cards = _re.findall(r'<article class="pcard.*?</article>', html, _re.S)
@@ -1088,8 +1095,9 @@ _refresh_home_cards()
 def _extensionless():
     import re as _re
     pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html']
-    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks)\.html([?#][^"]*)?"')
+             'pricing.html', 'trust.html', 'thanks.html',
+             'terms.html', 'privacy.html', 'recording.html']
+    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks|terms|privacy|recording)\.html([?#][^"]*)?"')
     def repl(m):
         slug, rest = m.group(1), m.group(2) or ''
         return 'href="%s%s"' % ('/' if slug == 'index' else '/' + slug, rest)
@@ -1116,7 +1124,8 @@ _extensionless()
 def _asset_version():
     import re as _re, hashlib as _hl
     pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html']
+             'pricing.html', 'trust.html', 'thanks.html',
+             'terms.html', 'privacy.html', 'recording.html']
     vers = {}
     for a in ('answered.css', 'answered.js'):
         f = ROOT / 'assets' / a

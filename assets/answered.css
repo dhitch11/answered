@@ -90,7 +90,10 @@ a { color: inherit; text-decoration: none; }
   --mono: 'Martian Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* ONE easing across the whole system. Beats: 120ms out, 260ms settle.
-     Nothing runs longer than 420ms except the 6s ring heartbeat. */
+     The old 420ms ceiling was retired by the 2026-08-13 ruling for more
+     motion; choreographed sequences may run long, but every property that
+     moves is still transform, opacity or filter, and reduced motion still
+     rests at the finished state. */
   --e:      cubic-bezier(0.2, 0.8, 0.2, 1);
   --e-out:  cubic-bezier(0.2, 0.8, 0.2, 1);
   --e-in:   cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -221,8 +224,12 @@ body {
 @media (max-width: 480px) {
   .brand-mark .bm-arc2, .brand-mark .bm-a2 { display: none; }
 }
-/* under 360px the word may hide. the mark stays. */
-@media (max-width: 359px) {
+/* in the crunch zone the word hides and the mark stays. measured 2026-08-13:
+   with the word visible the nav needs ~443px (brand 143 + gaps + seg 181 +
+   burger 42 + gutters), so 360 to 413 was scrolling horizontally by 15 to
+   45px. 449 is the first width that holds the word without squashing the
+   burger below its 42px target. */
+@media (max-width: 449px) {
   .brand-name { display: none; }
   .nav .wrap { gap: 14px; }
 }
@@ -253,6 +260,8 @@ body {
 
 .burger {
   display: none;
+  flex: 0 0 auto;   /* a tap target must never be squashed by the flex row:
+                       measured 30px wide at 390 before this held it at 42 */
   width: 42px; height: 42px;
   align-items: center; justify-content: center;
   background: none; border: 1px solid var(--line2); border-radius: 10px;
@@ -699,7 +708,7 @@ html.js .rv.d3.in { transition-delay: .21s; }
 
 @media (prefers-reduced-motion: reduce) {
   html.js .rv, html.js .rv.in { opacity: 1; transform: none; transition: none; }
-  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; animation-delay: 0s !important; transition-delay: 0s !important; }
 }
 
 /* ── the mobile sheet carries a description per item, because a menu of five
@@ -790,18 +799,21 @@ html.js .rv.d3.in { transition-delay: .21s; }
 .sc-num { margin-left: auto; color: var(--bronze-2); letter-spacing: .06em; }
 .sc-body { padding: 20px 18px 22px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
 
-/* conversation turns */
+/* conversation turns. base-hidden ONLY under html.js: a JS-off reader gets
+   the whole conversation at rest, finished and legible. */
 .turn {
   max-width: 84%;
   padding: 12px 15px;
   border-radius: 14px;
   font-size: 15px;
   line-height: 1.5;
+}
+html.js .turn {
   opacity: 0;
   transform: translateY(10px);
   transition: opacity .42s var(--e-out), transform .42s var(--e-out);
 }
-.turn.in { opacity: 1; transform: none; }
+html.js .turn.in { opacity: 1; transform: none; }
 .turn.them { background: rgba(242,244,240,.06); border: 1px solid var(--line); align-self: flex-start; }
 .turn.us {
   align-self: flex-end;
@@ -823,10 +835,12 @@ html.js .rv.d3.in { transition-delay: .21s; }
   border: 1px solid rgba(227,255,79,.2);
   background: rgba(227,255,79,.14);
   padding: 16px 17px;
+}
+html.js .sc-result {
   opacity: 0; transform: translateY(16px);
   transition: opacity .42s var(--e-out), transform .42s var(--e-out);
 }
-.sc-result.in { opacity: 1; transform: none; }
+html.js .sc-result.in { opacity: 1; transform: none; }
 .sc-result-h {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
@@ -879,10 +893,12 @@ html.js .rv.d3.in { transition-delay: .21s; }
   background: rgba(255,51,85,.14);
   font-weight: 500; font-size: 15.5px; color: var(--t1);
   display: flex; align-items: center; gap: 11px;
+}
+html.js .hold-hit {
   opacity: 0; transform: translateY(14px);
   transition: opacity .42s var(--e-out), transform .42s var(--e-out);
 }
-.hold-hit.in { opacity: 1; transform: none; }
+html.js .hold-hit.in { opacity: 1; transform: none; }
 
 /* the recover meter */
 .meter-big {
@@ -1079,6 +1095,7 @@ html.js .rv.split { opacity: 1; transform: none; transition: none; }
 /* ── a hairline of Hi-Vis tracks reading progress ────────────────────────── */
 .prog {
   position: fixed; inset: 0 auto auto 0; z-index: 300;
+  pointer-events: none;
   height: 2px; width: 100%;
   transform: scaleX(0); transform-origin: 0 50%;
   background: var(--bronze);
@@ -1359,7 +1376,11 @@ body.track-biz .cards[data-track="biz"] { display: grid; }
   transition: color .26s var(--e);
   -webkit-tap-highlight-color: transparent;
 }
-.seg-b[aria-selected="true"] { color: var(--ink-1000); }
+/* the dark-on-thumb ink only once JS has actually placed the thumb: with JS
+   off the thumb is 0px wide, and Obsidian text on the Graphite pill measured
+   1.04:1, an invisible label. the no-JS rest state reads in Halogen. */
+.seg-b[aria-selected="true"] { color: var(--t1); }
+html.js .seg-b[aria-selected="true"] { color: var(--ink-1000); }
 .seg-b:focus-visible { outline: 2px solid var(--bronze); outline-offset: 3px; }
 .seg-t { white-space: nowrap; }
 .seg-thumb {
@@ -1383,12 +1404,44 @@ body.track-biz .cards[data-track="biz"] { display: grid; }
 .card-go span { transition: transform .26s var(--e); }
 .card-go:hover span { transform: translateX(4px); }
 
-/* the control must fit a 320px nav beside the mark and the burger */
-@media (max-width: 480px) {
+/* the control must fit a 320px nav beside the mark and the burger. this holds
+   to 520px, not 480: at 481 to 519 the full-size control plus the visible
+   brand word plus a rigid 42px burger needs more row than exists. */
+@media (max-width: 520px) {
   .seg-b { padding: 0 10px; font-size: 12px; }
 }
 @media (max-width: 359px) {
   .seg-b { padding: 0 8px; font-size: 11.5px; letter-spacing: 0; }
+}
+
+/* ══ THE CONVEYOR. the trades that live on the phone, on one belt. two
+   identical sets, so a translate of exactly half the track closes the loop
+   with no seam: each set carries its own trailing gap as padding, which keeps
+   the arithmetic exact. transform only. it animates only under html.js AND
+   only while actually on screen (answered.js toggles .go from an
+   IntersectionObserver), so it never burns while scrolled away. JS-off and
+   reduced-motion readers get the first set at rest, clipped and legible; the
+   belt is aria-hidden and the .vh paragraph beside it carries the full list. */
+.convey { overflow: hidden; margin-top: 36px; }
+.convey-track { display: flex; width: max-content; }
+.cv-set { display: flex; gap: 10px; padding-right: 10px; flex: 0 0 auto; }
+.cv-chip {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: 8px 16px; border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: rgba(242,244,240,.04);
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--t3);
+}
+html.js .convey .convey-track {
+  animation: convey 48s linear infinite;
+  animation-play-state: paused;
+  will-change: transform;
+}
+html.js .convey.go .convey-track { animation-play-state: running; }
+@keyframes convey { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  html.js .convey .convey-track { animation: none; transform: none; }
 }
 
 /* ══ THE MISSED CALL. a phone, a conversation, and the one text you get. ══ */
@@ -1405,6 +1458,14 @@ body.track-biz .cards[data-track="biz"] { display: grid; }
 .phone-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex: 0 0 auto;
   animation: pdot 2s ease-in-out infinite; }
 @keyframes pdot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+/* an infinite blink must not spend frames while its card is scrolled away:
+   the same IntersectionObserver that runs the conveyor toggles .go on .phone
+   and .showcase, so pdot ticks only inside the viewport. measured before this
+   rule: playState "running" with the card fully offscreen. JS-off keeps the
+   blink, because with no JS there is no observer to pause it and the resting
+   loop is the honest default. */
+html.js .phone .phone-dot, html.js .showcase.running .sc-dot { animation-play-state: paused; }
+html.js .phone.go .phone-dot, html.js .showcase.running.go .sc-dot { animation-play-state: running; }
 @media (prefers-reduced-motion: reduce) { .phone-dot { animation: none; } }
 .phone-time { margin-left: auto; color: var(--static); letter-spacing: .06em; }
 .phone-body { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
@@ -1556,3 +1617,292 @@ html.js.answering .brand-mark .bm-a2 { animation-delay: .05s; }
   width: 5px; height: 5px; border-radius: 1px; background: var(--bronze); opacity: .75;
 }
 .pc-meter b { color: var(--t1); font-weight: 500; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE 20x MOTION LAYER (David 2026-08-13: dramatically more motion, award
+   tier, copied from the estate's own corpus). Every rule here is transform,
+   opacity, filter or clip-path (the recorded PRESS amendment); every reveal
+   rests finished and legible under prefers-reduced-motion and with JS off;
+   nothing fabricates data. Loops are perfume, reveals are information.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · THE SIGNAL FIELD. ambient canvas behind the hero: faint signal
+   ticks drifting through the dark, pulsing on the same North American ring
+   cadence the ring runs. It describes the ring, nothing else. ── */
+.hero-field {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+html.js.answering .hero-field { opacity: 0; }
+html.js.answered-in .hero-field { opacity: 1; transition: opacity 1.6s var(--e); }
+
+/* ── 2 · HERO ENTRANCE 2.0. the headline is masked per word and rises off
+   the stem baseline once the interface has unfolded. kinetic type in doses
+   (corpus technique 21), interruptible, absent under reduced motion. ── */
+.wd { display: inline-block; overflow: hidden; vertical-align: top;
+  padding-bottom: .09em; margin-bottom: -.09em; }
+.wd-i { display: inline-block; }
+html.js.answering .wd-i { transform: translateY(114%); }
+html.js.answered-in .wd-i {
+  transform: none;
+  transition: transform .64s var(--e-out);
+  transition-delay: calc(var(--wi, 0) * 42ms);
+}
+
+/* the scroll cue: one dot descending the line, on the ring's own tempo.
+   hidden the moment the visitor answers it by scrolling. */
+.cue {
+  position: absolute; left: 50%; bottom: 16px; z-index: 2;
+  width: 1px; height: 34px; margin-left: -.5px;
+  background: rgba(242,244,240,.14);
+  transition: opacity .4s var(--e);
+}
+.cue::after {
+  content: ''; position: absolute; left: -1.5px; top: -2px;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--bronze);
+  animation: cuedrop 2.4s var(--e) infinite;
+}
+@keyframes cuedrop {
+  0% { transform: translateY(0); opacity: 0; }
+  16% { opacity: 1; }
+  68% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(30px); opacity: 0; }
+}
+html.scrolled .cue { opacity: 0; }
+html.scrolled .cue::after { animation-play-state: paused; }
+@media (max-width: 940px) { .cue { display: none; } }
+
+/* ── 4 · THE SEAM ANSWERS. every section hairline draws itself in from the
+   left, then a single Hi-Vis pulse travels it once. one-shot: a reveal is
+   information, so it never loops. JS-off keeps the resting hairline. ── */
+html.js .seam::before {
+  transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform 1.05s var(--e-out);
+}
+html.js .seam.sm-in::before { transform: scaleX(1); }
+html.js .seam::after {
+  content: ''; position: absolute; top: -1px; left: 0; height: 1px; width: 11%;
+  background: linear-gradient(90deg, transparent, var(--bronze), transparent);
+  opacity: 0; pointer-events: none;
+}
+html.js .seam.sm-in::after { animation: seampulse 1.2s var(--e) .12s 1 both; }
+@keyframes seampulse {
+  0% { transform: translateX(-36%); opacity: 0; }
+  14% { opacity: .9; }
+  100% { transform: translateX(809%); opacity: 0; }
+}
+/* navigating to an anchor flashes its seam once: the line answers the jump */
+.seam:target::before { animation: seamflash 1.5s var(--e) 1; }
+@keyframes seamflash { 0% { opacity: 1; } 100% { opacity: .32; } }
+
+/* ── directional reveals: proof objects arrive from their own side, so motion
+   continues across the seam instead of every block doing the same nod.
+   :not(.in) is load-bearing: these rules sit AFTER `html.js .rv.in` at equal
+   specificity, so without it the landed state loses on cascade order and
+   every proof card sits 26px right forever (measured 2026-08-13: right edge
+   396 in a 390 viewport, clipped by the root's overflow-x clip). ── */
+html.js .rv.rv-r:not(.in) { transform: translateX(26px); }
+html.js .rv.rv-l:not(.in) { transform: translateX(-26px); }
+
+/* ── 5 · NUMERALS SETTLE, THE DESK LAW. markup ships the true figure; JS
+   starts at 90% and lands exact inside 550ms. the numeral resolves out of a
+   blur like a meter finding its reading. ── */
+.num-in { animation: numin .5s var(--e-out); }
+@keyframes numin { from { opacity: .25; filter: blur(6px); } to { opacity: 1; filter: blur(0); } }
+
+/* ── 6/7 · THE PRESS. paper proof (the ledger, the receipt) lands the way a
+   plate presses onto stock: clip opens from the centerline while the sheet
+   settles. the recorded amendment to transform/opacity, bounded elements
+   only (verdict-2 PRESS, W3 spec). ── */
+html.js .press {
+  clip-path: inset(46% 4% 46% 4% round 16px);
+  transform: translateY(14px) scale(.986);
+  transition: clip-path .64s cubic-bezier(0.16, 1, 0.3, 1),
+              transform .64s cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.js .press.in { clip-path: inset(0 0 0 0 round 16px); transform: none; }
+
+/* the ledger tabulates: rows write themselves in as the plate opens, and the
+   total row takes one Hi-Vis sweep when the arithmetic lands. */
+html.js .ledger.press .ledger-row { opacity: 0; transform: translateX(-10px); }
+html.js .ledger.press.in .ledger-row {
+  opacity: 1; transform: none;
+  transition: opacity .45s var(--e-out), transform .45s var(--e-out);
+}
+html.js .ledger.press.in .ledger-row:nth-child(1) { transition-delay: .18s; }
+html.js .ledger.press.in .ledger-row:nth-child(2) { transition-delay: .26s; }
+html.js .ledger.press.in .ledger-row:nth-child(3) { transition-delay: .34s; }
+html.js .ledger.press.in .ledger-row:nth-child(4) { transition-delay: .42s; }
+html.js .ledger.press.in .ledger-row:nth-child(5) { transition-delay: .50s; }
+html.js .ledger.press.in .ledger-row:nth-child(6) { transition-delay: .58s; }
+html.js .ledger.press.in .ledger-row:nth-child(7) { transition-delay: .66s; }
+.ledger-row.total { position: relative; overflow: hidden; }
+html.js .ledger.press.in .ledger-row.total::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  transform: translateX(-101%);
+  background: linear-gradient(100deg, transparent, rgba(227,255,79,.30), transparent);
+  animation: rowsweep .9s var(--e) 1.15s 1 both;
+}
+@keyframes rowsweep { to { transform: translateX(101%); } }
+
+/* ── 8 · THE TRANSCRIPT TYPES. each word arrives on a speech cadence, a
+   Hi-Vis caret marks the speaking turn, and the job card locks its fields
+   one by one before the bill chip stamps. ── */
+html.js .turn .tw { opacity: 0; transition: opacity .16s var(--e); }
+html.js .turn .tw.on { opacity: 1; }
+/* the caret rides the CURRENT word, not the turn: a caret on the turn's
+   ::after parks after the last (still hidden) word, an orphan cursor on an
+   empty line (measured 2026-08-13 mid-scene). answered.js moves .cur along
+   the words as they land. */
+.turn .tw.cur::after {
+  content: ''; display: inline-block; width: 2px; height: .95em;
+  background: var(--bronze); margin-left: 3px; vertical-align: -.12em;
+  animation: caretblink 1s steps(2, jump-none) infinite;
+}
+.turn.them .tw.cur::after { background: var(--t2); }
+@keyframes caretblink { 0% { opacity: 1; } 100% { opacity: 0; } }
+html.js .sc-kv dt, html.js .sc-kv dd {
+  opacity: 0; transform: translateY(5px);
+  transition: opacity .3s var(--e-out), transform .3s var(--e-out);
+}
+html.js .sc-kv dt.on, html.js .sc-kv dd.on { opacity: 1; transform: none; }
+html.js .sc-bill {
+  opacity: 0; transform: scale(1.16);
+  transition: opacity .3s var(--e-out), transform .3s var(--e-out);
+}
+html.js .sc-bill.on { opacity: 1; transform: scale(1); }
+
+/* ── 9 · THE MISSED CALL PLAYS. bubbles land in turn, words type at the same
+   cadence, and the one text you actually get arrives whole at the end. ── */
+html.js .pb { opacity: 0; transform: translateY(10px);
+  transition: opacity .45s var(--e-out), transform .45s var(--e-out); }
+html.js .pb.in { opacity: 1; transform: none; }
+html.js .pb .tw { opacity: 0; transition: opacity .16s var(--e); }
+html.js .pb .tw.on { opacity: 1; }
+html.js .phone-sms { opacity: 0; transform: translateY(8px);
+  transition: opacity .5s var(--e-out), transform .5s var(--e-out); }
+html.js .phone-sms.on { opacity: 1; transform: none; }
+
+/* ── 11 · THE DIAL. a cursor companion on fine pointers only: a quiet ring
+   that locks on over anything pressable and spins one arc segment, the
+   rotary dial made of one border. it is an outline, so it can never park on
+   top of a label and obscure it (the recorded PremiumCursor failure). ── */
+.dial {
+  position: fixed; left: 0; top: 0; z-index: 400;
+  width: 34px; height: 34px; margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(242,244,240,.30);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .35s var(--e), border-color .25s var(--e);
+}
+.dial::after {
+  content: ''; position: absolute; inset: -1.5px;
+  border-radius: 50%; border: 1.5px solid transparent;
+  border-top-color: var(--bronze);
+  opacity: 0; transition: opacity .2s var(--e);
+  /* paused unless locked on: measured 2026-08-13, the spin ran at opacity 0
+     for the whole session. an invisible infinite animation is still a
+     per-frame wakeup; the arc only spends frames while it is visible. */
+  animation: dialspin 2.2s linear infinite;
+  animation-play-state: paused;
+}
+.dial.hot::after { animation-play-state: running; }
+.dial.hot { border-color: rgba(227,255,79,.55); }
+.dial.hot::after { opacity: 1; }
+@keyframes dialspin { to { transform: rotate(360deg); } }
+
+/* ── 12 · CARDS ANSWER THE POINTER. the Linear look, adopted for dark
+   surfaces: a radial light that follows the cursor, plus a quiet tilt capped
+   at 1.2 degrees (W2 spec). fine pointers only. ── */
+@media (hover: hover) and (pointer: fine) {
+  .card::after, .pcard::after, .mode::after, .gc::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(240px circle at var(--lx, 50%) var(--ly, 50%),
+      rgba(227,255,79,.07), transparent 65%);
+    opacity: 0; transition: opacity .3s var(--e);
+  }
+  .card:hover::after, .pcard:hover::after, .mode:hover::after, .gc:hover::after { opacity: 1; }
+}
+
+/* ── 13 · THE CONVEYOR WAKES. chips cascade up once when the belt enters
+   view, the belt pauses under the pointer, and the chip under it lights. ── */
+html.js .convey.stage .cv-chip { opacity: 0; transform: translateY(10px); }
+html.js .convey.stage.up .cv-chip {
+  opacity: 1; transform: none;
+  transition: opacity .5s var(--e-out), transform .5s var(--e-out);
+  transition-delay: calc(var(--ci, 0) * 35ms);
+}
+@media (hover: hover) and (pointer: fine) {
+  html.js .convey.go:hover .convey-track { animation-play-state: paused; }
+  .convey { pointer-events: auto; }
+  .cv-chip { transition: border-color .2s var(--e), color .2s var(--e); }
+  .cv-chip:hover { border-color: rgba(227,255,79,.5); color: var(--t1); }
+}
+
+/* ── 15 · THE LOCKUP ANSWERS. hover the mark anywhere and the arcs fire on
+   the ring cadence while one emitted ring leaves the stem. CSS only, so the
+   templated chrome is never touched structurally. ── */
+.brand { position: relative; }
+.brand-mark .bm-a1, .brand-mark .bm-a2 {
+  transform-box: view-box; transform-origin: 8.2px 12px;
+}
+@media (hover: hover) {
+  .brand:hover .bm-a1 { animation: arcfire .45s var(--e) 1; }
+  .brand:hover .bm-a2 { animation: arcfire .45s var(--e) .07s 1 backwards; }
+  .brand::before {
+    content: ''; position: absolute; left: 15px; top: 50%;
+    width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+    border: 1.5px solid var(--bronze);
+    opacity: 0; pointer-events: none;
+  }
+  .brand:hover::before { animation: brandring .7s var(--e) 1; }
+}
+@keyframes brandring {
+  0% { transform: scale(.5); opacity: .55; }
+  100% { transform: scale(4.6); opacity: 0; }
+}
+
+/* ── 16 · POLISH THE JURY NOTICES ── */
+/* the seg thumb gets one degree of spring; reduced motion still kills it via
+   the global cap above. */
+.seg-thumb { transition: transform .46s cubic-bezier(.3, 1.35, .42, 1), width .3s var(--e); }
+/* disclosure bodies unfold instead of teleporting */
+.disc[open] .disc-body { animation: discin .34s var(--e-out); }
+@keyframes discin { from { opacity: 0; transform: translateY(-6px); } }
+/* footer links draw their own underline */
+.foot ul a {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat; background-position: 0 100%; background-size: 0 1px;
+  transition: background-size .32s var(--e), color .2s var(--e);
+}
+.foot ul a:hover { background-size: 100% 1px; }
+/* nothing may scroll sideways because an effect travelled: clip the root.
+   overflow-x on body already exists; clip on html avoids the iOS scroll
+   container quirk while catching what body misses. */
+html { overflow-x: clip; }
+
+/* ── REDUCED MOTION: every one of the above rests finished, legible, at
+   opacity 1. decoration that is only motion is absent. ── */
+@media (prefers-reduced-motion: reduce) {
+  html.js .press, html.js .ledger.press .ledger-row,
+  html.js .turn, html.js .sc-result, html.js .hold-hit,
+  html.js .turn .tw, html.js .pb .tw,
+  html.js .sc-kv dt, html.js .sc-kv dd, html.js .sc-bill,
+  html.js .pb, html.js .phone-sms,
+  html.js .convey.stage .cv-chip,
+  html.js .rv.rv-r, html.js .rv.rv-l,
+  html.js.answering .wd-i, html.js.answered-in .wd-i {
+    opacity: 1 !important; transform: none !important;
+    clip-path: none !important; transition: none !important;
+  }
+  html.js .seam::before { transform: none !important; transition: none !important; }
+  html.js .seam::after, html.js .ledger.press.in .ledger-row.total::after { display: none; }
+  .turn .tw.cur::after { display: none; }
+  .dial, .cue { display: none !important; }
+  .num-in { animation: none; }
+  html.js.answering .hero-field, html.js.answered-in .hero-field { opacity: 1; transition: none; }
+}
