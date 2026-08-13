@@ -1,9 +1,11 @@
 // /api/demo-health. The single source of truth for "is the demo line alive?"
 //
 // LAW: the front end may render a dialable demo control ONLY from a green
-// answer here. There is no fake green state in this file and there never will
-// be: a health check that guesses green is exactly how this estate once
-// shipped a dead play button on the homepage.
+// answer here. There is no fake green state in this file: a health check that
+// guesses green is exactly how this estate once shipped a dead play button on
+// the homepage. The single, loudly documented, delete-within-a-day exception
+// is the CANARY_BOOTSTRAP window described below, and it never overrides a
+// failed or stale canary: it only covers the hours before the first one runs.
 //
 // Phase B: the three REAL probes are wired in. Per the probe-landed law (a
 // probe that never landed cannot prove a gate works), every probe reports TWO
@@ -12,7 +14,27 @@
 //   ok      = what that answer said
 // A timeout, a transport failure, or a missing env var is landed=false with a
 // reason. It never means ok, and it never defaults to ok. healthy is true only
-// when all three probes landed AND all three said yes.
+// when all FOUR checks landed AND all four said yes.
+//
+// Check 4, "canary" (2026-08-13): reads the result of the scheduled
+// answered-canary function (Blobs store "canary", keys latest + prev). The
+// canary PLACES A REAL CALL through the whole seam every 2 hours; this check
+// is the law from the redesign verdict wired into the gate: no dialable
+// control renders unless a real-call canary recently passed, and TWO
+// CONSECUTIVE canary fails hold the gate red with that exact reason.
+//   landed = a latest record exists and is under 3 hours old
+//   ok     = latest.ok, and when latest AND prev both failed the reason says
+//            "two consecutive canary fails"
+// Before the first canary has ever run, this check is landed=false with
+// reason "no canary has run yet": which honestly keeps healthy=false.
+//
+// ⚠️ BOOTSTRAP ESCAPE HATCH. TEMPORARY BY DESIGN, REMOVE WITHIN A DAY.
+// CANARY_BOOTSTRAP=allow treats a MISSING canary record (and only a missing
+// record: never a failed or stale one) as landed=true ok=true reason
+// "bootstrap window", so the integrator can go green during the first hours
+// before the first scheduled run. The integrator MUST delete that env var
+// within a day: while it is set, a canary that never runs at all looks
+// green, which is exactly the silent-pass this whole file exists to forbid.
 //
 // Env, by NAME only:
 //   ELEVENLABS_API_KEY     probe 1, subscription status
@@ -20,6 +42,7 @@
 //   TWILIO_ACCOUNT_SID     probe 3, Lookup auth
 //   TWILIO_AUTH_TOKEN      probe 3, Lookup auth
 //   ANSWERED_DEMO_NUMBER   probe 3, the number being looked up
+//   CANARY_BOOTSTRAP       check 4, "allow" = bootstrap window (see above)
 //
 // THE FRONT-END CONTRACT DOES NOT CHANGE: nothing on any page calls this yet.
 // Shape stays {healthy, checks: {...}, checked}, GET-only, no-store.
@@ -100,6 +123,67 @@ async function probeTwilioNumber() {
   }
 }
 
+// ── check 4: the real-call canary result ────────────────────────────────────
+// Not a probe of a vendor; a read of the newest answered-canary record from
+// Blobs store "canary". The canary itself already reported probe_landed facts
+// separately; here landed means "a fresh record exists", ok means what the
+// canary said, with the two-consecutive-fails law applied.
+const CANARY_FRESH_MS = 3 * 60 * 60 * 1000; // canary runs every 2h; 3h = one missed run is stale
+const CANARY_SKEW_MS = 5 * 60 * 1000; // tolerate small clock skew, nothing more
+
+async function probeCanary(event) {
+  const bootstrap = (process.env.CANARY_BOOTSTRAP || '').trim() === 'allow';
+
+  // dynamic import so this CJS handler works however @netlify/blobs is packaged
+  let blobs;
+  try {
+    blobs = await import('@netlify/blobs');
+  } catch (e) {
+    return probeFail('@netlify/blobs failed to load: ' + String(e && e.message).slice(0, 80));
+  }
+
+  let latest = null;
+  let prev = null;
+  try {
+    if (typeof blobs.connectLambda === 'function') {
+      // Lambda-compat functions carry their blobs context on the event itself.
+      try { blobs.connectLambda(event); } catch (e) { /* verdict comes from the read */ }
+    }
+    const store = blobs.getStore('canary');
+    latest = await store.get('latest', { type: 'json' });
+    prev = await store.get('prev', { type: 'json' });
+  } catch (e) {
+    return probeFail('canary store read failed: ' + String(e && e.message).slice(0, 80));
+  }
+
+  if (!latest) {
+    if (bootstrap) {
+      // TEMPORARY: only ever green here while CANARY_BOOTSTRAP=allow is set,
+      // and only for a clean "no record yet". Remove the env var within a day.
+      return { landed: true, ok: true, reason: 'bootstrap window' };
+    }
+    return { landed: false, ok: false, reason: 'no canary has run yet' };
+  }
+
+  const ageMs = Date.now() - Date.parse(latest.at || '');
+  if (!Number.isFinite(ageMs) || ageMs >= CANARY_FRESH_MS || ageMs < -CANARY_SKEW_MS) {
+    const age = Number.isFinite(ageMs) ? Math.round(ageMs / 60000) + ' minutes old' : 'missing a readable timestamp';
+    return { landed: false, ok: false, reason: 'latest canary is stale: ' + age + ' (fresh means under 3 hours)' };
+  }
+
+  const latestOk = latest.ok === true;
+  const prevMissing = !prev;
+  const prevOk = !prevMissing && prev.ok === true;
+
+  let ok = latestOk && (prevMissing || prevOk || latestOk);
+  let reason = latestOk ? '' : String(latest.reason || 'canary failed');
+  if (!latestOk && !prevMissing && !prevOk) {
+    ok = false;
+    reason = 'two consecutive canary fails' + (latest.reason ? '; latest: ' + String(latest.reason).slice(0, 120) : '');
+  }
+  return { landed: true, ok, reason };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, headers: { Allow: 'GET' }, body: 'Method not allowed' };
@@ -112,14 +196,15 @@ exports.handler = async (event) => {
     for (const k in (event.headers || {})) headers[k.toLowerCase()] = event.headers[k];
     const host = String(headers.host || '');
 
-    const [el, brain, twilio] = await Promise.all([
+    const [el, brain, twilio, canary] = await Promise.all([
       probeElSubscription(),
       probeBrainReady(host),
       probeTwilioNumber(),
+      probeCanary(event),
     ]);
 
-    const checks = { el_subscription: el, brain_ready: brain, twilio_number: twilio };
-    const healthy = [el, brain, twilio].every((c) => c.landed && c.ok);
+    const checks = { el_subscription: el, brain_ready: brain, twilio_number: twilio, canary };
+    const healthy = [el, brain, twilio, canary].every((c) => c.landed && c.ok);
     body = { healthy, checks, checked: new Date().toISOString() };
     cached = { at: now, body };
   }
