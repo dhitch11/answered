@@ -78,15 +78,17 @@ async function probeBrainReady(host) {
 
 // ── probe 3: Twilio Lookup v2 on the demo number ────────────────────────────
 async function probeTwilioNumber() {
-  const sid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
-  const tok = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+  // This account authenticates by API key pair; the auth token is not
+  // available. Lookup accepts either credential shape as Basic auth.
+  const keySid = (process.env.TWILIO_API_SID || '').trim();
+  const keySecret = (process.env.TWILIO_API_SECRET || '').trim();
   const num = (process.env.ANSWERED_DEMO_NUMBER || '').trim();
-  if (!sid || !tok || !num) return probeFail('env not set');
+  if (!keySid || !keySecret || !num) return probeFail('env not set');
   const clean = num.replace(/[^+\d]/g, '');
   if (!/^\+\d{10,15}$/.test(clean)) return probeFail('ANSWERED_DEMO_NUMBER is not E.164');
   try {
     const r = await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(clean), {
-      headers: { Authorization: 'Basic ' + Buffer.from(sid + ':' + tok).toString('base64') },
+      headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
       signal: AbortSignal.timeout(5000),
     });
     if (!r.ok) return { landed: true, ok: false, reason: 'lookup returned ' + r.status };
