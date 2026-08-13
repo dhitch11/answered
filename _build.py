@@ -1104,3 +1104,37 @@ def _extensionless():
     print('extensionless links: %d rewritten' % n)
 
 _extensionless()
+
+
+# ── ASSET VERSIONING ──────────────────────────────────────────────────────────
+# /assets/* ships with a one-year immutable cache header, and answered.css /
+# answered.js live at fixed names, so a returning visitor kept STALE styles and
+# scripts for up to a year after every deploy (measured live 2026-08-13: a
+# browser that had ever loaded the old CSS computed the dead serif on the new
+# page). Every reference now carries ?v=<content-hash>; new HTML can never pair
+# with old assets again. The build FAILS if an unversioned reference survives.
+def _asset_version():
+    import re as _re, hashlib as _hl
+    pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
+             'pricing.html', 'trust.html', 'thanks.html']
+    vers = {}
+    for a in ('answered.css', 'answered.js'):
+        f = ROOT / 'assets' / a
+        vers[a] = _hl.md5(f.read_bytes()).hexdigest()[:8]
+    n = 0
+    for pg in pages:
+        p = ROOT / pg
+        s = p.read_text(encoding='utf-8')
+        out = s
+        for a, v in vers.items():
+            out = _re.sub(r'/assets/' + _re.escape(a) + r'(\?v=[0-9a-f]*)?', '/assets/%s?v=%s' % (a, v), out)
+        if out != s:
+            p.write_text(out, encoding='utf-8')
+            n += 1
+        for a in vers:
+            if _re.search(r'/assets/' + _re.escape(a) + r'(?!\?v=[0-9a-f]{8})', out):
+                print('*** BUILD REFUSED: unversioned %s reference in %s ***' % (a, pg), file=_sys.stderr)
+                _sys.exit(1)
+    print('asset versioning: css=%s js=%s stamped across %d pages' % (vers['answered.css'], vers['answered.js'], n))
+
+_asset_version()
