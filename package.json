@@ -1,0 +1,9 @@
+{
+  "name": "answered-site",
+  "private": true,
+  "version": "0.0.0",
+  "description": "answered.reddenda.com. package.json exists only to declare @netlify/blobs for the /api/event collector.",
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}

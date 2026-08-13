@@ -8,6 +8,20 @@ import re, pathlib
 
 ROOT = pathlib.Path(__file__).parent
 
+# The one place the absolute og origin is defined. The hand-written pages
+# (index/trades/hold) carry the same origin inline under an HTML comment that
+# points back here. og:image MUST be absolute or scrapers drop it.
+ORIGIN = 'https://answered.reddenda.com'
+
+# slug -> brand card under assets/og/ (rendered by _og-render.mjs; brand cards
+# only, never a receipt). thanks reuses the home card by design.
+OG_CARD = {
+    'pricing.html': 'pricing',
+    'recover.html': 'recover',
+    'trust.html':   'trust',
+    'thanks.html':  'home',
+}
+
 MARK = (
     '<svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">'
     '<rect class="bm-stem" x="4" y="5" width="5.4" height="22" rx="2.4" fill="var(--bronze)"/>'
@@ -87,6 +101,12 @@ HEAD = '''<!doctype html>
 <meta name="theme-color" content="#0B0C0E">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
+<meta property="og:type" content="website">
+<meta property="og:image" content="{og}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="{og}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -101,7 +121,14 @@ TAIL = '</main>\n' + FOOT + '\n<script src="/assets/answered.js" defer></script>
 
 
 def page(slug, title, desc, body):
-    html = HEAD.format(title=title, desc=desc) + nav('/' + slug) + '\n<main id="main">\n' + body + '\n' + TAIL
+    card = OG_CARD.get(slug)
+    if card is None:
+        raise SystemExit('BUILD REFUSED: no og card mapped for %s in OG_CARD' % slug)
+    if not (ROOT / 'assets' / 'og' / (card + '.png')).exists():
+        raise SystemExit('BUILD REFUSED: assets/og/%s.png missing for %s. '
+                         'Run: node _og-render.mjs' % (card, slug))
+    og = '%s/assets/og/%s.png' % (ORIGIN, card)
+    html = HEAD.format(title=title, desc=desc, og=og) + nav('/' + slug) + '\n<main id="main">\n' + body + '\n' + TAIL
     (ROOT / slug).write_text(html, encoding='utf-8')
     print('wrote', slug, len(html), 'bytes')
 

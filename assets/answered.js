@@ -646,3 +646,34 @@
     if (e.key === 'ArrowLeft')  { e.preventDefault(); a.currentTime = Math.max(0, a.currentTime - 15); }
   });
 })();
+
+/* ══ MEASUREMENT BEACONS ═══════════════════════════════════════════════════
+   First-party only. One helper, three wire-ups, nothing else. Every name
+   sent from here must be on the /api/event allowlist or the collector
+   answers 400. A beacon failure is swallowed on purpose: measurement must
+   never break the page it measures. The collector fails loud server-side.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  function answeredEvent(name, meta) {
+    try {
+      var body = JSON.stringify({ event: name, page: location.pathname, meta: meta || {} });
+      var sent = false;
+      try {
+        sent = !!(navigator.sendBeacon &&
+          navigator.sendBeacon('/api/event', new Blob([body], { type: 'application/json' })));
+      } catch (e) { sent = false; }
+      if (!sent && window.fetch) {
+        fetch('/api/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+      }
+    } catch (e2) { /* measurement must never break the page */ }
+  }
+  window.answeredEvent = answeredEvent;
+
+  // the For-me / For-my-business track flip on the home page
+  document.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-track-to]') : null; if (b) answeredEvent('track_flip', { to: b.getAttribute('data-track-to') }); });
+  // the pricing audience chooser
+  document.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-pick]') : null; if (b) answeredEvent('aud_choice', { pick: b.getAttribute('data-pick') }); });
+  // interest form submit, fired before the POST navigates (sendBeacon outlives the page)
+  document.addEventListener('submit', function (e) { var f = e.target; if (f && f.getAttribute && f.getAttribute('action') === '/api/interest') answeredEvent('interest_submitted', { form: f.getAttribute('name') || '' }); }, true);
+})();

@@ -21,3 +21,15 @@
   to = "/.netlify/functions/interest"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/event"
+  to = "/.netlify/functions/event"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/demo-health"
+  to = "/.netlify/functions/demo-health"
+  status = 200
+  force = true

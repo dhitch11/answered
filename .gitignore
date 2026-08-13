@@ -6,3 +6,6 @@ _shots/
 
 # macOS
 .DS_Store
+
+# function deps, bundled at deploy, never committed or published
+node_modules/
