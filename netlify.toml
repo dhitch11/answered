@@ -33,3 +33,16 @@
   to = "/.netlify/functions/demo-health"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/answered-voice"
+  to = "/.netlify/functions/answered-voice"
+  status = 200
+  force = true
+
+# /api/answered-brain has NO redirect block on purpose. It is a Netlify v2
+# function that declares its own routes in-file (export const config.path:
+# /api/answered-brain and /api/answered-brain/chat/completions, the suffix
+# ElevenLabs appends to a custom LLM server URL). Declaring a custom path
+# removes the default /.netlify/functions/answered-brain route, so a forced
+# redirect pointing there would shadow the live route with a dead target.
