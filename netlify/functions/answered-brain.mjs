@@ -426,6 +426,9 @@ export default async (req) => {
       };
       const say = (text) => {
         if (!text) return;
+        // transcripts of these turns render on real pages later; the copy law
+        // bans em dashes in net-new text, and a comma reads better to TTS too
+        text = String(text).replace(/\s*[—–]\s*/g, ', ');
         if (!ttfc) { ttfc = true; chunk({ role: 'assistant' }); }
         chunk({ content: (spoken ? ' ' : '') + text });
         spoken += (spoken ? ' ' : '') + text;
