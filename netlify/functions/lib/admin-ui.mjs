@@ -1539,8 +1539,8 @@ function renderContact(d, pre) {
   const dr = $('#drawer');
   dr.innerHTML = head + '<div class="drawer-b" id="dbody">' + panes[leadTab]() + '</div>';
   dr.__panes = panes; dr.__contact = c; dr.__pre = pre;
-  if (leadTab === 'timeline') loadTimeline(c.id);
-  if (leadTab === 'thread') loadThread(c.id);
+  const load = LEAD_TAB_LOADERS[leadTab];
+  if (load) load(c.id);
 }
 
 /**
@@ -2445,6 +2445,65 @@ function palGo() {
 }
 
 // ── events. One delegated listener, so nothing is bound to a node a repaint will replace. ──
+/**
+ * Which loader each lead tab needs. ONE table, consulted by every path that can put a tab on
+ * screen. It exists because there were two: renderContact knew about one set and the tab-click
+ * handler knew about another, so a new tab rendered its shell and never fetched anything, forever,
+ * with no error. A lookup cannot drift from itself.
+ */
+const LEAD_TAB_LOADERS = {
+  timeline: (id) => loadTimeline(id),
+  thread:   (id) => loadThread(id),
+};
+
+/**
+ * Every explicit action, in one place, returning TRUE when it handled the click.
+ *
+ * Pulled out of the click listener so it can run BEFORE the noun-based branches. An outreach button
+ * carries data-act AND data-contact; while the contact branch ran first, every send button in this
+ * console re-opened the lead drawer instead of doing its job.
+ *
+ * Returning a boolean rather than just acting means an unknown action falls through to the noun
+ * branches instead of being swallowed, so a typo in a data-act degrades to the old behaviour
+ * instead of making a control inert.
+ */
+async function actionClick(t, act) {
+  switch (act) {
+    case 'close-drawer':   closeDrawer(); return true;
+    case 'close-modal':    closeModal(); return true;
+    case 'clear-event':    S.filters.events.name = null; go('events'); return true;
+    case 'refund':         refundModal(t.dataset.charge, +t.dataset.max, t.dataset.label); return true;
+    case 'refund-go':      doRefund(t.dataset.charge, +t.dataset.max); return true;
+    case 'export-accounts': exportAccounts(); return true;
+    case 'crm-clear-sel':  S.selected.clear(); go('crm'); return true;
+    case 'crm-density':    S.dense = !S.dense; go('crm'); return true;
+    case 'crm-export':     exportLeads(); return true;
+    case 'crm-sort':       S.filters.crm.sort = t.dataset.value; S.filters.crm.offset = 0; go('crm'); return true;
+    case 'ck-skip': {
+      const q = (S.cockpit && S.cockpit.queue) || [];
+      const cur = S.cockpitTarget ? q.findIndex((x) => x.id === S.cockpitTarget.id) : 0;
+      S.cockpitTarget = q[(cur + 1) % Math.max(q.length, 1)] || null;
+      go('cockpit', { quiet: true }); return true;
+    }
+    case 'crm-sel-all':
+      $$('[data-sel]').forEach((cb) => { if (t.checked) S.selected.add(cb.dataset.sel); else S.selected.delete(cb.dataset.sel); });
+      go('crm'); return true;
+
+    // The gate's reason travels WITH the click, so the composer states it before the operator
+    // writes four hundred characters and then learns it was never sendable. The server still
+    // refuses independently: this is courtesy, not the control.
+    case 'do-email':  emailComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return true;
+    case 'do-sms':    smsComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return true;
+    case 'do-call':   doCall(t.dataset.contact, t.dataset.to); return true;
+    case 'add-note':  addNote(t.dataset.contact); return true;
+    case 'add-task':  addTask(t.dataset.contact); return true;
+    case 'ai-draft':  aiDraft(t.dataset.contact); return true;
+    case 'backfill':  backfill(t); return true;
+    case 'status':    statusChange(t.dataset.value); return true;
+    default:          return false;      // fall through to the noun branches
+  }
+}
+
 function wire() {
   document.addEventListener('click', async (e) => {
     const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],[data-cktarget],.pal-i');
@@ -2487,12 +2546,36 @@ function wire() {
       }
       go('crm'); return;
     }
+    // ★ AN EXPLICIT VERB OUTRANKS A NOUN, AND GETTING THIS BACKWARDS BROKE EVERY OUTREACH BUTTON.
+    //
+    // data-contact means "this element is about that business" and is what makes a table row
+    // clickable. data-act means "do this specific thing". An outreach button carries BOTH, because
+    // the action needs to know which business it is acting on — and because the contact branch used
+    // to run first, EVERY send button re-opened the lead drawer instead of composing.
+    //
+    // Measured on prod: clicking "Write an email" re-rendered the same lead. No error, no console
+    // message, a visible repaint that looked deliberate. The drawer even flickered convincingly.
+    // It is the third defect of this exact family in this file: a control whose click was received,
+    // routed somewhere reasonable, and silently never did the thing it named.
+    //
+    // So the action dispatch now runs FIRST, and the noun branches below are the fallback they were
+    // always meant to be. Anything with an explicit data-act is handled by actionClick().
+    if (t.dataset.act) { if (await actionClick(t, t.dataset.act)) return; }
+
     if (t.dataset.contact) { openContact(t.dataset.contact); return; }
     if (t.dataset.leadtab) {
       leadTab = t.dataset.leadtab;
       const dr = $('#drawer');
       $$('.tab', dr).forEach((b) => b.setAttribute('aria-selected', String(b.dataset.leadtab === leadTab)));
-      if (dr.__panes) { paint($('#dbody'), dr.__panes[leadTab]()); if (leadTab === 'timeline') loadTimeline(dr.__contact.id); }
+      if (dr.__panes) {
+        paint($('#dbody'), dr.__panes[leadTab]());
+        // ONE TABLE, CONSULTED BY BOTH RENDER PATHS. This branch used to name loadTimeline
+        // directly while renderContact named its own set, so a tab added to one was invisible in
+        // the other: the Conversation tab rendered its shell here and never fetched a message.
+        // Two places deciding the same thing is two places to forget.
+        const load = LEAD_TAB_LOADERS[leadTab];
+        if (load && dr.__contact) load(dr.__contact.id);
+      }
       return;
     }
     if (t.dataset.bulk) { bulkAction(t.dataset.bulk, t.dataset.value); return; }
@@ -2520,38 +2603,6 @@ function wire() {
       const g = S.filters[t.dataset.page];
       g.offset = Math.max(0, g.offset + (+t.dataset.dir) * 50); go(t.dataset.page); return;
     }
-    const act = t.dataset.act;
-    if (act === 'close-drawer') { closeDrawer(); return; }
-    if (act === 'close-modal') { closeModal(); return; }
-    if (act === 'clear-event') { S.filters.events.name = null; go('events'); return; }
-    if (act === 'refund') { refundModal(t.dataset.charge, +t.dataset.max, t.dataset.label); return; }
-    if (act === 'refund-go') { doRefund(t.dataset.charge, +t.dataset.max); return; }
-    if (act === 'export-accounts') { exportAccounts(); return; }
-    if (act === 'crm-clear-sel') { S.selected.clear(); go('crm'); return; }
-    if (act === 'crm-density') { S.dense = !S.dense; go('crm'); return; }
-    if (act === 'ck-skip') {
-      const q = (S.cockpit && S.cockpit.queue) || [];
-      const cur = S.cockpitTarget ? q.findIndex((x) => x.id === S.cockpitTarget.id) : 0;
-      S.cockpitTarget = q[(cur + 1) % Math.max(q.length, 1)] || null;
-      go('cockpit', { quiet: true }); return;
-    }
-    if (act === 'crm-sort') { S.filters.crm.sort = t.dataset.value; S.filters.crm.offset = 0; go('crm'); return; }
-    if (act === 'crm-sel-all') {
-      $$('[data-sel]').forEach((cb) => { if (t.checked) S.selected.add(cb.dataset.sel); else S.selected.delete(cb.dataset.sel); });
-      go('crm'); return;
-    }
-    if (act === 'crm-export') { exportLeads(); return; }
-    // The gate's reason travels WITH the click, so the composer can state it before the operator
-    // writes four hundred characters and then learns it was never sendable. The server still
-    // refuses independently: this is courtesy, not the control.
-    if (act === 'do-email') { emailComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return; }
-    if (act === 'do-sms') { smsComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return; }
-    if (act === 'do-call') { doCall(t.dataset.contact, t.dataset.to); return; }
-    if (act === 'add-note') { addNote(t.dataset.contact); return; }
-    if (act === 'add-task') { addTask(t.dataset.contact); return; }
-    if (act === 'ai-draft') { aiDraft(t.dataset.contact); return; }
-    if (act === 'backfill') { backfill(t); return; }
-    if (act === 'status') { statusChange(t.dataset.value); return; }
   });
 
   // ★ Single-key shortcuts require the PAGE to own focus, not merely "not an input". Testing
