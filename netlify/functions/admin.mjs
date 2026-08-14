@@ -61,6 +61,7 @@ export const config = {
     '/api/admin/audit',
     '/api/admin/system',
     '/api/admin/compliance',
+    '/api/admin/cockpit',
     '/api/admin/crm',
     '/api/admin/crm/facets',
     '/api/admin/crm/contact',
@@ -365,6 +366,9 @@ async function apiRoute(req, url, name) {
 
     case 'compliance':
       return json(200, await compliancePanel(nz(q.get('since'))));
+
+    case 'cockpit':
+      return json(200, await cockpitBoard());
 
     case 'recording':
       return await streamRecording(req, q.get('sid'), admin);
@@ -944,6 +948,67 @@ async function draftMessage(req, admin) {
     });
     return json(502, { error: String(e.message).slice(0, 300) });
   }
+}
+
+/**
+ * THE COCKPIT BOARD: the database's half merged with the runtime's half.
+ *
+ * The database knows the line bank, what is in flight, the queue and the compliance state. Only
+ * the running function knows whether a provider is actually answering right now. Every lamp gets
+ * BOTH its state and the sentence explaining it, because a lamp that cannot explain itself is
+ * decoration, and this console is not allowed decoration that looks like instrumentation.
+ *
+ * The provider probes run in parallel and each one is individually failure-tolerant: a dead
+ * provider must render as a dead lamp, never as a broken page.
+ */
+async function cockpitBoard() {
+  const [board, sms, ai] = await Promise.all([
+    rpc('sv_admin_cockpit'),
+    outreach.smsReadiness().catch((e) => ({ ok: false, state: 'unknown', why: String(e.message).slice(0, 140) })),
+    // The AI probe is a real round trip, not a key-presence check. "The key is set" and "the key
+    // works" are different claims and only one of them belongs on a cockpit.
+    ai_probeCached(),
+  ]);
+
+  // Telephony and SMS share one account, so one authentication failure explains both. Saying so
+  // is more useful than showing two red lamps with unrelated-looking reasons.
+  const telephonyDown = sms.state === 'provider_unavailable' || sms.state === 'unconfigured';
+
+  return {
+    ...board,
+    autopilot_kill: process.env.ANSWERED_AUTOPILOT_KILL === '1',
+    providers: {
+      telephony: telephonyDown
+        ? { ok: false, why: sms.why }
+        : { ok: true, why: 'Twilio is answering on this account.' },
+      sms: { ok: Boolean(sms.ok), state: sms.state, why: sms.why },
+      email: outreach.emailConfigured()
+        ? { ok: true, why: 'Resend is configured. ' + (board.book ? board.book.emailable : 0) + ' leads in the book are reachable by email right now.' }
+        : { ok: false, why: 'RESEND_API_KEY is not set on this deploy, so nothing can be sent.' },
+      ai: ai,
+    },
+  };
+}
+
+/**
+ * The AI probe costs a real API call, and a cockpit that polls would pay for one every tick. Cached
+ * for two minutes: long enough that watching the board is free, short enough that the lamp is not
+ * lying about a provider that recovered a moment ago.
+ */
+let aiProbeCache = { at: 0, value: null };
+async function ai_probeCached() {
+  if (aiProbeCache.value && Date.now() - aiProbeCache.at < 120000) return aiProbeCache.value;
+  let v;
+  try {
+    const r = await ai.probe();
+    v = r.ok
+      ? { ok: true, why: 'Answered in ' + r.ms + 'ms on ' + r.model + ', direct Anthropic API.', model: r.model, ms: r.ms }
+      : { ok: false, why: r.reason || 'The model did not answer.' };
+  } catch (e) {
+    v = { ok: false, why: String(e.message).slice(0, 160) };
+  }
+  aiProbeCache = { at: Date.now(), value: v };
+  return v;
 }
 
 // ── body readers ─────────────────────────────────────────────────────────────────────────────

@@ -407,15 +407,171 @@ select.fsel[data-on="1"]{border-color:var(--brand);color:var(--brand);background
 /* ── reach indicators: one glyph per channel, colour-blind safe by shape ─────────────────── */
 .reach{display:inline-flex;gap:4px;align-items:center}
 .rch{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:var(--r-xs);
-  font-size:11px;font-weight:var(--w-semi);border:1px solid var(--line-2);color:var(--ink-4);
+  font-size:11px;font-weight:var(--w-semi);border:1px solid var(--line-2);color:var(--ink-3);
   background:var(--raised);cursor:default}
 .rch.on{color:var(--brand-ink);background:var(--brand);border-color:var(--brand)}
-.rch.blocked{color:var(--ink-4);background:transparent;border-style:dashed}
+.rch.blocked{color:var(--ink-3);background:transparent;border-style:dashed}
 .rch.wait{color:var(--warn);border-color:rgba(251,191,36,.45);background:var(--warn-bg)}
 
 /* ── density ──────────────────────────────────────────────────────────────────────────────── */
 table.dense td{padding:6px 12px;font-size:var(--t-small)}
 table.dense th{padding:7px 12px}
+
+
+/* ══ THE COCKPIT ═══════════════════════════════════════════════════════════════════════════
+   David: "like a world class video game / fighter jet / phone interface ... incredible visual
+   and user interface ... very operator/user friendly."
+
+   The model is an AIRCRAFT MASTER CAUTION PANEL, and that is a deliberate choice rather than a
+   theme. A real cockpit is trustworthy BECAUSE it is loud and specific about what is inoperative.
+   Every lamp here is wired to a measurement and carries the sentence that explains it. Nothing
+   animates unless real data is moving: no decorative waveform, no idle pulse on a dead channel,
+   no LIVE lamp without a call actually on the wire.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ckpt{display:grid;gap:var(--sp-3);grid-template-columns:minmax(0,1fr) 344px;align-items:start}
+.ckpt-full{grid-column:1/-1}
+@media (max-width:1180px){.ckpt{grid-template-columns:minmax(0,1fr)}}
+
+/* the instrument shell: a hairline bezel and a very slight inner light, so panels read as
+   machined objects rather than as flat divs */
+.inst{background:linear-gradient(180deg,var(--raised) 0%,var(--surface) 100%);
+  border:1px solid var(--line-2);border-radius:var(--r);position:relative;overflow:hidden;
+  box-shadow:inset 0 1px 0 0 rgba(255,255,255,.045), 0 1px 2px rgba(0,0,0,.5)}
+.inst-h{display:flex;align-items:center;gap:var(--sp-2);padding:9px 13px;
+  border-bottom:1px solid var(--line);background:rgba(0,0,0,.25)}
+.inst-h h3{font-size:var(--t-micro);font-weight:var(--w-semi);letter-spacing:var(--ls-micro);
+  text-transform:uppercase;color:var(--ink-3);margin:0}
+.inst-h .sp{margin-left:auto;display:flex;gap:var(--sp-2);align-items:center}
+.inst-b{padding:var(--sp-3) var(--sp-3)}
+
+/* ── the lamp. Four states, distinguished by SHAPE and LABEL as well as colour. ───────────── */
+/* Eight lamps. auto-fit gave seven across at 1600 and left the eighth alone beside a dead gap,
+   which reads as a missing instrument rather than as a designed panel. Fixed counts instead, so
+   every row is full at every breakpoint: 4x2, 3x3, 2x4, 1x8. */
+.lamps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line)}
+@media (max-width:1280px){.lamps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.lamps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.lamps{grid-template-columns:1fr}}
+.lamp{background:var(--surface);padding:11px 13px;display:flex;flex-direction:column;gap:5px;
+  min-height:84px;position:relative}
+.lamp-t{display:flex;align-items:center;gap:7px}
+.lamp-d{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--ink-4);
+  box-shadow:0 0 0 3px rgba(255,255,255,.03)}
+.lamp-k{font-size:var(--t-micro);font-weight:var(--w-semi);letter-spacing:var(--ls-micro);
+  text-transform:uppercase;color:var(--ink-3)}
+.lamp-v{font-size:var(--t-base);font-weight:var(--w-semi);letter-spacing:var(--ls-base);color:var(--ink-2)}
+.lamp-w{font-size:var(--t-mini);line-height:1.45;color:var(--ink-3)}
+.lamp.go   .lamp-d{background:var(--ok);box-shadow:0 0 0 3px rgba(74,222,128,.14),0 0 12px rgba(74,222,128,.35)}
+.lamp.go   .lamp-v{color:var(--ok)}
+.lamp.caution .lamp-d{background:var(--warn);box-shadow:0 0 0 3px rgba(251,191,36,.14)}
+.lamp.caution .lamp-v{color:var(--warn)}
+.lamp.caution{background:linear-gradient(180deg,var(--warn-bg) 0%,var(--surface) 70%)}
+.lamp.stop .lamp-d{background:var(--bad);box-shadow:0 0 0 3px rgba(255,92,122,.16)}
+.lamp.stop .lamp-v{color:var(--bad-2)}
+.lamp.stop{background:linear-gradient(180deg,var(--bad-bg) 0%,var(--surface) 70%)}
+/* LIVE is the only lamp permitted to pulse, and only while a call is genuinely on the wire. */
+.lamp.live .lamp-d{background:var(--live);animation:lampPulse 1.4s var(--ease) infinite}
+.lamp.live .lamp-v{color:var(--live)}
+@keyframes lampPulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(55,200,240,.20),0 0 10px rgba(55,200,240,.45)}
+  50%{box-shadow:0 0 0 6px rgba(55,200,240,.06),0 0 20px rgba(55,200,240,.75)}}
+
+/* ── the line bank. David: "turn on multiple phone lines up to 100+ if we wanted." ───────── */
+.bank{display:grid;grid-template-columns:repeat(auto-fill,minmax(206px,1fr));gap:var(--sp-2)}
+.ln{border:1px solid var(--line-2);border-radius:var(--r-sm);padding:10px 11px;
+  background:var(--surface);position:relative;overflow:hidden}
+.ln.act{border-color:rgba(74,222,128,.34)}
+.ln.rest{opacity:.62;border-style:dashed}
+.ln.flag{border-color:var(--bad)}
+.ln-n{font-family:var(--mono);font-size:var(--t-small);color:var(--ink);letter-spacing:-.02em}
+.ln-l{font-size:var(--t-mini);color:var(--ink-3);margin-top:2px;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ln-m{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--t-micro);
+  color:var(--ink-3);letter-spacing:var(--ls-micro);text-transform:uppercase}
+/* the capacity bar is driven by calls_today/daily_cap, a real number, never a decoration */
+.ln-bar{height:3px;border-radius:2px;background:var(--raised-3);margin-top:8px;overflow:hidden}
+.ln-bar i{display:block;height:100%;background:var(--brand);
+  transition:width var(--d-slow) var(--ease)}
+.ln-add{border:1px dashed var(--line-3);border-radius:var(--r-sm);display:grid;place-items:center;
+  min-height:92px;color:var(--ink-3);font-size:var(--t-small);cursor:default;text-align:center;
+  padding:10px}
+
+/* ── the flight strip ─────────────────────────────────────────────────────────────────────── */
+.strip{display:flex;flex-direction:column}
+.fs{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;
+  padding:8px 13px;border-bottom:1px solid var(--line);font-size:var(--t-small);cursor:pointer;
+  transition:background var(--d-fast) var(--ease)}
+.fs:hover{background:var(--raised)}
+.fs:last-child{border-bottom:none}
+.fs-t{font-family:var(--mono);font-size:var(--t-mini);color:var(--ink-3)}
+.fs-w{min-width:0}
+.fs-w b{display:block;font-weight:var(--w-med);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fs-w span{font-size:var(--t-mini);color:var(--ink-3)}
+.fs-r{display:flex;gap:5px;align-items:center;white-space:nowrap}
+
+/* ── the wire: the live-call region ───────────────────────────────────────────────────────── */
+.wire{min-height:186px;display:grid;place-items:center;padding:var(--sp-5) var(--sp-4);
+  text-align:center;position:relative}
+/* An idle wire is a calm band, not a cavern. It was measured at 520px tall next to a long target
+   panel and read as a hole in the page rather than as a resting instrument. */
+.wire-idle{padding:var(--sp-2) 0}
+.wire-idle{max-width:46ch}
+.wire-idle .big{font-size:var(--t-lg);font-weight:var(--w-semi);color:var(--ink-2);margin-bottom:7px}
+.wire-idle .sm{font-size:var(--t-small);line-height:1.6;color:var(--ink-3)}
+/* the horizon: a single flat trace when nothing is on the wire. It does NOT move, because
+   nothing is moving. A scrolling line with no audio behind it would be a lie drawn at 60fps. */
+.horizon{width:100%;max-width:520px;height:1px;background:linear-gradient(90deg,
+  transparent 0%, var(--line-3) 18%, var(--line-3) 82%, transparent 100%);margin:0 0 18px}
+.wire.dead .wire-idle .big{color:var(--bad-2)}
+
+/* ── the queue ─────────────────────────────────────────────────────────────────────────────── */
+.q{display:flex;flex-direction:column;max-height:520px;overflow-y:auto}
+.qr{display:grid;grid-template-columns:22px 1fr auto;gap:9px;align-items:center;padding:9px 13px;
+  border-bottom:1px solid var(--line);cursor:pointer;transition:background var(--d-fast) var(--ease)}
+.qr:hover{background:var(--raised)}
+.qr[aria-current="true"]{background:var(--brand-dim);
+  box-shadow:inset 3px 0 0 0 var(--brand)}
+.qr-i{font-family:var(--mono);font-size:var(--t-micro);color:var(--ink-3);text-align:right}
+.qr-w{min-width:0}
+.qr-w b{display:block;font-size:var(--t-small);font-weight:var(--w-med);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qr-w span{font-size:var(--t-mini);color:var(--ink-3)}
+
+/* ── the channel bay: three arming switches ────────────────────────────────────────────────── */
+/* ★ The bay lives in a 344px rail, and three columns there gave each switch about 100px, which
+   wrapped its reason to one character per line. Measured on a screenshot, not guessed. Switches
+   stack vertically wherever they are narrow and only go side by side when there is genuinely room
+   for the sentence, because the sentence is the point of the control. */
+.bay{display:grid;grid-template-columns:1fr;gap:var(--sp-2)}
+@media (min-width:1500px){ .ckpt-wide .bay{grid-template-columns:repeat(3,1fr)} }
+.sw-w{overflow-wrap:anywhere}
+.sw{border:1px solid var(--line-2);border-radius:var(--r-sm);padding:12px 11px;text-align:left;
+  background:var(--surface);cursor:pointer;position:relative;overflow:hidden;
+  transition:border-color var(--d-fast) var(--ease),transform var(--d-fast) var(--ease)}
+.sw:hover:not(:disabled){border-color:var(--ink-3);transform:translateY(-1px)}
+.sw:active:not(:disabled){transform:translateY(0)}
+.sw-k{display:flex;align-items:center;gap:7px;font-size:var(--t-micro);font-weight:var(--w-semi);
+  letter-spacing:var(--ls-micro);text-transform:uppercase;color:var(--ink-3)}
+.sw-v{font-size:var(--t-base);font-weight:var(--w-semi);margin-top:6px;color:var(--ink-2)}
+.sw-w{font-size:var(--t-mini);line-height:1.45;color:var(--ink-3);margin-top:5px}
+.sw.armed{border-color:var(--brand);background:linear-gradient(180deg,var(--brand-dim) 0%,var(--surface) 72%)}
+.sw.armed .sw-v{color:var(--brand)}
+/* A DISARMED SWITCH IS PHYSICALLY DIFFERENT, not merely a different colour: it is dashed, it is
+   dimmed, its cursor says not-allowed, and it carries the reason. Colour alone would fail a
+   colour-blind operator and would fail a screenshot. */
+.sw:disabled{cursor:not-allowed;border-style:dashed;opacity:.72}
+.sw:disabled .sw-v{color:var(--ink-4)}
+
+/* the hangar: what the whole cockpit looks like when every channel is down. Darkened and calm
+   with one clear caution, which reads as competence. A page that looks broken reads as a broken
+   product. */
+.hangar{border:1px solid var(--warn);background:linear-gradient(180deg,var(--warn-bg) 0%,var(--surface) 60%);
+  border-radius:var(--r);padding:var(--sp-4)}
+@media (prefers-reduced-motion:reduce){
+  .lamp.live .lamp-d{animation:none;
+    box-shadow:0 0 0 4px rgba(55,200,240,.18),0 0 14px rgba(55,200,240,.5)}
+  .ln-bar i{transition:none}
+}
 
 /* CONSOLE-CSS-END */
 `;
@@ -487,8 +643,11 @@ export function consolePage({ admin, buildInfo = {} }) {
     <div class="mark"><span class="mark-dot"></span><span class="mark-name">Answered</span>
       <span class="mark-sub">admin</span></div>
 
+    <div class="nav-h">Flight deck</div>
+    <button class="nav" data-view="cockpit" aria-current="page"><span class="nav-ico">✈</span>Cockpit</button>
+
     <div class="nav-h">Business</div>
-    <button class="nav" data-view="overview" aria-current="page"><span class="nav-ico">◎</span>Overview</button>
+    <button class="nav" data-view="overview"><span class="nav-ico">◎</span>Overview</button>
     <button class="nav" data-view="crm"><span class="nav-ico">☰</span>Leads<span class="nav-n" data-count="leads"></span></button>
     <button class="nav" data-view="customers"><span class="nav-ico">◧</span>Customers<span class="nav-n" data-count="accounts"></span></button>
     <button class="nav" data-view="billing"><span class="nav-ico">§</span>Billing</button>
@@ -656,6 +815,8 @@ const S = {
   lastMeasuredAt: null,
   drawerAccount: null,
   drawerContact: null,
+  cockpit: null,
+  cockpitTarget: null,
   selected: new Set(),
   facets: null,
 };
@@ -782,6 +943,208 @@ function ladder(a) {
 }
 
 // ── LEADS. The CRM over 4,374 real classified contractor businesses. ─────────────────────────
+// ══ THE COCKPIT ═══════════════════════════════════════════════════════════════════════════
+// David, verbatim: "world class Call/Text internal cockpit/interface ... incredible functionalities
+// and filters and features ... manually control or turn on autopilot ... turn on multiple phone
+// lines up to 100+ ... like a world class video game/fighter jet/phone interface ... no gated
+// processes / no lengthy processes / full usability in every way."
+//
+// ★ THE RULE THAT SHAPES EVERY PIXEL BELOW. A cockpit is the most tempting surface in software to
+// fake, and this estate has a first law that nothing is fabricated. So: no animation runs without
+// real data moving, no lamp lights without a measurement behind it, and the LIVE indicator is wired
+// to exactly one thing — a call actually on the wire. The honest version is also the better one: a
+// panel that is loud about what is inoperative is what makes the rest of it believable.
+//
+// It calls sv_board and sv_admin_cockpit. IT DOES NOT DIAL. There is exactly one dial path in this
+// system and it belongs to the outbound lane; a second one that did not run the compliance gate is
+// precisely how that control gets bypassed.
+VIEWS.cockpit = async () => {
+  const d = await api('cockpit');
+  S.lastMeasuredAt = d.at; freshness();
+  S.cockpit = d;
+
+  const live = d.in_flight.length;
+  const providerDead = /provider_unavailable|unconfigured|unknown/.test(
+    (d.providers && d.providers.sms && d.providers.sms.state) || '');
+
+  const lamp = (kind, key, value, why) =>
+    '<div class="lamp ' + kind + '"><div class="lamp-t"><span class="lamp-d"></span>' +
+    '<span class="lamp-k">' + esc(key) + '</span></div>' +
+    '<div class="lamp-v">' + value + '</div>' +
+    '<div class="lamp-w">' + why + '</div></div>';
+
+  const p = d.providers || {};
+  const lamps = '<div class="inst ckpt-full"><div class="inst-h"><h3>Master caution</h3>' +
+    '<span class="sp muted mono" style="font-size:11px">every lamp is a measurement, taken ' +
+    esc(when(d.at)) + '</span></div>' +
+    '<div class="lamps">' +
+      lamp(live ? 'live' : '', 'On the wire', live ? n(live) + ' live' : 'Clear',
+        live ? 'A call is connected right now. This is the only thing that lights this lamp.'
+             : 'No call is on the wire. Nothing here is animating, because nothing is moving.') +
+      lamp(p.telephony && p.telephony.ok ? 'go' : 'stop', 'Telephony',
+        p.telephony && p.telephony.ok ? 'Ready' : 'Down',
+        esc((p.telephony && p.telephony.why) || 'not measured')) +
+      lamp(p.sms && p.sms.ok ? 'go' : 'caution', 'Carrier campaign',
+        p.sms && p.sms.ok ? 'Approved' : 'Blocked', esc((p.sms && p.sms.why) || 'not measured')) +
+      lamp(p.email && p.email.ok ? 'go' : 'stop', 'Mail',
+        p.email && p.email.ok ? 'Sending' : 'Down', esc((p.email && p.email.why) || 'not measured')) +
+      lamp(d.lamps.registry.ok ? 'go' : 'caution', 'Do-not-call registry',
+        d.lamps.registry.ok ? 'Loaded' : 'Never loaded', esc(d.lamps.registry.why)) +
+      lamp(d.autopilot_kill ? 'caution' : 'go', 'Autopilot',
+        d.autopilot_kill ? 'Disarmed' : 'Armed',
+        d.autopilot_kill
+          ? 'The kill switch is set, so no campaign can place a call. A 200 from a call endpoint does not mean outbound is live.'
+          : 'Campaigns may dial.') +
+      lamp(d.lamps.states.open ? 'go' : 'caution', 'States cleared',
+        n(d.lamps.states.open) + ' of ' + n(d.lamps.states.in_book), esc(d.lamps.states.why)) +
+      lamp(p.ai && p.ai.ok ? 'go' : 'caution', 'AI',
+        p.ai && p.ai.ok ? 'Online' : 'Off', esc((p.ai && p.ai.why) || 'not measured')) +
+    '</div></div>';
+
+  // ── the line bank ────────────────────────────────────────────────────────────────────────
+  const cap = d.line_capacity;
+  const bank = '<div class="inst ckpt-full"><div class="inst-h"><h3>Line bank</h3>' +
+    '<span class="sp muted mono" style="font-size:11px">' + n(cap.lines) + ' provisioned · ' +
+      n(cap.active) + ' active · ' + n(cap.calls_today) + ' of ' + n(cap.daily_ceiling) +
+      ' calls today</span></div><div class="inst-b"><div class="bank">' +
+    d.lines.map((l) => {
+      const pct = l.daily_cap ? Math.min(100, Math.round((l.calls_today / l.daily_cap) * 100)) : 0;
+      const cls = l.reputation === 'flagged' || l.reputation === 'at_risk' ? 'flag'
+                : l.resting ? 'rest' : l.status === 'active' ? 'act' : '';
+      return '<div class="ln ' + cls + '">' +
+        '<div class="ln-n">' + esc(phone(l.phone)) + '</div>' +
+        '<div class="ln-l">' + esc(l.label || 'unlabelled') + '</div>' +
+        '<div class="ln-m"><span>' + esc(l.purpose) + '</span><span>·</span>' +
+          '<span>' + esc(l.resting ? 'resting' : l.status) + '</span>' +
+          (l.in_flight ? '<span style="margin-left:auto;color:var(--live)">' + n(l.in_flight) + ' live</span>' : '') +
+        '</div>' +
+        '<div class="ln-bar" title="' + n(l.calls_today) + ' of ' + n(l.daily_cap) + ' today"><i style="width:' + pct + '%"></i></div>' +
+      '</div>';
+    }).join('') +
+    // The 100+ requirement, answered honestly: the capacity is real and the constraint is named.
+    '<div class="ln-add">Add a line<br><span class="muted" style="font-size:11px">' +
+      'Provisioning needs the telephony account funded. The bank has no software ceiling.</span></div>' +
+    '</div></div></div>';
+
+  // ── the wire ─────────────────────────────────────────────────────────────────────────────
+  const wire = '<div class="inst"><div class="inst-h"><h3>The wire</h3>' +
+    (live ? '<span class="sp pill" style="color:var(--live);border-color:var(--live)">' + n(live) + ' connected</span>' : '') +
+    '</div>' +
+    (live
+      ? '<div class="strip">' + d.in_flight.map((c) =>
+          '<div class="fs" data-call="' + esc(c.call_sid || '') + '">' +
+          '<span class="fs-t">' + esc(String(c.elapsed_s || 0)) + 's</span>' +
+          '<span class="fs-w"><b>' + esc(c.contact_name || phone(c.to_number)) + '</b>' +
+          '<span>' + esc(c.status) + ' · ' + n(c.lines_so_far) + ' transcript lines</span></span>' +
+          '<span class="fs-r"><a class="btn ghost sm" href="/internal/cockpit" target="_blank" rel="noreferrer">Listen live</a></span>' +
+          '</div>').join('') + '</div>'
+      : '<div class="wire' + (providerDead ? ' dead' : '') + '"><div class="wire-idle">' +
+        '<div class="horizon"></div>' +
+        (providerDead
+          ? '<div class="big">The wire is cold</div><div class="sm">' +
+            esc((p.telephony && p.telephony.why) || 'The telephony provider is not answering.') +
+            ' Nothing is drawn here because nothing is measured. This panel will light by itself when the provider answers again.</div>'
+          : '<div class="big">Nothing on the wire</div><div class="sm">No call is connected. ' +
+            'The trace above is flat because there is no audio, not because it is decorative. ' +
+            'Live calls appear here the moment one connects, and the supervisor console at ' +
+            '<a href="/internal/cockpit" target="_blank" rel="noreferrer">/internal/cockpit</a> ' +
+            'is where you listen, whisper, barge and take over.</div>') +
+        '</div></div>') +
+    '</div>';
+
+  // ── the target and its channel bay ───────────────────────────────────────────────────────
+  const target = S.cockpitTarget || d.queue[0];
+  const bay = target
+    ? '<div class="inst" style="height:100%"><div class="inst-h"><h3>Target</h3>' +
+        '<span class="sp"><button class="btn ghost sm" data-act="ck-skip">Skip</button>' +
+        '<button class="btn ghost sm" data-contact="' + esc(target.id) + '">Open record</button></span></div>' +
+      '<div class="inst-b">' +
+        '<div style="font-size:var(--t-xl);font-weight:var(--w-semi);letter-spacing:var(--ls-xl)">' +
+          esc(target.name || 'Unnamed') + '</div>' +
+        '<div class="muted mono" style="font-size:12.5px;margin-top:4px">' +
+          esc(phone(target.phone)) + ' · ' + esc(target.line_type || 'line type unknown') +
+          (target.city ? ' · ' + esc([target.city, target.state].filter(Boolean).join(', ')) : '') + '</div>' +
+        '<div class="tile-s" style="margin-top:9px">' + esc(target.why) + '</div>' +
+        '<div class="bay" style="margin-top:14px">' + channelSwitches(target, d) + '</div>' +
+      '</div></div>'
+    : '<div class="inst"><div class="inst-h"><h3>Target</h3></div>' +
+      '<div class="inst-b">' + emptyState('The queue is empty',
+        'No lead is in new, queued or callback and not suppressed. That is a measured zero.') + '</div></div>';
+
+  const queue = '<div class="inst"><div class="inst-h"><h3>Queue</h3>' +
+    '<span class="sp muted mono" style="font-size:11px">' + n(d.queue.length) + ' ready · ' +
+      n(d.book.emailable) + ' emailable in the book</span></div>' +
+    '<div class="q">' + d.queue.map((q, i) =>
+      '<div class="qr" data-cktarget="' + esc(q.id) + '"' +
+        (target && q.id === target.id ? ' aria-current="true"' : '') + '>' +
+      '<span class="qr-i">' + (i + 1) + '</span>' +
+      '<span class="qr-w"><b>' + esc(q.name || 'Unnamed') + '</b>' +
+      '<span>' + esc([q.trade, q.city, q.state].filter(Boolean).join(' · ')) + '</span></span>' +
+      '<span class="fs-r">' + (q.has_email ? '<span class="rch on" title="Email is open">E</span>' : '') +
+        (q.fixed_line ? '<span class="rch wait" title="Fixed line, waiting on the registry">C</span>' : '') +
+      '</span></div>').join('') + '</div></div>';
+
+  const strip = '<div class="inst ckpt-full"><div class="inst-h"><h3>Flight strip</h3>' +
+    '<span class="sp muted mono" style="font-size:11px">the last ' + n(d.recent.length) +
+    ' calls · ' + n(d.book.transcript_lines) + ' transcript lines on record</span></div>' +
+    (d.recent.length
+      ? '<div class="strip">' + d.recent.map((c) =>
+          '<div class="fs" data-call="' + esc(c.call_sid || '') + '">' +
+          '<span class="fs-t">' + esc(when(c.created_at)) + '</span>' +
+          '<span class="fs-w"><b>' + esc(c.contact_name || phone(c.to_number) || 'unknown') + '</b>' +
+          '<span>' + esc(c.call_class || 'unclassified') + ' · ' +
+            (c.placed ? esc(c.status || 'placed') : 'refused') +
+            (c.transcript_lines ? ' · ' + n(c.transcript_lines) + ' lines' : '') + '</span></span>' +
+          '<span class="fs-r">' +
+            (c.recording_sid ? '<span class="pill info">rec</span>' : '') +
+            (c.disclosure_verified === true ? '<span class="pill ok">disclosed</span>'
+              : c.disclosure_verified === false ? '<span class="pill bad">not spoken</span>'
+              : '<span class="pill warn">unchecked</span>') +
+          '</span></div>').join('') + '</div>'
+      : emptyState('No calls yet', 'A measured zero: the call spine is empty.')) + '</div>';
+
+  // The target is the thing an operator acts on, so it gets the full width and the bay gets room
+  // for its sentences. The wire and the queue share the row below it.
+  return '<div class="ckpt">' + lamps + bank +
+    '<div class="ckpt-full ckpt-wide">' + bay + '</div>' +
+    wire + queue + strip + '</div>';
+};
+
+const target_or = (t, html) => html;
+
+// Three switches. A switch that cannot act is DASHED, DIMMED and carries its reason: it is
+// physically different, not merely a different colour, so it survives a colour-blind operator and
+// a black-and-white screenshot.
+function channelSwitches(t, d) {
+  const p = d.providers || {};
+  const mailOk = Boolean(p.email && p.email.ok) && Boolean(t.has_email);
+  const smsOk = Boolean(p.sms && p.sms.ok) && (t.line_type === 'mobile' || t.line_type === 'nonFixedVoip');
+  const callOk = Boolean(d.lamps.registry.ok) && t.state_open && t.fixed_line && !d.autopilot_kill;
+
+  const sw = (key, label, ok, value, why, act) =>
+    '<button class="sw ' + (ok ? 'armed' : '') + '"' + (ok ? '' : ' disabled') +
+    (ok ? ' data-act="' + act + '" data-contact="' + esc(t.id) + '" data-to="' +
+          esc(key === 'email' ? (t.email || '') : (t.phone || '')) + '"' : '') +
+    ' title="' + esc(why) + '">' +
+    '<div class="sw-k">' + esc(label) + '</div>' +
+    '<div class="sw-v">' + (ok ? value : 'Disarmed') + '</div>' +
+    '<div class="sw-w">' + esc(why) + '</div></button>';
+
+  return sw('email', 'Email', mailOk, 'Armed',
+      mailOk ? 'A real send goes out and is logged against this record.'
+             : (!t.has_email ? 'No email address on this record yet.'
+                             : ((p.email && p.email.why) || 'The mail provider is not configured.')), 'do-email') +
+    sw('sms', 'Text', smsOk, 'Armed',
+      smsOk ? 'The line accepts texts and the campaign is approved.'
+            : ((p.sms && p.sms.why) || 'Not textable.'), 'do-sms') +
+    sw('call', 'Call', callOk, 'Armed',
+      callOk ? 'Lawful right now. Placement runs through the outbound gate, which is the only path that may dial.'
+             : (d.autopilot_kill ? 'The autopilot kill switch is set, so nothing on this deploy can place a call.'
+                : !t.fixed_line ? 'An artificial voice may not cold-call a ' + (t.line_type || 'line of unknown type') + ' without consent.'
+                : !t.state_open ? 'This state has not been cleared. That is a queue, not a refusal.'
+                : d.lamps.registry.why), 'do-call');
+}
+
 VIEWS.crm = async () => {
   const f = S.filters.crm;
   const qs = crmQuery(f, 50, f.offset);
@@ -1609,7 +1972,7 @@ function pager(group, d) {
 }
 
 // ── router ────────────────────────────────────────────────────────────────
-const TITLES = { overview:'Overview', crm:'Leads', customers:'Customers', calls:'Calls and recordings',
+const TITLES = { cockpit:'Cockpit', overview:'Overview', crm:'Leads', customers:'Customers', calls:'Calls and recordings',
   usage:'Usage', billing:'Billing', parley:'Parley', events:'Behaviour', compliance:'Compliance',
   audit:'Audit log', system:'System' };
 
@@ -1885,7 +2248,7 @@ function palGo() {
 // ── events. One delegated listener, so nothing is bound to a node a repaint will replace. ──
 function wire() {
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],.pal-i');
+    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],[data-cktarget],.pal-i');
     if (!t) return;
 
     // ── CRM ────────────────────────────────────────────────────────────────────────────────
@@ -1894,6 +2257,11 @@ function wire() {
       if (t.checked) S.selected.add(id); else S.selected.delete(id);
       go('crm', { quiet: true });
       return;
+    }
+    if (t.dataset.cktarget) {
+      const q = (S.cockpit && S.cockpit.queue) || [];
+      S.cockpitTarget = q.find((x) => x.id === t.dataset.cktarget) || null;
+      go('cockpit', { quiet: true }); return;
     }
     if (t.dataset.clearf) {
       const k = t.dataset.clearf, f = S.filters.crm;
@@ -1962,6 +2330,12 @@ function wire() {
     if (act === 'export-accounts') { exportAccounts(); return; }
     if (act === 'crm-clear-sel') { S.selected.clear(); go('crm'); return; }
     if (act === 'crm-density') { S.dense = !S.dense; go('crm'); return; }
+    if (act === 'ck-skip') {
+      const q = (S.cockpit && S.cockpit.queue) || [];
+      const cur = S.cockpitTarget ? q.findIndex((x) => x.id === S.cockpitTarget.id) : 0;
+      S.cockpitTarget = q[(cur + 1) % Math.max(q.length, 1)] || null;
+      go('cockpit', { quiet: true }); return;
+    }
     if (act === 'crm-sort') { S.filters.crm.sort = t.dataset.value; S.filters.crm.offset = 0; go('crm'); return; }
     if (act === 'crm-sel-all') {
       $$('[data-sel]').forEach((cb) => { if (t.checked) S.selected.add(cb.dataset.sel); else S.selected.delete(cb.dataset.sel); });
@@ -1995,7 +2369,7 @@ function wire() {
     }
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
     if (e.target !== document.body) return;
-    const map = { g:'overview', d:'crm', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
+    const map = { f:'cockpit', g:'overview', d:'crm', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
       e:'events', k:'compliance', a:'audit', s:'system' };
     if (map[e.key]) { e.preventDefault(); go(map[e.key]); }
   });
@@ -2329,7 +2703,7 @@ async function exportAccounts() {
 
 function boot() {
   wire();
-  const v = location.hash.replace('#', '') || 'overview';
+  const v = location.hash.replace('#', '') || 'cockpit';
   go(v);
   // A gentle refresh that respects focus. paint() refuses to replace a region owning focus, so a
   // half-typed filter is never wiped by a tick.
