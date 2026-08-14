@@ -70,11 +70,11 @@ def nav(active):
   <div class="wrap">
     <a class="brand" href="/" aria-label="Answered, home">{MARK}<span class="brand-name"><b>ANSWERED</b></span></a>
     <nav class="nav-links" aria-label="Primary">{links}</nav>
-    {seg}<a class="nav-cta" href="/#early">Get on the list</a>
+    {seg}<a class="nav-cta" href="/setup">Set your rules</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/#early">Get on the list</a></div>'''
+<div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/setup">Set your rules</a></div>'''
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
@@ -861,7 +861,7 @@ RECOVER = '''
         <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called. Recover makes the call, in your name, on your caller ID, and writes down what was promised.</p>
         ''' + reversal('recover', top=24) + '''
         <div class="hero-actions rv d3" style="margin-top:26px">
-          <a class="btn btn-primary" href="/#early">Get on the list</a>
+          <a class="btn btn-primary" href="/setup">Set your rules</a>
           <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
         </div>
         <p class="src hero-note rv d3">All three bands and the flat alternative are <a href="#fee" style="color:var(--bronze-2)">further down this page</a>.</p>
@@ -983,7 +983,7 @@ RECOVER = '''
          the two lines around it, ONLY when /api/demo-health answers
          healthy:true. The demo number is never in this file. -->
     <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:46ch">Hear the voice before you hand it an invoice.</p>
-    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it chase an invoice"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it chase an invoice"><a class="btn btn-primary" href="/setup">Set your rules</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back.</p>
     <p class="src rv d3" data-callgate-off style="margin-top:14px">The demo line is not answering this minute, so the page has taken the number down. It is called every two hours and returns by itself.</p>
   </div>
@@ -1088,7 +1088,7 @@ TRUST = '''
          the two lines around it, ONLY when /api/demo-health answers
          healthy:true. The demo number is never in this file. -->
     <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:48ch">Call it and listen to the first sentence.</p>
-    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear the first sentence"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear the first sentence"><a class="btn btn-primary" href="/setup">Set your rules</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">It tells you it is an AI before anything else. Push it for a price and watch it refuse.</p>
     <p class="src rv d3" data-callgate-off style="margin-top:14px">The demo line is not answering this minute, so the page has taken the number down. Same rule as above: down beats unwatched.</p>
   </div>
