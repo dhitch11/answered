@@ -61,6 +61,7 @@ export const ROUTES = [
   // Internal, PIN-gated server-side. A 200 here is the LOGIN FORM, never the page: the content
   // lives inside the handler and is serialized only past the PIN. Its source file is deliberately
   // git-ignored, because this repository is public and the file is competitor intelligence.
+  { path: '/internal/parley',      kind: 'gate', expect: [200, 503], what: 'The negotiation board: every deal, what was said, what settled, what was paid. Anonymous callers get the PIN form.' },
   { path: '/internal/competitors', kind: 'api', expect: [200, 401, 503], what: 'Internal competitor intelligence. Anonymous callers get the PIN form and nothing else.' },
   { path: '/api/call-me',          kind: 'api', expect: [405, 400, 200], what: 'One click activation.' },
 

@@ -70,6 +70,17 @@
   status = 200
   force = true
 
+# /internal/parley — every negotiation, what was said, what settled and what was
+# paid (@ANSWERED-BUILD). Gated server side inside the function like the rest of
+# /internal: nothing is serialized before the PIN check. It deliberately cannot
+# see either party's sealed number, because the product promises those are shown
+# to nobody and that has to include us.
+[[redirects]]
+  from = "/internal/parley"
+  to = "/.netlify/functions/parley-console"
+  status = 200
+  force = true
+
 # /internal/ops — the daily operating view (@LANE-OPS). Gated server side inside
 # the function exactly like /internal and /internal/cockpit: nothing is
 # serialized before the PIN check. Read only: it cannot dial, text, or spend.
