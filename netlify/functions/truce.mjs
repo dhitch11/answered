@@ -117,7 +117,11 @@ export const handler = async (event) => {
         let gate;
         try {
           gate = await rpc('sv_rate_take', {
-            p_bucket: 'truce_create', p_key: ip, p_limit: 8, p_window: '1 hour',
+            p_bucket: 'truce_create', p_key: ip, p_limit: 20, p_window: '1 hour',
+            // 20/hour: a person starting real negotiations will never approach it, a scripted
+            // loop hits it in seconds, and the property suite (7 deals per run) has headroom for
+            // two runs. Deliberately NOT exempting the test path: a limiter with a bypass in it
+            // is not a limiter, and a suite that can trip it is the suite proving it works.
           });
         } catch (e) {
           console.error('rate limiter unreadable; refusing rather than waving through:', String(e.message).slice(0, 120));
