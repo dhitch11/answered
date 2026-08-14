@@ -835,7 +835,10 @@ VIEWS.compliance = async () => {
   // new, so most existing rows carry NULL, and a bare reassuring 0 would be the worst kind of lie:
   // the comfortable one.
   const exposure = e.ai_listened_without_verified_disclosure;
-  const measured = t.ai_listened;
+  // The denominator now ships WITH the headline number, so the panel no longer has to derive
+  // it. Falling back to the by-class sum keeps an older deploy of the RPC rendering honestly
+  // rather than silently reading undefined as zero.
+  const measured = (typeof e.ai_listened_total === 'number') ? e.ai_listened_total : t.ai_listened;
   const exposureTone = exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn');
   const exposureNote = exposure > 0
     ? 'Calls where an AI was receiving the audio and no disclosure has been verified on the wire. ' +
@@ -931,14 +934,53 @@ VIEWS.compliance = async () => {
       'disclosed.</strong></span></div>' +
   '</div>' +
 
-  ((e.states_refused && Object.keys(e.states_refused).length)
-    ? '<div class="card pad0"><div class="card-h"><h2>Why the gate refused</h2>' +
-      '<span class="sp muted">refusals are recorded, never discarded: they are the proof the gate ran</span></div>' +
-      '<div class="tw"><table><thead><tr><th>Reason</th><th class="num">Calls</th></tr></thead><tbody>' +
-      Object.entries(e.states_refused).sort((a, b) => b[1] - a[1]).map(([reason, count]) =>
-        '<tr><td class="dim">' + esc(reason) + '</td><td class="num">' + n(count) + '</td></tr>').join('') +
-      '</tbody></table></div></div>'
-    : '');
+  refusalsCard(e);
+};
+
+/**
+ * ★ A RENAMED KEY MUST FAIL LOUD, NOT VANISH.
+ *
+ * This card previously read 'e.states_refused'. The outbound lane replaced it with 'refusals',
+ * a better shape, and the panel kept rendering a clean page with the table silently absent: no
+ * error, no empty state, no gap anyone would notice. A section that disappears when its data
+ * source is renamed is the dominant failure mode in this estate wearing a different hat.
+ *
+ * So: the ONE shape it understands is 'refusals'. Anything else says so on the screen.
+ */
+function refusalsCard(e) {
+  const head = '<div class="card-h"><h2>Why the gate refused</h2>' +
+    '<span class="sp muted">refusals are recorded, never discarded: they are the proof the gate ran</span></div>';
+
+  if (!Array.isArray(e.refusals)) {
+    return '<div class="card pad0">' + head + errState('The refusal data changed shape',
+      "This panel expects a refusals array of { code, reason, n } and the evidence source did not " +
+      'return one. The table is not empty, it is unreadable, and those are different. Nothing here ' +
+      'is a measurement until this is fixed.') + '</div>';
+  }
+  if (!e.refusals.length) {
+    return '<div class="card pad0">' + head + emptyState('The gate has refused nothing in this window',
+      'A measured zero. Every call the gate saw met its preconditions. Measured ' + esc(stamp(S.lastMeasuredAt)) + '.') + '</div>';
+  }
+
+  // Colour by what KIND of refusal it is, from the stable code rather than from prose that may be
+  // reworded. A do-not-call refusal and a wrong-line-type refusal mean very different things about
+  // whether the programme is ready.
+  const TONE = { dnc_listed:'bad', dnc_unanswerable:'bad', dnc_no_scrub:'bad', dnc_no_procedures:'bad',
+    state_licensing:'warn', state_biometric:'warn', mobile_no_consent:'warn', suppressed:'bad',
+    line_type_unfit:'', lookup_failed:'warn', no_state:'warn', frequency_cap:'', toll_free:'', other:'' };
+  const total = e.refusals.reduce((a, r) => a + (Number(r.n) || 0), 0);
+
+  return '<div class="card pad0">' + head +
+    '<div class="tw"><table><thead><tr><th>Code</th><th>Why, in full</th>' +
+    '<th class="num">Calls</th></tr></thead><tbody>' +
+    e.refusals.slice().sort((a, b) => b.n - a.n).map((r) =>
+      '<tr><td><span class="pill ' + (TONE[r.code] || '') + '">' + esc(r.code || 'other') + '</span></td>' +
+      '<td class="dim">' + esc(r.reason) + '</td>' +
+      '<td class="num">' + n(r.n) + '</td></tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="card-h" style="border-bottom:none;border-top:1px solid var(--line)">' +
+      '<span class="muted">' + n(total) + ' refusals across ' + n(e.refusals.length) + ' distinct reasons</span></div>' +
+  '</div>';
 };
 
 const row3 = (label, ok, detail) =>
@@ -1517,3 +1559,19 @@ function boot() {
 return { boot };
 })();
 `;
+
+// ── a truncation guard, because this failed silently once ────────────────────────────────────
+// APP_JS is a String.raw template. A single stray backtick anywhere inside it ends the literal
+// early, and the failure is not always a parse error: it can produce a SHORTER but perfectly
+// valid string, which ships a half-written application that throws in the browser instead of on
+// the server. It happened here (a backtick inside a code comment) and the only reason it was
+// caught is that this particular truncation did not parse.
+//
+// So the module refuses to load unless the script it is about to serve actually reaches its own
+// last line. A console that fails at import is an outage. A console that serves a truncated
+// script is an outage that looks fine from the outside, which is worse.
+if (!/return \{ boot \};\s*\}\)\(\);\s*$/.test(APP_JS)) {
+  throw new Error(
+    'admin-ui: APP_JS is truncated. It does not end with its own closing lines, which means a ' +
+    'stray backtick closed the template literal early. Length is ' + APP_JS.length + ' chars.');
+}
