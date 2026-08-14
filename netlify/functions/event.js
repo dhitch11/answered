@@ -122,5 +122,51 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: 'Event not stored.' };
   }
 
+  // ── SECOND WRITE: the queryable copy ───────────────────────────────────────
+  // Blobs above is the DURABLE RAW LOG and stays the source of truth: it is
+  // append-only, cheap, and survives a database being rebuilt. But a blob store
+  // cannot answer "what did this account do last week", so the operator console
+  // reads app_events instead, and until this write existed that table had no
+  // writers at all. @ANSWERED-INTEL caught their own Behaviour panel calling
+  // that an honest measured zero, which was true of the query and false of the
+  // world: careful empty-state language over an unwired pipe is worse than a
+  // blank panel, because it lends authority to the wrong answer.
+  //
+  // This write is DELIBERATELY NOT FATAL. The raw log already succeeded, so the
+  // event is not lost; failing the request here would turn an analytics outage
+  // into a broken page. It is loud instead.
+  const dbUrl = (process.env.ANSWERED_DB_URL || '').replace(/\/+$/, '');
+  const dbAnon = process.env.ANSWERED_DB_ANON;
+  const dbSecret = process.env.ANSWERED_DB_SECRET;
+  if (dbUrl && dbAnon && dbSecret) {
+    try {
+      const r = await fetch(dbUrl + '/rest/v1/rpc/sv_admin_event', {
+        method: 'POST',
+        headers: {
+          apikey: dbAnon,
+          Authorization: 'Bearer ' + dbAnon,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          p_secret: dbSecret,
+          p_row: {
+            event: record.event,
+            page: record.page || null,
+            meta: record.meta || null,
+            anon_id: record.ip_sha256 || null,  // stitches pre-signup activity to an account later
+            ua: record.ua || null,
+            at: record.at || new Date().toISOString(),
+          },
+        }),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!r.ok) {
+        console.error('event: queryable copy rejected', r.status, '(raw log already written, so nothing is lost)');
+      }
+    } catch (e) {
+      console.error('event: queryable copy failed:', String(e && e.message).slice(0, 120), '(raw log already written)');
+    }
+  }
+
   return { statusCode: 204, body: '' };
 };

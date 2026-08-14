@@ -139,13 +139,11 @@
   status = 200
   force = true
 
-# The terms half of the signed artifact (@LANE-PARLEY). Its own door rather than
-# a sixth op on /api/truce, so that file stays @ANSWERED-RESEARCH's alone.
-[[redirects]]
-  from = "/api/parley-terms"
-  to = "/.netlify/functions/parley-terms"
-  status = 200
-  force = true
+# NOTE, deliberately left as a comment rather than a route: this lane briefly had
+# its own /api/parley-terms door onto tr_terms, so it would not be writing
+# @ANSWERED-RESEARCH's file. They folded `terms` in as a sixth op on /api/truce
+# within the hour, so the duplicate was deleted before it ever deployed. Two
+# doors onto one RPC is how one of them gets fixed and the other is forgotten.
 
 # ── one click activation (@ANSWERED-ACTIVATION) ──────────────────────────────
 # One function, three routes. The two webhook routes are declared FIRST and

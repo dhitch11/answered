@@ -36,6 +36,7 @@
 // still blocking any denial.
 
 import { isStop, askedIfAI } from './scripts.mjs';
+import { BOOK_TOOL } from './tools.mjs';
 
 // ── shared regexes. A floor's PIVOT is per persona; the detector is not. ────
 const PRICE_RE = /\$|\b(?:dollars?|bucks|cents)\b/i;
@@ -222,9 +223,19 @@ export function trimToSentence(t) {
 
 // ── THE SPECS ───────────────────────────────────────────────────────────────
 
-// FROZEN. Byte identical to the RILEY_SPEC that has been serving the live demo
-// line since 2026-08-13. Do not edit without a real call and a canary pass.
-const RILEY_SPEC = `You are Riley, the receptionist on the Answered demo line. You answer as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. The caller is usually a contractor testing the product, so give them the real experience: warm, quick, useful.
+// FROZEN, AND STILL FROZEN. Byte identical to the RILEY_SPEC that has been
+// serving the live demo line since 2026-08-13, and personas.test.mjs still
+// holds the same sha256 over exactly these 1,597 characters.
+//
+// ★ WHY THIS IS NOW A PREFIX AND NOT THE WHOLE SPEC (2026-08-14, @LANE-BOOK).
+// On 2026-08-14 the demo line got hands: a real ElevenLabs server tool that
+// writes the visit to /api/booking. A voice that can act needs to be told when
+// to act, and that instruction has to live in the spec. Rewriting the frozen
+// text to weave booking through it would have thrown away the one guarantee
+// this file offers, which is that the live line's words did not move. So the
+// frozen text is preserved EXACTLY, under its own name, and the booking rules
+// are appended after it. The old digest still passes, against the old bytes.
+export const RILEY_SPEC_FROZEN = `You are Riley, the receptionist on the Answered demo line. You answer as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. The caller is usually a contractor testing the product, so give them the real experience: warm, quick, useful.
 
 How a call goes:
 1. Find out what is wrong, where it is happening, and how urgent it feels. One question at a time.
@@ -241,6 +252,22 @@ Hard rules, and they never bend:
 - Never ask for card numbers, bank details, or a social security number, and refuse them if offered.
 - If the caller gets rude, stay calm and kind, and offer to end the call.
 - Keep every reply under about 40 words. Plain words a seventh grader would follow, a little foreman warmth. No lists, no headings, just talk.`;
+
+// The part that turns a nice conversation into a job on a calendar. Written to
+// one idea: the tool is the only thing that books, so the words "you are
+// booked" are a report on what the tool said and never a prediction of it.
+export const RILEY_BOOKING = `Booking the visit, and this is the part that actually matters:
+- Nothing is on the schedule until you use the ${BOOK_TOOL} tool. Saying it out loud does not book it.
+- Before you use it you need all five of these: their name, the service address, a good callback number, what the visit is for, and which of the three windows they agreed to.
+- Ask for whatever is missing, one question at a time, and never fill anything in yourself. If you did not hear it from them, you do not have it.
+- Read the phone number back to them before you use it.
+- Use the tool once, then wait. It answers in a couple of seconds and it tells you exactly what happened.
+- Only after it tells you the visit is booked do you tell the caller it is booked. Say the day and the time in words.
+- If it tells you nothing was booked, say that plainly and offer to start over. Never tell somebody a visit is on the schedule when it is not.`;
+
+const RILEY_SPEC = `${RILEY_SPEC_FROZEN}
+
+${RILEY_BOOKING}`;
 
 const SCOUT_SPEC = `You are the voice on an outbound research call for a company called Answered. You are talking to somebody who runs or works at a home service business, and they did not ask you to call.
 
@@ -319,6 +346,25 @@ export const PERSONAS = {
     routes: ['/api/answered-brain', '/api/answered-brain/riley'],
     frozen: true,
     spec: RILEY_SPEC,
+    // ── the hands ─────────────────────────────────────────────────────────
+    // A persona may only call a tool that is on its own allowlist AND that the
+    // vendor declared on the request. Both halves are required on purpose: the
+    // allowlist stops a console change handing a voice an action nobody wrote
+    // a floor for, and requiring the vendor's declaration stops the model
+    // emitting a call to something that cannot run, which would look to the
+    // caller exactly like a booking and be nothing at all.
+    tools: [BOOK_TOOL],
+    // Only used on a turn where a tool is actually offered. The five booking
+    // fields do not fit in 120 tokens beside a spoken sentence, and a truncated
+    // arguments object is an invalid booking. Turns without tools still get
+    // exactly 120, so nothing about the line's ordinary cadence moved.
+    toolMaxTokens: 400,
+    // Said while the tool runs, so nobody sits in silence. It claims nothing.
+    toolHold: 'Let me get that written down for you.',
+    // Said when the model produced a booking this bridge could not parse. It is
+    // the honest sentence, and it never promises a callback, because Riley's own
+    // contact floor is right: on the demo line nobody is going to call back.
+    toolFail: 'I could not get that written down just now, so nothing is booked. Give me one more go at it.',
     maxTokens: 120,
     temperature: 0.6, // primary model only; the backup call omits it on purpose
     sentenceCap: 2,
@@ -645,6 +691,7 @@ export function describe() {
       soft_close_at_turn: p.softCloseAt,
       hard_close_at_turn: p.hardCloseAt,
     },
+    tools: (p.tools || []).slice(),
     output_floors: p.outFloors.map((f) => f.by),
     input_branches: (p.stop ? ['stop'] : []).concat(p.inBranches.map((b) => b.by)).concat(['hard-close']),
     numerals_allowed_without_the_caller_saying_them: Array.from(p.numAllow),

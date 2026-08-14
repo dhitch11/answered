@@ -1,15 +1,16 @@
-// POST /api/el-postcall — ElevenLabs hands us the call after it ends, and we turn it into a recap.
+// POST /api/el-postcall — ElevenLabs hands us the call after it ends, and we turn it into a record.
 //
-// This is the transcript delivery path for the line that actually works today: the inbound demo
-// number, answered by the ConvAI agent as Riley. When a conversation finishes, ElevenLabs POSTs
-// the whole thing here (transcript, duration, the caller's number, its own summary), and this
-// forwards it into the same recap flow the outbound side uses. One recap format, one channel,
-// one place where the copy about texting lives.
+// This is the transcript path for the line that actually works today: the inbound demo number,
+// answered by the ConvAI agent as Riley. When a conversation finishes, ElevenLabs POSTs the whole
+// thing here (transcript, duration, the caller's number, its own summary), this writes it into the
+// live call spine, and then delivers the recap. One recap format, one delivery layer, one place
+// where the copy about texting lives.
 //
-// ★ THE SIGNATURE IS CHECKED, AND IT FAILS CLOSED. An unauthenticated webhook that emails an
-// operator is a way for a stranger to put words in a transcript and have the shop read them as if
-// a customer said them. ElevenLabs signs with `ElevenLabs-Signature: t=<unix>,v0=<hex>` over
-// `${t}.${rawBody}`. Three things this checks that a naive implementation skips:
+// ★ THE SIGNATURE IS CHECKED, AND IT FAILS CLOSED. An unauthenticated webhook that writes a
+// transcript and emails an operator is a way for a stranger to put words in a customer's mouth and
+// have the shop read them as if they were said. ElevenLabs signs with
+// `ElevenLabs-Signature: t=<unix>,v0=<hex>` over `${t}.${rawBody}`. Three things this checks that a
+// naive implementation skips:
 //   1. The RAW body, byte for byte, before any JSON.parse. Re-serializing changes key order and
 //      whitespace, and every signature fails for reasons nobody can find.
 //   2. A constant-time compare, on equal-length buffers.
@@ -18,10 +19,19 @@
 // With ELEVENLABS_WEBHOOK_SECRET unset this returns 503 and refuses everything. It never accepts
 // an unsigned payload "for now".
 //
-// OPERATOR STEP THIS NEEDS, AND IT IS NOT DONE YET: in the ElevenLabs dashboard, set the agent's
-// post-call webhook to https://answered.reddenda.com/api/el-postcall and copy the signing secret
-// into ELEVENLABS_WEBHOOK_SECRET on the Netlify site. Until both exist, this endpoint is live and
-// correctly refusing, which is the honest state, not a broken one.
+// ★ THE SECRET IS ELEVENLABS', NOT OURS. `POST /v1/workspace/webhooks` GENERATES the signing
+// secret and returns it exactly once, at creation. You cannot choose your own. Anyone "generating
+// a webhook secret" and setting it here will watch every signature fail with a correct
+// implementation, which is a very expensive afternoon. The value in ELEVENLABS_WEBHOOK_SECRET
+// must be the `wsec_...` string that call returned.
+//
+// ★ WHAT THIS DOES WITH A VERIFIED EVENT, in order, because the order is the point:
+//   1. PERSIST to the spine (calls, transcript_lines, call_events) via the sv_* RPCs. Before this
+//      existed, `calls` held ZERO inbound rows and `transcript_lines` held ZERO ElevenLabs lines:
+//      the line answered, people spoke, and the only copy of those words lived inside a vendor.
+//   2. DELIVER the recap on whatever channels ANSWERED_RECAP_CHANNELS names, guarded by a durable
+//      per-call claim so a retry cannot send twice.
+// Storing first means a mail outage costs nobody their record.
 
 import crypto from 'node:crypto';
 import { deliverRecap } from './recap.mjs';
@@ -73,16 +83,26 @@ export function readPayload(body) {
 
   const startSecs = Number(meta.start_time_unix_secs);
   const callSid = String(phone.call_sid || d.call_sid || '');
+  const to = String(phone.agent_number || phone.to_number || '');
+
+  // The demo number is ours, not a customer's line. Labelling those calls 'demo' keeps the
+  // billing and reporting surfaces from counting a proof call as a shop's inbound call.
+  const demo = String(process.env.ANSWERED_DEMO_NUMBER || '').trim();
 
   return {
     call_sid: /^CA[0-9a-f]{32}$/i.test(callSid) ? callSid : '',
     conversation_id: String(d.conversation_id || ''),
+    agent_id: String(d.agent_id || ''),
+    direction: String(phone.direction || 'inbound') === 'outbound' ? 'outbound' : 'inbound',
     from: String(phone.external_number || phone.from_number || ''),
-    to: String(phone.agent_number || phone.to_number || ''),
+    to,
     started_at: Number.isFinite(startSecs) && startSecs > 0 ? new Date(startSecs * 1000).toISOString() : '',
     duration_seconds: Number(meta.call_duration_secs ?? d.call_duration_secs),
+    termination_reason: String(meta.termination_reason || ''),
     disposition: String(analysis.call_successful || d.status || ''),
     summary: String(analysis.transcript_summary || ''),
+    summary_title: String(analysis.call_summary_title || ''),
+    call_class: demo && to === demo ? 'demo' : 'inbound',
     transcript: lines,
   };
 }
@@ -114,14 +134,14 @@ export default async (req) => {
   }
 
   const input = readPayload(body);
-  if (!input.transcript.length && !input.call_sid) {
-    return json(200, { ok: true, ignored: 'no transcript and no call sid in the payload, so there is nothing to recap' });
+  if (!input.transcript.length && !input.call_sid && !input.conversation_id) {
+    return json(200, { ok: true, ignored: 'no transcript, no call sid and no conversation id in the payload, so there is nothing to file' });
   }
 
-  const result = await deliverRecap(input, { site: new URL(req.url).origin });
-  // Always 200 to ElevenLabs once the signature passed: a non-2xx makes them retry, and a retry of
-  // an email that already went is worse than a log line about one that did not.
-  if (!result.ok && !result.duplicate) console.error(`el-postcall: recap delivery failed: ${JSON.stringify(result.delivery && result.delivery.email)}`);
+  const result = await deliverRecap(input, { site: new URL(req.url).origin, persist: true });
+  // Always 200 to ElevenLabs once the signature passed: a non-2xx makes them retry, and the words
+  // are already stored by this point, so a retry could only duplicate a delivery.
+  if (!result.ok) console.error(`el-postcall: recap delivery failed for ${result.key}: ${JSON.stringify(result.delivery)}`);
   return json(200, { ok: true, recap: result });
 };
 

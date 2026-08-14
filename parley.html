@@ -188,6 +188,87 @@
 .pl-not b { color: var(--t1); font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { .pl-norow { transition: none; } .pl-norow:hover { transform: none; } }
 
+/* ── THE REAL DEAL. pd- prefixed, same containment law as pl-. ─────────────
+      Everything below styles a LIVE negotiation running on /api/truce, not the
+      simulator. It reuses .pl-thread / .pl-msg / .pl-sheet on purpose: the real
+      thread and the real signed page must look like the ones the page promised,
+      or the demo was a different product. NOTHING here uses .rv, because .rv
+      rests at opacity:0 under html.js and only the load-time IntersectionObserver
+      ever adds .in. Injected .rv content would rest invisible forever. */
+.pd-card { border: 1px solid var(--line2); border-radius: 16px; background: var(--ink-900); padding: clamp(18px,2.4vw,26px); }
+.pd-card + .pd-card { margin-top: 16px; }
+.pd-k { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--bronze); }
+.pd-h { margin-top: 12px; font-size: clamp(19px,2.1vw,25px); line-height: 1.25; letter-spacing: -.01em; color: var(--t1); }
+.pd-p { margin-top: 11px; font-size: 15px; line-height: 1.6; color: var(--t2); }
+.pd-p b { color: var(--t1); font-weight: 500; }
+.pd-fine { margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--t3); }
+.pd-mono { font-family: var(--mono); font-size: 12.5px; letter-spacing: .02em; color: var(--static); word-break: break-all; }
+
+/* the status strip */
+.pd-strip { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; margin-top: 14px; }
+.pd-badge { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--static); }
+.pd-badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--static); flex: none; }
+.pd-badge.on i { background: var(--bronze); }
+.pd-badge.done i { background: #E3FF4F; }
+
+/* the two links. THEIRS is the loud one: it is the only one that gets sent. */
+.pd-links { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin-top: 18px; }
+@media (max-width: 780px) { .pd-links { grid-template-columns: 1fr; } }
+.pd-link { border: 1px solid var(--line2); border-radius: 14px; padding: 16px; background: var(--ink-950); }
+.pd-link.them { border-color: rgba(227,255,79,.42); }
+.pd-linkrow { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 13px; }
+
+/* the direction choice */
+.pd-dirs { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-top: 16px; }
+@media (max-width: 620px) { .pd-dirs { grid-template-columns: 1fr; } }
+.pd-dir { text-align: left; padding: 16px; border-radius: 13px; border: 1px solid var(--line2); background: var(--ink-950); color: var(--t1); cursor: pointer; font-size: 15.5px; line-height: 1.4; transition: border-color .2s var(--e); }
+.pd-dir span { display: block; margin-top: 8px; font-size: 13.5px; line-height: 1.5; color: var(--t3); }
+.pd-dir:hover { border-color: var(--bronze); }
+.pd-dir[aria-pressed="true"] { border-color: var(--bronze); background: rgba(227,255,79,.07); }
+.pd-dir[aria-pressed="true"] span { color: var(--t2); }
+@media (prefers-reduced-motion: reduce) { .pd-dir { transition: none; } }
+
+/* the two numbers. they are never styled the same, because they are not the
+   same kind of thing: one is shown to the other side and one never is. */
+.pd-num { margin-top: 18px; padding: 16px; border-radius: 13px; border: 1px solid var(--line2); background: var(--ink-950); }
+.pd-num.sealed { border-color: rgba(227,255,79,.42); }
+.pd-numk { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--static); }
+.pd-num.sealed .pd-numk { color: var(--bronze); }
+.pd-numh { margin-top: 10px; font-size: 16px; line-height: 1.45; color: var(--t1); }
+.pd-numw { margin-top: 8px; font-size: 13.5px; line-height: 1.55; color: var(--t3); }
+.pd-in { margin-top: 13px; display: flex; align-items: center; gap: 10px; }
+.pd-in span { font-family: var(--mono); font-size: 19px; color: var(--t2); flex: none; }
+.pd-in input { flex: 1; min-width: 0; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(11,12,14,.2); background: rgba(255,255,255,.65); color: var(--paper-ink); font-size: 16px; font-family: var(--mono); }
+.pd-in input:focus { outline: none; border-color: var(--dialtone-day); background: #fff; }
+.pd-terms { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.pd-terms input { padding: 12px 14px; border-radius: 11px; border: 1px solid rgba(11,12,14,.2); background: rgba(255,255,255,.65); color: var(--paper-ink); font-size: 16px; }
+.pd-terms input:focus { outline: none; border-color: var(--dialtone-day); background: #fff; }
+
+/* the honest message line. it is never green-on-green: an error and a
+   confirmation must not be told apart by colour alone, so both carry a word. */
+.pd-say { margin-top: 14px; font-size: 14.5px; line-height: 1.55; color: var(--t2); min-height: 0; }
+.pd-say.err { color: #FF7A8F; }
+.pd-say:empty { display: none; }
+
+.pd-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
+.pd-busy { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--static); }
+
+/* the live thread, on the real deal */
+.pd-rail { margin-top: 18px; border: 1px solid var(--line2); border-radius: 16px; background: var(--ink-950); padding: 16px; max-height: 460px; overflow-y: auto; overflow-x: hidden; }
+.pd-sum { margin-top: 16px; padding: 16px 18px; border-radius: 13px; border: 1px solid rgba(227,255,79,.42); background: rgba(227,255,79,.07); }
+.pd-sum.dead { border-color: var(--line2); background: rgba(242,244,240,.04); }
+.pd-sumv { margin-top: 8px; font-family: var(--display); font-weight: 700; font-size: clamp(34px,5vw,54px); line-height: 1; letter-spacing: -.03em; color: var(--t1); }
+
+/* the sign box */
+.pd-sign { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.pd-sign input { flex: 1 1 220px; min-width: 0; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(11,12,14,.2); background: rgba(255,255,255,.65); color: var(--paper-ink); font-size: 16px; }
+.pd-sign input:focus { outline: none; border-color: var(--dialtone-day); background: #fff; }
+
+/* deals started on this device */
+.pd-mine { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 18px; }
+.pd-minerow { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.pd-minerow a { color: var(--bronze-2); border-bottom: 1px solid var(--line2); }
+
 /* the price */
 .pl-price { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(24px,4vw,54px); margin-top: 30px; align-items: start; }
 @media (max-width: 860px) { .pl-price { grid-template-columns: 1fr; } }
@@ -211,8 +292,31 @@
 <div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Get on the list</a></div>
 <main id="main">
 
+<!-- ══ THE LIVE DEAL. ═══════════════════════════════════════════════════════
+     This section is EMPTY and hidden in the initial HTML and stays that way
+     unless the URL carries a party token (/truce/<token>). It is not a second
+     page: sv_truce_create hands both sides a link on this origin, netlify.toml
+     rewrites /truce/* here, and the page reads the token off its own path. The
+     token IS the credential, which is the whole reason the other side needs no
+     account, no app and no password.
+
+     Nothing inside it is .rv. Under html.js a .rv element rests at opacity:0
+     and only the load-time IntersectionObserver ever adds .in, so injected .rv
+     content would rest invisible forever. A live negotiation is not allowed to
+     depend on an animation observer having seen it. ══════════════════════════ -->
+<section class="pad seam" id="deal" hidden>
+  <div class="wrap">
+    <p class="eyebrow">Your negotiation</p>
+    <h1 class="display" id="pd-subject" style="font-size:clamp(28px,3.6vw,46px);line-height:1.1;letter-spacing:-.018em;text-wrap:balance;margin-top:16px"></h1>
+    <p class="lede" id="pd-who" style="margin-top:16px"></p>
+    <div class="pd-strip" id="pd-strip"></div>
+    <div id="pd-stage" style="margin-top:26px" aria-live="polite"></div>
+    <p class="src" id="pd-expiry" style="margin-top:22px"></p>
+  </div>
+</section>
+
 <!-- ══ HERO ══ -->
-<section class="hero" style="min-height:auto;padding-bottom:clamp(40px,5.2vw,74px)">
+<section class="hero" id="hero" style="min-height:auto;padding-bottom:clamp(40px,5.2vw,74px)">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="wrap">
     <div class="hero-grid">
@@ -223,9 +327,10 @@
         <p class="rv d2" style="margin-top:18px;color:var(--t2)">A car. A couch on Marketplace. A deposit. A scope change. A house. For anybody arguing about money by text, and for a business that wants terms closed without a call.</p>
         <p class="price-law rv d3">$29 WHEN IT SETTLES. $0 WHEN IT DOES NOT. IT NEVER CALLS ANYONE.</p>
         <div class="hero-actions rv d3" style="margin-top:24px">
-          <a class="btn btn-primary" href="/#early">Get on the list</a>
-          <a class="btn btn-ghost" href="#table">Run one right now</a>
+          <a class="btn btn-primary" href="#start">Start a real one</a>
+          <a class="btn btn-ghost" href="#table">Watch one run first</a>
         </div>
+        <p class="src rv d3" style="margin-top:14px">It makes the link. You send it. <a href="/#early" style="color:var(--bronze-2);border-bottom:1px solid var(--line2)">Get on the list</a> for everything else we build.</p>
       </div>
       <div class="rv d2">
         <div class="pl-herocard">
@@ -373,6 +478,68 @@
   </div>
 </section>
 
+<!-- ══ START A REAL ONE ═════════════════════════════════════════════════════
+     The real product, on the real engine. This form calls /api/truce with
+     op:"create" and gets back two party links out of Postgres. It does not
+     simulate anything and it does not queue anything.
+
+     THE INVITATION SEAM IS IN THE MARKUP, NOT ONLY IN THE COPY. There is no
+     field on this form for the other person's phone number or email address,
+     because nothing here sends. Parley hands you their link and you send it
+     from your own phone, which is also why the carrier block on texting does
+     not touch this product. ══════════════════════════════════════════════════ -->
+<section class="pad seam" id="start">
+  <div class="wrap">
+    <p class="eyebrow rv">Start one</p>
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;max-width:22ch">Make the link. You send it.</h2>
+    <p class="lede rv d2" style="margin-top:18px;max-width:60ch">Say what the deal is and who is in it. You get two links: yours, and one for them. Neither of you needs an account, an app or a card.</p>
+
+    <form class="iform rv d2" id="pd-new" style="max-width:760px" novalidate>
+      <div class="ifield full">
+        <label for="pd-f-subject">What is the deal, in one line</label>
+        <input id="pd-f-subject" name="subject" maxlength="200" autocomplete="off" placeholder="Selling the 2015 Civic" required>
+      </div>
+      <div class="ifield full">
+        <label for="pd-f-kind">What kind of thing is it</label>
+        <select id="pd-f-kind" name="kind">
+          <option value="vehicle">A vehicle</option>
+          <option value="marketplace">A private sale</option>
+          <option value="rent">Rent or a lease</option>
+          <option value="deposit">A deposit being held</option>
+          <option value="freelance">Work and a scope change</option>
+          <option value="invoice">An invoice</option>
+          <option value="real_estate">A house or land</option>
+          <option value="other" selected>Something else</option>
+        </select>
+      </div>
+      <div class="ifield">
+        <label for="pd-f-aname">Your name</label>
+        <input id="pd-f-aname" name="a_name" maxlength="80" autocomplete="name" placeholder="Mara">
+      </div>
+      <div class="ifield">
+        <label for="pd-f-arole">What you are in this</label>
+        <input id="pd-f-arole" name="a_role" maxlength="40" autocomplete="off" placeholder="seller">
+      </div>
+      <div class="ifield">
+        <label for="pd-f-bname">Their name</label>
+        <input id="pd-f-bname" name="b_name" maxlength="80" autocomplete="off" placeholder="Dev">
+      </div>
+      <div class="ifield">
+        <label for="pd-f-brole">What they are</label>
+        <input id="pd-f-brole" name="b_role" maxlength="40" autocomplete="off" placeholder="buyer">
+      </div>
+      <button class="btn btn-primary" type="submit" id="pd-make">Make the link</button>
+    </form>
+    <p class="pd-say" id="pd-newsay" role="status"></p>
+
+    <div id="pd-made" hidden style="margin-top:26px"></div>
+
+    <div class="pd-mine" id="pd-mine" hidden></div>
+
+    <p class="src rv d3" style="margin-top:24px;max-width:64ch">No number and no email address is asked for here, because nothing on this page sends anything. Parley makes the link and hands it to you. You send it, from your own phone, to somebody who is already expecting to hear from you.</p>
+  </div>
+</section>
+
 <!-- ══ TEXT, ON PURPOSE ══ -->
 <section class="pad-s seam">
   <div class="wrap">
@@ -432,8 +599,8 @@
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="font-size:clamp(34px,3.9vw,58px);line-height:1.06;letter-spacing:-.018em;text-wrap:balance;margin-top:16px">Somebody has to send the first message.</h2>
-    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto">Parley is not open yet. Get on the list and you go first.</p>
-    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="/#early">Get on the list</a></p>
+    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto">It is going to be you. Parley makes the link and then it waits, because it will not open a deal in your name.</p>
+    <p class="rv d2" style="margin-top:24px"><a class="btn btn-primary" href="#start">Start a real one</a> <a class="btn btn-ghost" href="/#early">Get on the list</a></p>
     <p class="src rv d3" style="margin-top:16px;margin-inline:auto">Or read <a href="#limits" style="color:var(--bronze-2)">the seven things it will not do</a>.</p>
   </div>
 </section>
@@ -879,6 +1046,707 @@
     bCover.addEventListener('click', function () { setMode(false); });
     setMode(true);
   }
+})();
+
+/* ══ THE REAL DEAL ═════════════════════════════════════════════════════════
+   Everything above this line is the explainer. Everything below it is the
+   product, running against /api/truce, which runs against Postgres.
+
+   WHAT THIS FILE IS NOW. The same page does three jobs, decided by one thing:
+   whether the URL carries a party token.
+     /parley                 the pitch, the simulator, and the form that makes
+                             a real deal
+     /truce/<party token>    that party's live negotiation
+
+   FOUR PROPERTIES THAT MUST SURVIVE EVERY EDIT TO THIS BLOCK:
+
+   1. THE PAGE NEVER SENDS THE INVITATION. There is no field here for the other
+      person's number or address and no call here that transmits anything. The
+      only "send" control is an href that opens the READER'S OWN messages or
+      mail app with the text prefilled and their thumb on the button. That is
+      the invitation seam, and it is also why the carrier block on texting does
+      not gate this product.
+
+   2. THE SEALED LIMIT IS NEVER RENDERED FROM ANYTHING BUT `me`. The other
+      party's number is not withheld by this file; it is unreachable to it.
+      `tr_view` returns `them.opening` and `them.has_set_limit` and there is no
+      shape of call that returns `them.limit`. If you ever find yourself
+      writing `them.limit`, the bug is upstream and this page must not paper
+      over it.
+
+   3. THE PROOF CONTROL CALLS THE INSTRUMENT. On a live deal, "search every
+      message for my limit" is a real call to `tr_leak_check`, and this file
+      prints whatever comes back, including a number greater than zero. A claim
+      you cannot measure is a slogan, and a claim you measure but only print
+      when you like the answer is worse.
+
+   4. NOTHING IS FABRICATED WHILE WAITING. A deal with one side in shows an
+      honest waiting state. It does not invent a message, a countdown, a
+      "typing" indicator, or a fake other party.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var API = '/api/truce';
+  var TOKEN_RE = /^[0-9a-f]{32,96}$/;
+  var STORE = 'answered.parley.v1';
+  var MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  var dealSec = document.getElementById('deal');
+  var stage = document.getElementById('pd-stage');
+  if (!dealSec || !stage) return;
+
+  /* ── plumbing ───────────────────────────────────────────────────────────*/
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function usd(n) {
+    var v = Number(n);
+    if (!isFinite(v)) return '';
+    var r = Math.round(v * 100) / 100;
+    var whole = Math.floor(Math.abs(r));
+    var cents = Math.round((Math.abs(r) - whole) * 100);
+    var s = '$' + whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (cents) s += '.' + (cents < 10 ? '0' : '') + cents;
+    return (r < 0 ? '-' : '') + s;
+  }
+  function money(str) {
+    var n = Number(String(str == null ? '' : str).replace(/[^0-9.]/g, ''));
+    return isFinite(n) ? n : NaN;
+  }
+  function day(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+  /* One network shape for the whole product. A thrown fetch, a non-JSON body
+     and an RPC that answers 200 with {error} all land in the same place, so no
+     caller can mistake a failure for an empty result. */
+  function post(body) {
+    return fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null;
+        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+        if (!j || typeof j !== 'object') j = { error: 'we could not read the answer from our own server' };
+        if (!r.ok && !j.error) j.error = 'the server answered ' + r.status;
+        return j;
+      });
+    }, function () {
+      return { error: 'we could not reach the server. Check your connection and try again.' };
+    });
+  }
+
+  /* Links you made on this device, so you can find them again. The token in
+     the link is the credential, exactly like the copy of it sitting in your
+     messages app, so there is a control to wipe it. */
+  function saved() {
+    try { var a = JSON.parse(localStorage.getItem(STORE) || '[]'); return Object.prototype.toString.call(a) === '[object Array]' ? a : []; }
+    catch (e) { return []; }
+  }
+  function remember(rec) {
+    try {
+      var all = saved().filter(function (d) { return d && d.id !== rec.id; });
+      all.unshift(rec);
+      localStorage.setItem(STORE, JSON.stringify(all.slice(0, 12)));
+    } catch (e) { /* private mode: the links are on screen, that is enough */ }
+  }
+  function theirLinkFor(dealId) {
+    var hit = saved().filter(function (d) { return d && d.id === dealId; })[0];
+    return hit ? hit.them : '';
+  }
+
+  function shareHrefs(url, subject) {
+    var line = 'I want to settle ' + subject + ' without going back and forth. '
+             + 'Open this and set your number, it takes a minute: ' + url;
+    return {
+      sms: 'sms:?&body=' + encodeURIComponent(line),
+      mail: 'mailto:?subject=' + encodeURIComponent('Settling ' + subject)
+          + '&body=' + encodeURIComponent(line),
+      text: line
+    };
+  }
+
+  /* A copy control that tells the truth about whether it copied. The clipboard
+     API is refused outright in plenty of real conditions, so the fallback is a
+     selectable field rather than a button that lies. */
+  function bindCopy(btn, value, say) {
+    btn.addEventListener('click', function () {
+      function failed() {
+        say.className = 'pd-say err';
+        say.textContent = 'This browser would not let us copy it. Press and hold the link above to select it.';
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(function () {
+          say.className = 'pd-say';
+          say.textContent = 'Copied. Now paste it to them yourself.';
+        }, failed);
+      } else { failed(); }
+    });
+  }
+
+  /* ── the two links, drawn the same way wherever they appear ─────────────*/
+  function linksHtml(you, them, subject) {
+    var s = shareHrefs(them, subject);
+    return ''
+      + '<div class="pd-links">'
+      +   '<div class="pd-link them">'
+      +     '<div class="pd-k">SEND THIS ONE</div>'
+      +     '<p class="pd-p" style="margin-top:9px">Their side of the deal. This is the only link that leaves your hands.</p>'
+      +     '<p class="pd-mono" style="margin-top:11px">' + esc(them) + '</p>'
+      +     '<div class="pd-linkrow">'
+      +       '<button class="pl-btn go" type="button" data-copy="them">COPY IT</button>'
+      +       '<a class="pl-btn" href="' + esc(s.sms) + '">OPEN MY MESSAGES</a>'
+      +       '<a class="pl-btn" href="' + esc(s.mail) + '">OPEN MY EMAIL</a>'
+      +     '</div>'
+      +     '<p class="pd-fine">Those two buttons open your own app with the message written. You press send, not us.</p>'
+      +   '</div>'
+      +   '<div class="pd-link">'
+      +     '<div class="pd-k">KEEP THIS ONE</div>'
+      +     '<p class="pd-p" style="margin-top:9px">Your side. Anybody holding it is you, so do not send it to them by mistake.</p>'
+      +     '<p class="pd-mono" style="margin-top:11px">' + esc(you) + '</p>'
+      +     '<div class="pd-linkrow">'
+      +       '<a class="pl-btn go" href="' + esc(you) + '">OPEN MY SIDE</a>'
+      +       '<button class="pl-btn" type="button" data-copy="you">COPY IT</button>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>';
+  }
+
+  /* ══ MAKING A DEAL ═════════════════════════════════════════════════════*/
+  var form = document.getElementById('pd-new');
+  var newSay = document.getElementById('pd-newsay');
+  var made = document.getElementById('pd-made');
+  var mine = document.getElementById('pd-mine');
+
+  function drawMine() {
+    if (!mine) return;
+    var all = saved();
+    if (!all.length) { mine.hidden = true; mine.innerHTML = ''; return; }
+    mine.hidden = false;
+    mine.innerHTML = '<div class="pd-k">DEALS YOU STARTED ON THIS DEVICE</div>'
+      + all.map(function (d) {
+          return '<div class="pd-minerow"><span style="color:var(--t2);flex:1 1 240px">' + esc(d.subject) + '</span>'
+               + '<a href="' + esc(d.you) + '">Open my side</a>'
+               + '<span class="pd-mono">' + esc(day(d.at)) + '</span></div>';
+        }).join('')
+      + '<div class="pd-linkrow"><button class="pl-btn" type="button" id="pd-forget">FORGET THESE LINKS</button></div>'
+      + '<p class="pd-fine">Kept in this browser only. Nothing about this list is on our servers.</p>';
+    var f = document.getElementById('pd-forget');
+    if (f) f.addEventListener('click', function () {
+      try { localStorage.removeItem(STORE); } catch (e) {}
+      drawMine();
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('pd-make');
+      var subject = document.getElementById('pd-f-subject').value.trim();
+      if (!subject) {
+        newSay.className = 'pd-say err';
+        newSay.textContent = 'Say what the deal is, in one line. The other side sees it first.';
+        document.getElementById('pd-f-subject').focus();
+        return;
+      }
+      btn.disabled = true;
+      newSay.className = 'pd-say';
+      newSay.textContent = 'Making it.';
+      post({
+        op: 'create',
+        subject: subject,
+        kind: document.getElementById('pd-f-kind').value,
+        a_name: document.getElementById('pd-f-aname').value.trim() || 'You',
+        a_role: document.getElementById('pd-f-arole').value.trim() || 'side a',
+        b_name: document.getElementById('pd-f-bname').value.trim() || 'Them',
+        b_role: document.getElementById('pd-f-brole').value.trim() || 'side b'
+      }).then(function (r) {
+        btn.disabled = false;
+        if (r.error) {
+          newSay.className = 'pd-say err';
+          newSay.textContent = r.error;
+          return;
+        }
+        newSay.className = 'pd-say';
+        newSay.textContent = '';
+        remember({ id: r.deal_id, subject: subject, you: r.you, them: r.them, at: new Date().toISOString() });
+        made.hidden = false;
+        made.innerHTML = '<div class="pd-card">'
+          + '<div class="pd-k">TWO LINKS. THEY ARE NOT INTERCHANGEABLE.</div>'
+          + '<p class="pd-h">' + esc(subject) + '</p>'
+          + linksHtml(r.you, r.them, subject)
+          + '<p class="pd-say" id="pd-copysay" role="status"></p>'
+          + '<p class="pd-fine">Nothing happens to this deal until you both set a number. Neither of you can see the other one’s.</p>'
+          + '</div>';
+        var say = document.getElementById('pd-copysay');
+        var cThem = made.querySelector('[data-copy="them"]');
+        var cYou = made.querySelector('[data-copy="you"]');
+        if (cThem) bindCopy(cThem, r.them, say);
+        if (cYou) bindCopy(cYou, r.you, say);
+        drawMine();
+        made.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    drawMine();
+  }
+
+  /* ══ RUNNING A DEAL ════════════════════════════════════════════════════*/
+  var TOKEN = (function () {
+    var m = location.pathname.match(/^\/truce\/([0-9a-f]{32,96})\/?$/i);
+    return m ? m[1].toLowerCase() : '';
+  })();
+  if (!TOKEN || !TOKEN_RE.test(TOKEN)) return;
+
+  var hero = document.getElementById('hero');
+  if (hero) hero.hidden = true;
+  dealSec.hidden = false;
+  var robots = document.createElement('meta');
+  robots.name = 'robots';
+  robots.content = 'noindex, nofollow';
+  document.head.appendChild(robots);
+
+  var elSubject = document.getElementById('pd-subject');
+  var elWho = document.getElementById('pd-who');
+  var elStrip = document.getElementById('pd-strip');
+  var elExpiry = document.getElementById('pd-expiry');
+
+  var VIEW = null;
+  var pollTimer = null;
+  var polls = 0;
+  var MAX_POLLS = 120;                       // ten minutes at five seconds
+
+  function badge(state, label) {
+    return '<span class="pd-badge ' + state + '"><i></i>' + esc(label) + '</span>';
+  }
+
+  function drawHead(v) {
+    var d = v.deal, me = v.me, them = v.them;
+    elSubject.textContent = d.subject;
+    document.title = d.subject + '. Parley.';
+    elWho.innerHTML = 'You are <b>' + esc(me.name) + '</b>, the ' + esc(me.role)
+                    + '. The other side is <b>' + esc(them.name) + '</b>, the ' + esc(them.role) + '.';
+
+    var st = d.status;
+    var stateLabel = st === 'settled' ? 'SETTLED'
+      : st === 'no_overlap' ? 'NO OVERLAP'
+      : st === 'expired' ? 'THIS LINK HAS RUN OUT'
+      : st === 'withdrawn' ? 'WITHDRAWN'
+      : st === 'negotiating' ? 'ONE SIDE IS IN'
+      : 'NOBODY HAS SET A NUMBER';
+    var bits = [badge(st === 'settled' ? 'done' : (st === 'negotiating' ? 'on' : ''), stateLabel)];
+    bits.push(badge(me.limit != null ? 'done' : '', me.limit != null ? 'YOUR NUMBER IS IN' : 'YOUR NUMBER IS NOT SET'));
+    bits.push(badge(them.has_set_limit ? 'done' : '', them.has_set_limit ? esc(them.name).toUpperCase() + ' IS IN' : 'WAITING ON ' + esc(them.name).toUpperCase()));
+    if (st === 'settled') {
+      bits.push(badge(me.signed_at ? 'done' : '', me.signed_at ? 'YOU SIGNED' : 'YOU HAVE NOT SIGNED'));
+      bits.push(badge(them.signed_at ? 'done' : '', them.signed_at ? esc(them.name).toUpperCase() + ' SIGNED' : esc(them.name).toUpperCase() + ' HAS NOT SIGNED'));
+    }
+    elStrip.innerHTML = bits.join('');
+
+    /* The REAL expiry off the record, not a number retyped from the copy. */
+    if (d.expires_at) {
+      var gone = new Date(d.expires_at).getTime() < Date.now();
+      elExpiry.textContent = gone
+        ? 'This link ran out on ' + day(d.expires_at) + '.'
+        : 'This link stops working on ' + day(d.expires_at) + '. After that neither side can open it.';
+    } else { elExpiry.textContent = ''; }
+  }
+
+  /* the thread, drawn from the messages the engine actually wrote */
+  function threadHtml(v) {
+    if (!v.thread || !v.thread.length) return '';
+    var meAgent = 'agent_' + v.me.side;
+    var out = ['<div class="pd-rail"><div class="pl-thread">'];
+    for (var i = 0; i < v.thread.length; i++) {
+      var m = v.thread[i];
+      var isMine = m.speaker === meAgent;
+      var whoName = m.speaker === 'system' ? 'PARLEY'
+        : (isMine ? esc(v.me.name).toUpperCase() + "'S AGENT" : esc(v.them.name).toUpperCase() + "'S AGENT");
+      var t = new Date(m.at);
+      var clock = isNaN(t.getTime()) ? '' : (t.getHours() + ':' + (t.getMinutes() < 10 ? '0' : '') + t.getMinutes());
+      out.push('<div class="pl-msg ' + (isMine ? 'lo' : 'hi') + '">'
+        + '<div class="pl-who"><span>' + whoName + '</span><span>' + esc(clock) + '</span></div>'
+        + '<div class="pl-txt">' + esc(m.body) + '</div></div>');
+    }
+    out.push('</div></div>');
+    return out.join('');
+  }
+
+  /* ── STATE 1: your number is not in yet ────────────────────────────────*/
+  function setForm(v) {
+    var me = v.me, them = v.them;
+    /* If tr_view ever grows them.direction, the second mover is locked to the
+       opposite and the trap below cannot be sprung. Until then both parties
+       answer the SAME question about the SAME two named people, which at least
+       makes the two answers comparable instead of independent. */
+    var theirs = them.direction || null;
+    var forced = theirs ? (theirs === 'min' ? 'max' : 'min') : null;
+
+    var payThem = 'Pay ' + esc(them.name);
+    var takeFrom = esc(them.name) + ' pays you';
+
+    stage.innerHTML = '<div class="pd-card">'
+      + '<div class="pd-k">STEP 1 OF 2</div>'
+      + '<p class="pd-h">Which way does the money go?</p>'
+      + (forced
+          ? '<p class="pd-p">' + esc(them.name) + ' set their side first, so this one is already decided: '
+            + '<b>' + (forced === 'min' ? esc(them.name) + ' pays you' : 'you pay ' + esc(them.name)) + '</b>.</p>'
+          : '<p class="pd-p">Pick the one that is true. It has to match what '
+            + esc(them.name) + ' picks, because two people who are both being paid have nothing to settle.</p>')
+      + '<div class="pd-dirs">'
+      +   '<button class="pd-dir" type="button" data-dir="min" aria-pressed="' + (forced === 'min' ? 'true' : 'false') + '"' + (forced === 'max' ? ' disabled' : '') + '>'
+      +     takeFrom + '<span>So your number is a floor. You will not take less than it.</span></button>'
+      +   '<button class="pd-dir" type="button" data-dir="max" aria-pressed="' + (forced === 'max' ? 'true' : 'false') + '"' + (forced === 'min' ? ' disabled' : '') + '>'
+      +     payThem + '<span>So your number is a ceiling. You will not pay more than it.</span></button>'
+      + '</div>'
+      + '<div id="pd-nums" ' + (forced ? '' : 'hidden') + '>'
+      +   '<div class="pd-num">'
+      +     '<div class="pd-numk">YOUR OPENING</div>'
+      +     '<p class="pd-numh" id="pd-openh">What you are asking for out loud.</p>'
+      +     '<p class="pd-numw">' + esc(them.name) + ' sees this one. It is what you would say first if you were doing this yourself.</p>'
+      +     '<div class="pd-in"><span>$</span><input id="pd-open" inputmode="decimal" autocomplete="off" placeholder="0"></div>'
+      +   '</div>'
+      +   '<div class="pd-num sealed">'
+      +     '<div class="pd-numk">YOUR LIMIT. SEALED.</div>'
+      +     '<p class="pd-numh" id="pd-limh">The number you will not cross.</p>'
+      +     '<p class="pd-numw">' + esc(them.name) + ' never sees this, and cannot work it out from what you settle at. Parley holds it and haggles against it. That is the job.</p>'
+      +     '<div class="pd-in"><span>$</span><input id="pd-limit" inputmode="decimal" autocomplete="off" placeholder="0"></div>'
+      +   '</div>'
+      +   '<div class="pd-terms">'
+      +     '<div class="pd-numk">TERMS YOU CARE ABOUT, IF ANY</div>'
+      +     '<p class="pd-numw" style="margin-top:0">They go on the page you both sign, once the deal is done. Not while it is running, because a term is leverage too.</p>'
+      +     '<input id="pd-t1" maxlength="120" autocomplete="off" placeholder="Keys and the remote come back Friday">'
+      +     '<input id="pd-t2" maxlength="120" autocomplete="off" placeholder="Paid on pickup">'
+      +     '<input id="pd-t3" maxlength="120" autocomplete="off" placeholder="">'
+      +     '<p class="pd-fine">Do not put your limit in here. A line with that number in it is held back from the signed page, so it would only cost you the term.</p>'
+      +   '</div>'
+      +   '<p class="pd-say" id="pd-say" role="status"></p>'
+      +   '<div class="pd-actions"><button class="btn btn-primary" type="button" id="pd-lock">Lock my number in</button></div>'
+      +   '<p class="pd-fine">You can change it right up until ' + esc(them.name) + ' sets theirs. After that it runs, once, and it is done.</p>'
+      + '</div>'
+      + '</div>';
+
+    var chosen = forced;
+    var nums = document.getElementById('pd-nums');
+    var openIn = document.getElementById('pd-open');
+    var limIn = document.getElementById('pd-limit');
+    var say = document.getElementById('pd-say');
+
+    function paintDir() {
+      var dirs = stage.querySelectorAll('[data-dir]');
+      for (var i = 0; i < dirs.length; i++) {
+        dirs[i].setAttribute('aria-pressed', dirs[i].getAttribute('data-dir') === chosen ? 'true' : 'false');
+      }
+      document.getElementById('pd-openh').textContent = chosen === 'min'
+        ? 'What you are asking for.' : 'What you are offering.';
+      document.getElementById('pd-limh').textContent = chosen === 'min'
+        ? 'The least you will take.' : 'The most you will pay.';
+      nums.hidden = false;
+    }
+    if (chosen) paintDir();
+
+    var dirBtns = stage.querySelectorAll('[data-dir]');
+    for (var i = 0; i < dirBtns.length; i++) {
+      dirBtns[i].addEventListener('click', function () {
+        chosen = this.getAttribute('data-dir');
+        paintDir();
+      });
+    }
+
+    document.getElementById('pd-lock').addEventListener('click', function () {
+      var btn = this;
+      var opening = money(openIn.value);
+      var limit = money(limIn.value);
+      function no(msg) { say.className = 'pd-say err'; say.textContent = msg; }
+      if (!chosen) return no('Pick which way the money goes first.');
+      if (!isFinite(limit) || limit <= 0) return no('Your limit needs to be a number.');
+      if (!isFinite(opening) || opening <= 0) return no('Your opening needs to be a number.');
+      if (chosen === 'min' && opening < limit) {
+        return no('Your opening is lower than the least you will take. Ask for at least your own floor.');
+      }
+      if (chosen === 'max' && opening > limit) {
+        return no('Your opening is higher than the most you will pay. Offer no more than your own ceiling.');
+      }
+      var terms = [];
+      ['pd-t1', 'pd-t2', 'pd-t3'].forEach(function (id) {
+        var v2 = document.getElementById(id).value.trim();
+        if (v2) terms.push(v2);
+      });
+      btn.disabled = true;
+      say.className = 'pd-say';
+      say.textContent = them.has_set_limit ? 'Locking it in and running the negotiation.' : 'Locking it in.';
+      post({ op: 'set_limit', token: TOKEN, direction: chosen, amount: limit, opening: opening, must_haves: terms })
+        .then(function (r) {
+          btn.disabled = false;
+          if (r.error) { no(r.error); return; }
+          render(r);
+        });
+    });
+  }
+
+  /* ── STATE 2: you are in, they are not ─────────────────────────────────*/
+  function waiting(v) {
+    var me = v.me, them = v.them;
+    var theirLink = theirLinkFor(v.deal.id);
+    stage.innerHTML = '<div class="pd-card">'
+      + '<div class="pd-k">STEP 2 OF 2. NOTHING IS RUNNING YET.</div>'
+      + '<p class="pd-h">Your number is in. ' + esc(them.name) + ' has not set one.</p>'
+      + '<p class="pd-p">Parley does not open with your number and it does not chase anybody. One side alone reveals nothing and does nothing, which is exactly why it is safe to go first.</p>'
+      + '<div class="pd-num">'
+      +   '<div class="pd-numk">YOUR OPENING, WHICH THEY WILL SEE</div>'
+      +   '<p class="pd-numh">' + esc(usd(me.opening)) + '</p>'
+      + '</div>'
+      + '<div class="pd-num sealed">'
+      +   '<div class="pd-numk">YOUR LIMIT, WHICH NOBODY WILL SEE</div>'
+      +   '<p class="pd-numh">' + esc(usd(me.limit)) + '</p>'
+      +   '<p class="pd-numw">On screen because it is yours. It is not in any message, any summary, or the page you sign.</p>'
+      + '</div>'
+      + (me.must_haves && me.must_haves.length
+          ? '<div class="pd-num"><div class="pd-numk">TERMS YOU ASKED FOR</div>'
+            + me.must_haves.map(function (t) { return '<p class="pd-numh" style="font-size:15px">' + esc(t) + '</p>'; }).join('')
+            + '</div>'
+          : '')
+      + (theirLink
+          ? '<div style="margin-top:20px"><div class="pd-k">SEND ' + esc(them.name).toUpperCase() + ' THEIR LINK AGAIN</div>'
+            + linksHtml(location.href, theirLink, v.deal.subject)
+            + '<p class="pd-say" id="pd-copysay2" role="status"></p></div>'
+          : '<p class="pd-fine" style="margin-top:20px">You opened this from your own link, so their link is not on this device. Whoever started the deal has it.</p>')
+      + '<div class="pd-actions">'
+      +   '<button class="pl-btn" type="button" id="pd-again">CHECK AGAIN</button>'
+      +   '<span class="pd-busy" id="pd-watch">Checking every few seconds while this page is open.</span>'
+      + '</div>'
+      + '</div>';
+    var say2 = document.getElementById('pd-copysay2');
+    if (say2) {
+      var c1 = stage.querySelector('[data-copy="them"]');
+      var c2 = stage.querySelector('[data-copy="you"]');
+      if (c1) bindCopy(c1, theirLink, say2);
+      if (c2) bindCopy(c2, location.href, say2);
+    }
+    document.getElementById('pd-again').addEventListener('click', function () {
+      polls = 0;
+      var w = document.getElementById('pd-watch');
+      if (w) w.textContent = 'Checking now.';
+      load();
+    });
+  }
+
+  /* ── the signed page. the artifact, drawn from the record. ─────────────*/
+  function sheetHtml(v, terms) {
+    var d = v.deal;
+    var both = v.me.signed_at && v.them.signed_at;
+    var aName = v.me.side === 'a' ? v.me.name : v.them.name;
+    var bName = v.me.side === 'a' ? v.them.name : v.me.name;
+    var lines = ['The number is ' + usd(d.settled_value) + '.'];
+    (terms || []).forEach(function (t) { lines.push(t.term + ' (' + t.name + ')'); });
+    lines.push('Anything not written here stays as it was.');
+    return '<div class="pl-sheet' + (both ? ' draw' : '') + '" style="margin-top:22px">'
+      + '<div class="pl-sheet-h">PARLEY AGREEMENT</div>'
+      + '<div class="pl-sheet-s">' + esc(d.subject) + '. Between ' + esc(aName) + ' and ' + esc(bName) + '.</div>'
+      + '<div class="pl-terms">' + lines.map(function (t, i) {
+          return '<div class="pl-term"><span>' + (i + 1) + '.</span>' + esc(t) + '</div>';
+        }).join('') + '</div>'
+      + '<div class="pl-big">' + esc(usd(d.settled_value)) + '</div>'
+      + '<div class="pl-sigs">'
+      +   '<div class="pl-sig">' + (v.me.signed_at
+            ? '<svg viewBox="0 0 200 42" aria-hidden="true"><path d="M6 32 C 26 6, 40 40, 58 20 S 86 4, 104 26 S 132 34, 158 12"/></svg>'
+            : '<div style="height:42px"></div>')
+      +     '<div class="pl-signame">' + esc(v.me.name) + (v.me.signed_at ? ', signed ' + esc(day(v.me.signed_at)) : ', not signed') + '</div></div>'
+      +   '<div class="pl-sig">' + (v.them.signed_at
+            ? '<svg viewBox="0 0 200 42" aria-hidden="true"><path d="M8 28 C 30 34, 36 8, 56 24 S 92 36, 112 14 S 148 8, 166 30"/></svg>'
+            : '<div style="height:42px"></div>')
+      +     '<div class="pl-signame">' + esc(v.them.name) + (v.them.signed_at ? ', signed ' + esc(day(v.them.signed_at)) : ', not signed') + '</div></div>'
+      + '</div>'
+      + (both ? '<div class="pl-stamp">SETTLED</div>' : '')
+      + '<div class="pl-sheetfoot">Every line here traces back to a message in the thread above, and the thread is part of the record. '
+      + 'The fee on this deal is ' + esc(usd((d.fee_cents || 0) / 100)) + ', split, and it exists only once both names are on this page. '
+      + 'Nothing on this page takes a payment.</div>'
+      + '</div>';
+  }
+
+  /* ── STATE 3: it settled ───────────────────────────────────────────────*/
+  function settled(v) {
+    var s = v.deal.settlement || {};
+    stage.innerHTML = '<div class="pd-card">'
+      + '<div class="pd-k">THE THREAD</div>'
+      + '<p class="pd-p">Two agents, each one disclosed in its first sentence, each one working against a number the other could not see.</p>'
+      + threadHtml(v)
+      + '<div class="pd-sum">'
+      +   '<div class="pl-outk">SETTLED</div>'
+      +   '<div class="pd-sumv">' + esc(usd(v.deal.settled_value)) + '</div>'
+      +   '<p class="pd-p">' + esc(s.messages || (v.thread || []).length) + ' messages. '
+      +     'The figure is ' + esc(s.method || 'a point inside the overlap between the two sealed limits') + '.</p>'
+      + '</div>'
+      + '<div id="pd-artifact"></div>'
+      + '<div id="pd-signbox"></div>'
+      + '</div>';
+
+    var art = document.getElementById('pd-artifact');
+    art.innerHTML = sheetHtml(v, null);
+    /* The terms half of the artifact comes from its own call, because it opens
+       only once the negotiation is over. A failure here must not blank the
+       sheet that is already correct. */
+    post({ op: 'terms', token: TOKEN }).then(function (t) {
+      if (t && !t.error && t.terms && t.terms.length) art.innerHTML = sheetHtml(v, t.terms);
+    });
+
+    var box = document.getElementById('pd-signbox');
+    if (v.me.signed_at) {
+      box.innerHTML = '<p class="pd-p" style="margin-top:20px"><b>You signed this on ' + esc(day(v.me.signed_at)) + '.</b> '
+        + (v.them.signed_at
+            ? esc(v.them.name) + ' signed it too. The deal is closed.'
+            : esc(v.them.name) + ' has not signed yet. Nothing is owed until they do.') + '</p>';
+    } else {
+      box.innerHTML = '<div style="margin-top:22px"><div class="pd-k">SIGN IT</div>'
+        + '<p class="pd-p">Type your name. That is the signature, and the time and this device go on the record with it.</p>'
+        + '<div class="pd-sign"><input id="pd-name" maxlength="120" autocomplete="name" placeholder="' + esc(v.me.name) + '">'
+        + '<button class="btn btn-primary" type="button" id="pd-dosign">Sign it</button></div>'
+        + '<p class="pd-say" id="pd-signsay" role="status"></p>'
+        + '<p class="pd-fine">Reading it and not signing is a real answer. It costs nothing and the number stays where it is.</p></div>';
+      document.getElementById('pd-dosign').addEventListener('click', function () {
+        var btn = this;
+        var say = document.getElementById('pd-signsay');
+        var name = document.getElementById('pd-name').value.trim();
+        if (!name) {
+          say.className = 'pd-say err';
+          say.textContent = 'Type your name to sign.';
+          return;
+        }
+        btn.disabled = true;
+        say.className = 'pd-say';
+        say.textContent = 'Signing.';
+        post({ op: 'sign', token: TOKEN, name: name }).then(function (r) {
+          btn.disabled = false;
+          if (r.error) { say.className = 'pd-say err'; say.textContent = r.error; return; }
+          render(r);
+        });
+      });
+    }
+  }
+
+  /* ── STATE 4: no overlap. a real outcome, not an error. ────────────────*/
+  function noOverlap(v) {
+    stage.innerHTML = '<div class="pd-card">'
+      + '<div class="pd-k">THE THREAD</div>'
+      + threadHtml(v)
+      + '<div class="pd-sum dead">'
+      +   '<div class="pl-outk">NO DEAL</div>'
+      +   '<p class="pd-p">The two numbers never met. Parley stopped where you each told it to stop, and it did not go one dollar past either limit to save the deal.</p>'
+      +   '<p class="pd-p"><b>There is nothing to sign and nothing to pay.</b> Neither number was shown to the other side, so nobody learned anything by trying.</p>'
+      + '</div>'
+      + '<p class="pd-p">If either of you has moved since, start a fresh one. This deal is finished and it cannot be re-run.</p>'
+      + '<div class="pd-actions"><a class="pl-btn go" href="/parley#start">START A NEW ONE</a></div>'
+      + '</div>';
+  }
+
+  function dead(v, msg) {
+    stage.innerHTML = '<div class="pd-card"><div class="pd-k">THIS LINK IS DONE</div>'
+      + '<p class="pd-h">' + esc(msg) + '</p>'
+      + threadHtml(v)
+      + '<div class="pd-actions"><a class="pl-btn go" href="/parley#start">START A NEW ONE</a></div></div>';
+  }
+
+  /* ── the router ────────────────────────────────────────────────────────*/
+  function render(v) {
+    if (!v || v.error) {
+      dealSec.hidden = false;
+      elSubject.textContent = 'That link did not open.';
+      elWho.textContent = (v && v.error) || 'We could not read it.';
+      elStrip.innerHTML = '';
+      elExpiry.textContent = '';
+      stage.innerHTML = '<div class="pd-card"><p class="pd-p">A Parley link works for one person, on one deal, and only while the deal is live. '
+        + 'If you were sent this by somebody, ask them to send it again. If you started it, your own link is on the device you made it on.</p>'
+        + '<div class="pd-actions"><a class="pl-btn go" href="/parley#start">START ONE</a></div></div>';
+      return;
+    }
+    VIEW = v;
+    drawHead(v);
+    var st = v.deal.status;
+    if (st === 'expired') { dead(v, 'This link ran out. Nobody can open it now, on either side.'); }
+    else if (st === 'withdrawn') { dead(v, 'This deal was taken back before it settled. Nothing was owed.'); }
+    else if (st === 'settled') { settled(v); }
+    else if (st === 'no_overlap') { noOverlap(v); }
+    else if (v.me.limit == null) { setForm(v); }
+    else { waiting(v); schedulePoll(); }
+    wireProof();
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    if (polls >= MAX_POLLS) {
+      var w = document.getElementById('pd-watch');
+      if (w) w.textContent = 'Stopped checking. Press check again when you want to.';
+      return;
+    }
+    pollTimer = setTimeout(function () {
+      polls += 1;
+      if (document.hidden) { schedulePoll(); return; }
+      load();
+    }, 5000);
+  }
+
+  function load() {
+    return post({ op: 'view', token: TOKEN }).then(render);
+  }
+
+  /* ── SECTION 3's PROOF CONTROL, ON A LIVE DEAL ─────────────────────────
+     The simulator's button runs a string search over the thread in this
+     browser, which is real but is a search of a demo. On a live deal the same
+     control calls tr_leak_check in Postgres, which compares every message in
+     the record against BOTH sealed limits and can come back non-zero. Cloning
+     the node is what drops the simulator's listener; adding a second listener
+     would have run both and printed two answers.
+     ────────────────────────────────────────────────────────────────────────*/
+  var proofWired = false;
+  function wireProof() {
+    if (proofWired) return;
+    var old = document.getElementById('pl-find');
+    if (!old) return;
+    proofWired = true;
+    var btn = old.cloneNode(true);
+    btn.textContent = 'SEARCH MY REAL THREAD FOR MY LIMIT';
+    old.parentNode.replaceChild(btn, old);
+    var q = document.getElementById('pl-findq');
+    var a = document.getElementById('pl-finda');
+    q.textContent = 'This one asks the engine about YOUR deal, not the demo above.';
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      q.textContent = 'ASKING THE ENGINE.';
+      post({ op: 'leak_check', token: TOKEN }).then(function (r) {
+        btn.disabled = false;
+        a.hidden = false;
+        if (r.error) {
+          q.textContent = 'THE CHECK DID NOT RUN.';
+          a.textContent = r.error + ' No result is being shown, because a proof you could not run is not a proof.';
+          return;
+        }
+        var mineHits = Number(r.your_limit_appears_in_messages);
+        var theirHits = Number(r.their_limit_appears_in_messages);
+        q.textContent = 'CHECKED EVERY MESSAGE IN THIS DEAL AGAINST BOTH SEALED NUMBERS.';
+        var out = 'Your limit appears in ' + mineHits + ' messages. Their limit appears in ' + theirHits + '.';
+        if (r.settled_on_a_limit) {
+          out += ' This one settled exactly on somebody’s limit, which happens when the overlap is one number wide. '
+               + 'It is reported rather than hidden.';
+        } else if (mineHits === 0 && theirHits === 0) {
+          out += ' Neither number was ever put on the table, and the settled figure is not the midpoint, so neither can be worked back out of it.';
+        }
+        a.textContent = out;
+      });
+    });
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && VIEW && VIEW.deal
+        && (VIEW.deal.status === 'open' || VIEW.deal.status === 'negotiating')
+        && VIEW.me.limit != null) { load(); }
+  });
+
+  stage.innerHTML = '<div class="pd-card"><p class="pd-p">Opening your deal.</p></div>';
+  load();
 })();
 </script>
 </body>

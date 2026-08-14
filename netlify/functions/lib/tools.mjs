@@ -144,8 +144,11 @@ const FAKE_STREET = /^\s*(?:123|1234)\s+(?:main|any|elm|first|test|example)\s?(?
 
 const isPlaceholder = (s) => PLACEHOLDER.some((re) => re.test(String(s).trim()));
 
+// Control characters out, whitespace collapsed. Same posture as lib/booking's `clean`, minus the
+// newline carve-out: nothing a voice agent hands over has a deliberate line break in it.
+const CTRL = new RegExp('[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]', 'g');
 const tidy = (s, cap) => String(s == null ? '' : s)
-  .replace(/[ --]/g, '')
+  .replace(CTRL, ' ')
   .replace(/\s+/g, ' ')
   .trim()
   .slice(0, cap);

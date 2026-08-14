@@ -26,14 +26,24 @@ const bad = (c, m) => ({ statusCode: c, headers: JSON_HEADERS, body: JSON.string
 
 const TOKEN = /^[0-9a-f]{32,96}$/;
 
-/** Public RPCs take the party token instead of the estate secret. */
+/**
+ * The token-authenticated RPCs. TWO credentials, and neither substitutes for the other:
+ * the party TOKEN is the user's (it is what makes a link work with no account), and the shared
+ * SECRET proves the call came from our server.
+ *
+ * ★ The secret was added after @ANSWERED-INTEL measured that every tr_* function was invokable by
+ * anyone holding the publishable key. A Postgres function is born PUBLIC EXECUTE — the opposite
+ * default from a table — so revoking anon on every table, as all three lanes had done, closed the
+ * wrong door. It was not a data breach, because the 192-bit token is still the boundary, but it
+ * meant the rate limiting in this file could be walked straight around by calling PostgREST direct.
+ */
 async function open(fn, args) {
   const url = process.env.ANSWERED_DB_URL;
   const anon = process.env.ANSWERED_DB_ANON;
   const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: { apikey: anon, Authorization: `Bearer ${anon}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(args),
+    body: JSON.stringify({ p_secret: process.env.ANSWERED_DB_SECRET, ...args }),
     signal: AbortSignal.timeout(8000),
   });
   const text = await res.text();
