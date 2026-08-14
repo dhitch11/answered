@@ -39,13 +39,31 @@ function key() {
   return k;
 }
 
-/** Stripe wants form encoding, including for nested keys like transfer_data[destination]. */
+/**
+ * Stripe wants form encoding, including nested keys like transfer_data[destination] and INDEXED
+ * arrays like line_items[0][price_data][currency].
+ *
+ * ★ THE ARRAY BRANCH IS NOT DECORATION. The first version of this excluded arrays from the
+ * recursion and fell through to String(v), so `line_items: [{...}]` was serialized as the literal
+ * `[object Object]` and Stripe answered `400 Invalid array`. Every checkout this file could open
+ * was broken, and I did not catch it because I had validated the REQUEST SHAPE with raw curl
+ * instead of by calling my own function. A shape proven outside the code says nothing about the
+ * code. Run the function.
+ */
 function form(obj, prefix = '', out = new URLSearchParams()) {
   for (const [k, v] of Object.entries(obj)) {
     if (v === undefined || v === null) continue;
     const name = prefix ? `${prefix}[${k}]` : k;
-    if (typeof v === 'object' && !Array.isArray(v)) form(v, name, out);
-    else out.append(name, String(v));
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => {
+        if (item && typeof item === 'object') form(item, `${name}[${i}]`, out);
+        else out.append(`${name}[${i}]`, String(item));
+      });
+    } else if (typeof v === 'object') {
+      form(v, name, out);
+    } else {
+      out.append(name, String(v));
+    }
   }
   return out;
 }
@@ -183,6 +201,66 @@ export async function verifyWebhook(rawBody, signatureHeader, { toleranceSec = 3
     return { ok: true, event: JSON.parse(rawBody) };
   } catch (e) {
     return { ok: false, reason: 'signed body is not json' };
+  }
+}
+
+
+/**
+ * ★ THE FEE, COLLECTED WITHOUT CONNECT. THIS IS THE PATH THAT WORKS TODAY.
+ *
+ * The destination charge above is the better product: one movement, the payee's share lands in
+ * their own account, our cut separates in the same transaction, and we OBSERVE the settlement
+ * rather than being told about it. It needs Stripe Connect, which is a dashboard signup only the
+ * account owner can do.
+ *
+ * This is the version that needs none of that, and it is not a downgrade of the money: it is a
+ * real charge for a real amount at the moment value was produced. What it gives up is CARRYING the
+ * settlement, so the two parties move the principal between themselves however they like and we
+ * are paid for the outcome we produced. Verified against the live account: a checkout session
+ * mints and returns a working URL with no Connect enabled.
+ *
+ * The fee comes from the deal row and is never a number typed at a call site: pricing on this
+ * estate is not final, and the live catalogue is the only authority.
+ */
+export async function checkoutForFee({ payoutId, dealId, subject, feeCents, payerEmail }) {
+  const site = process.env.URL || 'https://answered.reddenda.com';
+  if (!Number.isInteger(feeCents) || feeCents <= 0) throw new Error('a fee must be positive cents');
+  return stripe('/checkout/sessions', {
+    body: {
+      mode: 'payment',
+      customer_email: payerEmail || undefined,
+      metadata: { product: 'parley', kind: 'fee', deal_id: dealId, payout_id: payoutId },
+      payment_intent_data: {
+        metadata: { product: 'parley', kind: 'fee', deal_id: dealId, payout_id: payoutId },
+        description: `Parley fee for a settled negotiation: ${String(subject || '').slice(0, 90)}`,
+      },
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: feeCents,
+          product_data: {
+            name: 'Parley',
+            description: `You settled: ${String(subject || 'your negotiation').slice(0, 90)}`,
+          },
+        },
+      }],
+      success_url: `${site}/truce/paid?deal=${encodeURIComponent(dealId)}`,
+      cancel_url: `${site}/truce/unpaid?deal=${encodeURIComponent(dealId)}`,
+    },
+    idempotencyKey: `parley-fee-${payoutId}`,
+  });
+}
+
+/** Is the destination-charge rail available on this account, or only the fee rail? */
+export async function connectReady() {
+  try {
+    await stripe('/accounts?limit=1', { method: 'GET' });
+    // Listing succeeds even without Connect, so it proves nothing. Only a CREATE settles it, and
+    // we must not create a stray account just to ask, so this reports what the last attempt saw.
+    return { known: false, reason: 'a listing is not a capability; only a create attempt settles it' };
+  } catch (e) {
+    return { known: true, ready: false, reason: String(e.message).slice(0, 120) };
   }
 }
 

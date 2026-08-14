@@ -27,7 +27,7 @@
 
 import { rpc, dbConfigured } from './lib/db.mjs';
 import { negotiate } from './lib/parley-agent.mjs';
-import { createPayeeAccount, onboardingLink, payeeReady, checkoutForSettlement } from './lib/parley-money.mjs';
+import { createPayeeAccount, onboardingLink, payeeReady, checkoutForSettlement, checkoutForFee } from './lib/parley-money.mjs';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -136,7 +136,7 @@ export const handler = async (event) => {
 
   // Every token-authenticated op validates the shape first, so a malformed token never reaches
   // the database and a scan gets a 400 rather than a timing signal.
-  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact', 'say', 'payout_setup', 'payout_status', 'pay'];
+  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact', 'say', 'payout_setup', 'payout_status', 'pay', 'pay_fee'];
   if (needsToken.includes(op) && !TOKEN.test(token)) return bad(400, 'that link is not valid');
 
   try {
@@ -347,6 +347,42 @@ export const handler = async (event) => {
           return ok({ ok: true, checkout_url: session.url, amount_cents: opened.amount_cents, fee_cents: opened.fee_cents });
         } catch (e) {
           console.error('truce pay:', String(e && e.message).slice(0, 200));
+          return bad(502, 'we could not open a checkout just now. Nothing was charged.');
+        }
+      }
+
+      // ★ THE FEE, AND THIS ONE WORKS TODAY. The destination charge above is the better product
+      // and needs Stripe Connect, which is a dashboard signup only the account owner can do. This
+      // path needs none of it: the two parties move the principal between themselves however they
+      // like, and Parley is paid for the outcome it produced, at the moment it produced it.
+      // Verified against the LIVE account with no Connect enabled: a checkout session mints and
+      // returns a working URL.
+      case 'pay_fee': {
+        const v = await open('tr_view', { p_token: token });
+        if (!v || v.error) return bad(400, (v && v.error) || 'that link is not valid');
+        if (v.deal.status !== 'settled') return bad(400, 'there is no fee until this settles, which is the whole promise');
+
+        const fee = Number(v.deal.fee_cents) || 0;
+        if (fee <= 0) return ok({ ok: true, nothing_to_pay: true, note: 'This deal carries no fee.' });
+
+        const opened = await rpc('tr_payout_open', {
+          p_deal: v.deal.id, p_payer_side: v.me.side, p_fee_cents: fee,
+        });
+        if (!opened || opened.ok !== true) return bad(400, (opened && opened.reason) || 'a fee could not be opened');
+        if (opened.already && opened.status === 'succeeded') {
+          return ok({ ok: true, already_paid: true, fee_cents: opened.fee_cents });
+        }
+        try {
+          const session = await checkoutForFee({
+            payoutId: opened.payout_id, dealId: v.deal.id, subject: v.deal.subject, feeCents: fee,
+          });
+          await rpc('tr_payout_intent', {
+            p_payout: opened.payout_id, p_session: session.id,
+            p_intent: session.payment_intent || null, p_account: null,
+          });
+          return ok({ ok: true, checkout_url: session.url, fee_cents: fee });
+        } catch (e) {
+          console.error('truce pay_fee:', String(e && e.message).slice(0, 200));
           return bad(502, 'we could not open a checkout just now. Nothing was charged.');
         }
       }
