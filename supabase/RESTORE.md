@@ -1,8 +1,8 @@
 # Restoring the Answered database
 
-Exported 2026-08-14T23:08:50.593217+00:00 by `scripts/dump-schema.mjs`. Postgres 17.6.
+Exported 2026-08-14T23:36:36.316595+00:00 by `scripts/dump-schema.mjs`. Postgres 17.6.
 
-**79 migrations · 62 tables · 183 functions · 182 indexes · 5 triggers · 1 views · 0 policies.**
+**81 migrations · 62 tables · 186 functions · 182 indexes · 5 triggers · 1 views · 0 policies.**
 
 ## What is in here
 

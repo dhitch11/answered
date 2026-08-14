@@ -7843,7 +7843,7 @@
  ],
  "policies": [],
  "postgres": "17.6",
- "taken_at": "2026-08-14T23:08:50.593217+00:00",
+ "taken_at": "2026-08-14T23:36:36.316595+00:00",
  "triggers": [
   {
    "name": "admin_audit_no_mutate",
@@ -8543,6 +8543,23 @@
   },
   {
    "acl": [
+    "postgres=X/postgres",
+    "service_role=X/postgres",
+    "anon=X/postgres"
+   ],
+   "args": "p_secret text, p_call_sid text, p_row jsonb",
+   "name": "sv_admin_call_summary",
+   "config": [
+    "search_path=public"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_call_summary(p_secret text, p_call_sid text, p_row jsonb)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_id uuid;\nbegin\n  perform private.require(p_secret);\n\n  update public.calls\n     set summary   = nullif(p_row->>'summary',''),\n         sentiment = nullif(p_row->>'sentiment',''),\n         ai_notes  = p_row - 'summary' - 'sentiment'\n   where call_sid = p_call_sid\n   returning id into v_id;\n\n  -- An UPDATE that matched nothing must say so. A silent zero-row update reads to the caller as\n  -- success and is how a console ends up displaying a summary that was never stored.\n  if v_id is null then\n    return jsonb_build_object('ok', false, 'reason', 'no call has that sid');\n  end if;\n\n  insert into public.crm_activity (contact_id, account_id, kind, title, body, payload, source, actor,\n                                   ref_kind, ref_id)\n  select c.contact_id, c.account_id, 'call',\n         'Call summarised by ' || coalesce(p_row->>'model','an unnamed model'),\n         left(coalesce(p_row->>'summary',''), 2000),\n         p_row, 'admin-console', nullif(p_row->>'actor',''), 'call', p_call_sid\n    from public.calls c where c.id = v_id;\n\n  return jsonb_build_object('ok', true, 'call_id', v_id);\nend;\n$function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
     "=X/postgres",
     "postgres=X/postgres",
     "anon=X/postgres",
@@ -8716,7 +8733,7 @@
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_events(p_secret text, p_account uuid, p_name text, p_since timestamp with time zone, p_limit integer, p_offset integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v jsonb; n bigint; lim integer; off integer; since timestamptz;\nbegin\n  perform private.require(p_secret);\n  lim := greatest(1, least(coalesce(p_limit, 100), 500));\n  off := greatest(0, coalesce(p_offset, 0));\n  since := coalesce(p_since, now() - interval '30 days');\n\n  select count(*) into n from public.app_events e\n   where e.at >= since and (p_account is null or e.account_id = p_account)\n     and (p_name is null or e.name = p_name);\n\n  select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into v from (\n    select e.id, e.name, e.page, e.meta, e.source, e.at, e.account_id, e.anon_id,\n           a.business_name\n      from public.app_events e\n      left join public.accounts a on a.id = e.account_id\n     where e.at >= since and (p_account is null or e.account_id = p_account)\n       and (p_name is null or e.name = p_name)\n     order by e.at desc limit lim offset off\n  ) x;\n\n  return jsonb_build_object(\n    'total', n, 'limit', lim, 'offset', off, 'since', since, 'rows', v,\n    'by_name', (select coalesce(jsonb_agg(jsonb_build_object(\n                  'name', g.name, 'n', g.n, 'accounts', g.accts, 'last_at', g.last_at)\n                  order by g.n desc), '[]'::jsonb)\n                from (select name, count(*) as n, count(distinct account_id) as accts,\n                             max(at) as last_at\n                        from public.app_events where at >= since\n                         and (p_account is null or account_id = p_account)\n                       group by name) g),\n    'by_day', (select coalesce(jsonb_agg(jsonb_build_object('day', d.day, 'n', d.n)\n                 order by d.day), '[]'::jsonb)\n               from (select date_trunc('day', at)::date as day, count(*) as n\n                       from public.app_events where at >= since\n                        and (p_account is null or account_id = p_account)\n                      group by 1) d)\n  );\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_events(p_secret text, p_account uuid, p_name text, p_since timestamp with time zone, p_limit integer, p_offset integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v jsonb; n int; lim int; off int; since timestamptz;\nbegin\n  perform private.require(p_secret);\n  lim := greatest(1, least(coalesce(p_limit, 100), 500));\n  off := greatest(0, coalesce(p_offset, 0));\n  since := coalesce(p_since, now() - interval '30 days');\n\n  select count(*) into n from public.app_events e\n   where e.at >= since and (p_account is null or e.account_id = p_account)\n     and (p_name is null or e.name = p_name);\n\n  select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into v from (\n    select e.id, e.name, e.page, e.meta, e.source, e.at, e.account_id, e.anon_id,\n           a.business_name\n      from public.app_events e\n      left join public.accounts a on a.id = e.account_id\n     where e.at >= since and (p_account is null or e.account_id = p_account)\n       and (p_name is null or e.name = p_name)\n     order by e.at desc limit lim offset off\n  ) x;\n\n  return jsonb_build_object(\n    'total', n, 'limit', lim, 'offset', off, 'since', since, 'rows', v,\n    'filtered_by_name', p_name,\n    -- Say what scope each breakdown was computed at, so a caller never has to infer it.\n    'by_name_scope', 'all_names',\n    'by_day_scope',  case when p_name is null then 'all_names' else 'this_name' end,\n    'by_name', (select coalesce(jsonb_agg(jsonb_build_object(\n                  'name', g.name, 'n', g.n, 'accounts', g.accts, 'last_at', g.last_at)\n                  order by g.n desc), '[]'::jsonb)\n                from (select name, count(*) as n, count(distinct account_id) as accts,\n                             max(at) as last_at\n                        from public.app_events where at >= since\n                         and (p_account is null or account_id = p_account)\n                       group by name) g),\n    'by_day', (select coalesce(jsonb_agg(jsonb_build_object('day', d.day, 'n', d.n)\n                 order by d.day), '[]'::jsonb)\n               from (select date_trunc('day', at)::date as day, count(*) as n\n                       from public.app_events where at >= since\n                        and (p_account is null or account_id = p_account)\n                        and (p_name is null or name = p_name)\n                      group by 1) d)\n  );\nend $function$\n",
    "security_definer": true
   },
   {
@@ -10777,6 +10794,23 @@
     "postgres=X/postgres",
     "service_role=X/postgres"
    ],
+   "args": "p_secret text, p_limit integer",
+   "name": "tr_board",
+   "config": [
+    "search_path=public, private, sealed, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_board(p_secret text, p_limit integer DEFAULT 60)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private', 'sealed', 'extensions'\nAS $function$\ndeclare out jsonb;\nbegin\n  perform private.require(p_secret);\n  select coalesce(jsonb_agg(row order by created_at desc), '[]'::jsonb) into out from (\n    select d.created_at,\n      jsonb_build_object(\n        'id', d.id,\n        'subject', d.subject,\n        'kind', d.kind,\n        'status', d.status,\n        'created_at', d.created_at,\n        'expires_at', d.expires_at,\n        'settled_at', d.settled_at,\n        'settled_value', d.settled_value,\n        'method', d.settlement->>'method',\n        'notified', d.notified_at is not null,\n        'messages', (select count(*) from public.truce_messages m where m.deal_id = d.id),\n        'human_messages', (select count(*) from public.truce_messages m where m.deal_id = d.id and m.move = 'human'),\n        'parties', (select jsonb_agg(jsonb_build_object(\n              'side', p.side, 'name', p.display_name, 'role', p.role,\n              'joined', p.joined_at is not null,\n              'invited_not_opened', p.claim_code is not null,\n              'number_set', p.limit_set_at is not null,\n              'opening', (select l.opening from sealed.limits l where l.party_id = p.id),\n              'signed', p.signed_at is not null,\n              'told_by_email', p.contact is not null,\n              'payouts_ready', p.payouts_ready\n            ) order by p.side) from public.truce_parties p where p.deal_id = d.id),\n        'payout', (select jsonb_build_object('status', y.status, 'amount_cents', y.amount_cents,\n                     'fee_cents', y.fee_cents, 'paid_at', y.paid_at)\n                   from public.truce_payouts y where y.deal_id = d.id\n                   order by y.created_at desc limit 1)\n      ) as row\n    from public.truce_deals d\n    order by d.created_at desc\n    limit greatest(1, least(coalesce(p_limit,60), 200))\n  ) x;\n  return jsonb_build_object('ok', true, 'deals', out,\n    'revenue', public.tr_revenue(p_secret, 30));\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
    "args": "p_secret text, p_code text",
    "name": "tr_claim",
    "config": [
@@ -11026,6 +11060,23 @@
    "comment": null,
    "returns": "jsonb",
    "definition": "CREATE OR REPLACE FUNCTION public.tr_terms(p_secret text, p_token text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare me public.truce_parties; d public.truce_deals;\nbegin\n  perform private.require(p_secret);\n  select * into me from public.truce_parties where token = p_token;\n  if not found then return jsonb_build_object('error','unknown link'); end if;\n  select * into d from public.truce_deals where id = me.deal_id;\n  if d.status not in ('settled','no_overlap') then\n    return jsonb_build_object('status', d.status, 'terms', '[]'::jsonb,\n      'note','terms are exchanged when the negotiation finishes, not while it is running');\n  end if;\n  return jsonb_build_object('status', d.status, 'settled_value', d.settled_value,\n                            'terms', sealed.terms_for(d.id));\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_deal uuid",
+   "name": "tr_thread_admin",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_thread_admin(p_secret text, p_deal uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare out jsonb;\nbegin\n  perform private.require(p_secret);\n  select jsonb_build_object('ok', true,\n    'subject', (select subject from public.truce_deals where id = p_deal),\n    'thread', coalesce((select jsonb_agg(jsonb_build_object(\n        'seq', m.seq, 'speaker', m.speaker, 'body', m.body, 'move', m.move,\n        'amount', m.amount, 'at', m.at) order by m.seq)\n      from public.truce_messages m where m.deal_id = p_deal), '[]'::jsonb))\n  into out;\n  return out;\nend $function$\n",
    "security_definer": true
   },
   {

@@ -573,6 +573,12 @@ table.dense th{padding:7px 12px}
   .ln-bar i{transition:none}
 }
 
+/* A stranger's transcribed words, set apart from our own sentence. The quotation marks are the
+   point: an operator must never read a caller's instruction as our compliance determination. */
+.heard{quotes:'\u201C' '\u201D';font-style:italic;color:var(--ink-2)}
+.heard::before{content:open-quote}
+.heard::after{content:close-quote}
+
 /* ── the call summary ─────────────────────────────────────────────────────
    A quote is the part of a summary that reads as evidence, so it is set apart from the model's own
    prose rather than blended into it. The left rule is the whole point: the reader can see at a
@@ -903,6 +909,43 @@ const S = {
   facets: null,
 };
 
+/**
+ * ★ A GATE'S REASON CAN CONTAIN A STRANGER'S WORDS, AND MUST NOT BE PRESENTED AS OURS.
+ *
+ * Traced end to end in the live schema, 2026-08-14:
+ *
+ *   a caller says "stop"      scripts.mjs matches /^\s*stop\b/i
+ *   -> call-transcription.mjs passes p_heard_as: text.slice(0, 200)   — THE CALLER'S OWN SPEECH
+ *   -> sv_dnc_request builds  'do-not-call request: ' || p_heard_as
+ *   -> trigger apply_suppression sets contacts.suppressed_reason = that string
+ *   -> sv_crm_outreach_state SPLICES suppressed_reason into the why sentence this console shows
+ *
+ * So up to 200 characters of transcribed speech from an unknown third party can arrive inside a
+ * sentence an operator reads as the system's compliance determination. It is escaped, so it is not
+ * an injection into the page - it is an injection into the VOICE. An operator who reads
+ * "Do not contact: do-not-call request: this is the wrong number, try 555-0100" may act on a
+ * stranger's instruction believing it is our finding.
+ *
+ * Two rules follow, and the second is the one that will matter more later:
+ *   1. Split our determination from their words, and render theirs as an attributed quotation.
+ *   2. NEVER put the raw sentence in a model prompt. Escaping does nothing to a prompt; only the
+ *      structural separation this function performs does.
+ *
+ * The prefix match is deliberately narrow and falls through to rendering the whole string as ours
+ * when it does not match, because inventing an attribution would be its own fabrication.
+ */
+const CALLER_QUOTED_PREFIX = 'do-not-call request: ';
+function gateWhy(why) {
+  const s = String(why == null ? '' : why);
+  const i = s.indexOf(CALLER_QUOTED_PREFIX);
+  if (i < 0) return esc(s);
+  const ours = s.slice(0, i + CALLER_QUOTED_PREFIX.length - 2);   // keep our sentence, drop the ": "
+  const theirs = s.slice(i + CALLER_QUOTED_PREFIX.length).trim();
+  if (!theirs) return esc(s);
+  return esc(ours) + '. <span class="muted">Heard on the call, transcribed, not our wording:</span> ' +
+         '<q class="heard">' + esc(theirs) + '</q>';
+}
+
 // ── empty and error states, which are not the same thing ──────────────────
 const emptyState = (title, detail) =>
   '<div class="empty"><div class="big">' + esc(title) + '</div><div class="sm">' + detail + '</div></div>';
@@ -1067,9 +1110,9 @@ VIEWS.cockpit = async () => {
         p.telephony && p.telephony.ok ? 'Ready' : 'Down',
         esc((p.telephony && p.telephony.why) || 'not measured')) +
       lamp(p.sms && p.sms.ok ? 'go' : 'caution', 'Carrier campaign',
-        p.sms && p.sms.ok ? 'Approved' : 'Blocked', esc((p.sms && p.sms.why) || 'not measured')) +
+        p.sms && p.sms.ok ? 'Approved' : 'Blocked', gateWhy((p.sms && p.sms.why) || 'not measured')) +
       lamp(p.email && p.email.ok ? 'go' : 'stop', 'Mail',
-        p.email && p.email.ok ? 'Sending' : 'Down', esc((p.email && p.email.why) || 'not measured')) +
+        p.email && p.email.ok ? 'Sending' : 'Down', gateWhy((p.email && p.email.why) || 'not measured')) +
       lamp(d.lamps.registry.ok ? 'go' : 'caution', 'Do-not-call registry',
         d.lamps.registry.ok ? 'Loaded' : 'Never loaded', esc(d.lamps.registry.why)) +
       lamp(d.autopilot_kill ? 'caution' : 'go', 'Autopilot',
@@ -1146,7 +1189,7 @@ VIEWS.cockpit = async () => {
         '<div class="muted mono" style="font-size:12.5px;margin-top:4px">' +
           esc(phone(target.phone)) + ' · ' + esc(target.line_type || 'line type unknown') +
           (target.city ? ' · ' + esc([target.city, target.state].filter(Boolean).join(', ')) : '') + '</div>' +
-        '<div class="tile-s" style="margin-top:9px">' + esc(target.why) + '</div>' +
+        '<div class="tile-s" style="margin-top:9px">' + gateWhy(target.why) + '</div>' +
         '<div class="bay" style="margin-top:14px">' + channelSwitches(target, d) + '</div>' +
       '</div></div>'
     : '<div class="inst"><div class="inst-h"><h3>Target</h3></div>' +
@@ -1432,7 +1475,7 @@ function channelRow(label, state, action, contactId, to) {
         ? '<button class="btn sm" data-act="' + action + '" data-contact="' + esc(contactId) + '" data-to="' + esc(to || '') + '">' + label + '</button>'
         : '') +
     '</div>' +
-    '<div class="tile-s" style="margin-top:7px">' + esc(state ? state.why : 'unknown') + '</div>' +
+    '<div class="tile-s" style="margin-top:7px">' + gateWhy(state ? state.why : 'unknown') + '</div>' +
   '</div>';
 }
 
@@ -1905,7 +1948,14 @@ VIEWS.events = async () => {
     'table is the queryable copy of the same stream. <strong>Nothing has been migrated out of Blobs</strong>, ' +
     'so no history was destroyed to make this page work.</div></div>' +
   '<div class="grid g2">' +
-  '<div class="card pad0"><div class="card-h"><h2>By event, last 30 days</h2></div>' +
+  // ★ SAY WHICH SCOPE EACH NUMBER WAS COMPUTED AT. This table is the PICKER, so it stays unfiltered
+  // even when a name filter is on - filtering it would leave one row and destroy its only job. But
+  // an unlabelled unfiltered breakdown sitting beside a filtered total is two numbers that disagree
+  // with nothing saying so, and both are individually true, which is what lets that survive review.
+  '<div class="card pad0"><div class="card-h"><h2>By event, last 30 days</h2>' +
+    (f.name && d.by_name_scope === 'all_names'
+      ? '<span class="sp muted">every event name, not just ' + esc(f.name) + ', so you can switch</span>'
+      : '') + '</div>' +
     (d.by_name.length ? '<div class="tw"><table><thead><tr><th>Event</th><th class="num">Count</th>' +
       '<th class="num">Customers</th><th>Last seen</th></tr></thead><tbody>' +
       d.by_name.map((g) => '<tr class="click" data-event="' + esc(g.name) + '"><td class="mono">' + esc(g.name) + '</td>' +
