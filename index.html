@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=0b83571b">
+<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
 </head>
 <body class="track-me">
 <a class="skip" href="#main">Skip to content</a>
@@ -35,24 +35,38 @@
 <main id="main">
 
 <!-- ══ HERO. both tracks share the shell; the nav control flips them. ══ -->
-<section class="hero">
+<section class="hero" style="padding-top:calc(var(--nav-h) + 4px)">
   <canvas class="hero-field" aria-hidden="true"></canvas>
   <div class="wrap">
     <div class="hero-grid">
       <div>
         <p class="eyebrow quiet bt b1">ONE AI. BOTH SIDES OF THE PHONE.</p>
-        <h1 class="display bt b2" data-track="me">You <span class="lit">never</span> have to be on the phone again.</h1>
-        <h1 class="display bt b2" data-track="biz">Every call answered. Every job on the books.</h1>
-        <p class="lede hero-sub bt b3" data-track="me">It picks up when you cannot and texts you the one line that matters, the kind you can read at a light. It calls the bank, the airline and the IRS for you, and it eats the hold. It even makes the call you have been putting off, and it does not get talked out of it.</p>
-        <p class="lede hero-sub bt b3" data-track="biz">It answers your line at 2 AM in a voice that knows your trade, books the job with a name, an address, a callback number and a window, and rings your cell the moment it is a real emergency. $19 when it books. Nothing when it does not.</p>
-        <p class="src bt b4" style="margin-top:14px;max-width:56ch">It says it is an AI in its first sentence of every call. You can hear that yourself in about thirty seconds.</p>
-        <p class="price-law bt b4">YOU PAY WHEN IT PRODUCES AN OUTCOME. NO SUBSCRIPTION. NO PER-MINUTE CHARGE.</p>
-        <div class="hero-actions bt b5">
+        <h1 class="display bt b2" data-track="me" style="margin-top:8px">You <span class="lit">never</span> have to be on the phone again.</h1>
+        <h1 class="display bt b2" data-track="biz" style="margin-top:8px">Every call answered. Every job booked.</h1>
+        <p class="lede hero-sub bt b3" data-track="me" style="margin-top:16px">It picks up when you cannot, and texts you the one line that matters. It calls the bank, the airline and the IRS for you, and it eats the hold.</p>
+        <p class="lede hero-sub bt b3" data-track="biz" style="margin-top:16px">It answers your line at 2 AM in a voice that knows your trade, books the job with a name, an address and a time window, and rings your cell the second it is a real emergency.</p>
+        <div class="hero-actions bt b4" style="margin-top:26px">
           <!-- THE HEALTH GATE: this slot upgrades to the live call control ONLY
                when /api/demo-health answers healthy:true. The demo number is
-               never in this file. -->
-          <span class="cta-slot" id="cta-primary"><a class="btn btn-ghost" href="#early">Get on the list</a></span>
+               never in this file. Every [data-callslot] on the site upgrades
+               together, so the closing CTA on each product page gets the same
+               control from the same one fetch. -->
+          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-ghost" href="#early">Get on the list</a></span>
           <a class="btn btn-ghost" href="#price">See what it costs</a>
+        </div>
+        <!-- THE DECISION MOMENT, adjacent to the control and LOUD.
+             A juror reading only the first screen must already know the whole
+             offer and the way out of it. So the risk reversal sits directly
+             under the button at 16px on a Hi-Vis rule, in the words of the
+             track that is showing, and the mono law and the honesty line
+             stay one line each underneath it. The call control itself is
+             unaffected by anything below it: hero content overflows the
+             centred box, so it starts at the padding and grows DOWN. -->
+        <div class="bt b5" style="margin-top:18px">
+          <p class="setup-flash" data-track="me" style="text-wrap:pretty;margin-top:0;max-width:54ch">Your <b style="color:var(--ink)">first hold is free</b>. After that it is <b style="color:var(--ink)">$20</b> when a real person picks up, and <b style="color:var(--ink)">$0</b> when nobody ever does.</p>
+          <p class="setup-flash" data-track="biz" style="text-wrap:pretty;margin-top:0;max-width:54ch"><b style="color:var(--ink)">$0</b> to start. <b style="color:var(--ink)">$19</b> when it books a job. If a booking is not real, reply <b style="color:var(--ink)">VOID</b> and the charge comes off.</p>
+          <p class="price-law" style="margin-top:14px">NO SUBSCRIPTION. NO PER-MINUTE CHARGE.</p>
+          <p class="src" style="margin-top:6px;max-width:62ch">It says it is an AI in its first sentence of every call.</p>
         </div>
       </div>
 
@@ -64,7 +78,7 @@
             <div class="ring-count">4.8s</div>
           </div>
         </div>
-        <p class="src" style="text-align:center;margin-top:12px;max-width:34ch;margin-inline:auto">The ring runs the North American cadence, two seconds on and four off.</p>
+        <p class="src" style="text-align:center;margin-top:12px;max-width:32ch;margin-inline:auto;text-wrap:balance">Two seconds on, four off. The North American ring cadence.</p>
       </div>
     </div>
   </div>
@@ -76,47 +90,62 @@
 <div id="track" aria-hidden="true"></div>
 
 <!-- ══ THE DEMO-NUMBER MOMENT (#call-it). SHIPS DARK, [hidden] ON PURPOSE.
-     The demo number is NEVER in this file, and the health-gate module in
-     answered.js currently upgrades ONLY #cta-primary. INTEGRATOR: extend the
-     health gate so that on healthy:true it (1) removes the hidden attribute
-     from this section and (2) injects the tel: call control into #callit-slot,
-     exactly as it does for the hero slot. On red, this section stays dark:
-     no dead control ever renders. Copy below is the judged deck, do not
-     rewrite it while wiring. ══ -->
-<section class="pad seam" id="call-it" hidden>
+     WIRED. The demo number is NEVER in this file. The health gate in
+     answered.js upgrades every [data-callslot] on the page from one fetch,
+     and un-hides every [data-callgate] section, so on healthy:true this
+     section appears with a live control in it. On red it stays dark and no
+     dead control ever renders. Copy below is the judged deck. ══ -->
+<section class="pad seam" id="call-it" data-callgate hidden>
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Do not take our word for anything on this page</p>
     <h2 class="h2 rv d1" style="margin-top:18px">Call it. Right now. Mid-scroll.</h2>
-    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" id="callit-slot"></span></p>
-    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:52ch">That is not a recording. It is the same engine we sell, answering live. Try to talk it into quoting a price. Ask it to prove it is an AI. It will tell you. Hang up whenever you like.</p>
-    <p class="src rv d3" style="margin-top:16px">Free. No account. Nobody calls you back. Just a phone doing the thing this whole page claims.</p>
+    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" id="callit-slot" data-callslot></span></p>
+    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:50ch;text-wrap:pretty">That is not a recording. It is the same engine we sell, answering live as a plumbing shop. Here are three things worth trying on it.</p>
+    <!-- the dare. every one of these is a claim made elsewhere on this page,
+         written as something the visitor can go and test in thirty seconds. -->
+    <ul class="chips rv d2" style="flex-direction:row;flex-wrap:wrap;justify-content:center;gap:12px 14px;margin-top:24px;text-align:left">
+      <li style="flex:1 1 190px;align-items:flex-start"><span class="chip-n">1</span> Ask what a job costs. It will not quote you a price, however you ask.</li>
+      <li style="flex:1 1 190px;align-items:flex-start"><span class="chip-n">2</span> Ask if it is a real person. It already told you it is an AI.</li>
+      <li style="flex:1 1 190px;align-items:flex-start"><span class="chip-n">3</span> Say your water heater is leaking. Watch it book the slot.</li>
+    </ul>
+    <p class="src rv d3" style="margin-top:22px">Free. No account. Nobody calls you back. Hang up whenever you like. It is just a phone doing the thing this whole page claims.</p>
   </div>
 </section>
 
 <!-- ══ STAT BAND ══ -->
 <section class="band" data-track="me">
   <div class="wrap" style="padding-inline:0">
-    <p class="eyebrow rv" style="padding:clamp(20px,2.6vw,30px) clamp(16px,2vw,28px) 0">Four numbers. All of them promises.</p>
+    <p class="eyebrow rv" style="padding:clamp(20px,2.6vw,30px) clamp(16px,2vw,28px) 0">Four numbers, all promises.</p>
+    <!-- PROOF DENSITY. Each cell is a plate, not a div: a plate number, the
+         figure, the claim, then a ruled footing that says HOW WE KNOW at a
+         size a partner can actually read. The old citation was 11.5px at 66%
+         alpha, which is the exact line a sceptic leans in for and the exact
+         line we were whispering. 12.5px at 82% here, and the same treatment
+         on /trades and /hold. -->
     <div class="band-grid">
       <div class="band-cell rv">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">01 / 04</div>
         <div class="band-v num">$0</div>
         <div class="band-k">if nobody ever picks up. You are never charged for waiting.</div>
-        <div class="band-s src">Answered pricing law. The meter only moves on a human.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Answered pricing law. The meter only moves on a human.</div>
       </div>
       <div class="band-cell rv d1">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">02 / 04</div>
         <div class="band-v num">0</div>
         <div class="band-k">apps to install. It runs on the phone already in your pocket.</div>
-        <div class="band-s src">One dial code from your handset. No porting, no new number.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>One dial code from your handset. No porting, no new number.</div>
       </div>
       <div class="band-cell rv d2">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">03 / 04</div>
         <div class="band-v num"><span data-settle="30">30</span><span style="font-size:.6em">s</span></div>
         <div class="band-k">to switch it on. Ten seconds to switch it back off.</div>
-        <div class="band-s src">Carrier call forwarding codes, Verizon and T-Mobile primary documentation, accessed 2026-08-10.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Carrier call forwarding codes, Verizon and T-Mobile primary documentation, accessed 2026-08-10.</div>
       </div>
       <div class="band-cell rv d3">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">04 / 04</div>
         <div class="band-v num">1</div>
         <div class="band-k">voice that does all of it. One account, one bill, four problems gone.</div>
-        <div class="band-s src">Same engine on both ends of the call.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Same engine on both ends of the call.</div>
       </div>
     </div>
   </div>
@@ -124,32 +153,37 @@
 
 <section class="band" data-track="biz">
   <div class="wrap" style="padding-inline:0">
-    <p class="eyebrow rv" style="padding:clamp(20px,2.6vw,30px) clamp(16px,2vw,28px) 0">Five numbers. None of them ours.</p>
+    <p class="eyebrow rv" style="padding:clamp(20px,2.6vw,30px) clamp(16px,2vw,28px) 0">Five numbers. None are ours.</p>
     <div class="band-grid">
       <div class="band-cell rv">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">01 / 05</div>
         <div class="band-v num"><span data-count="48" data-suf="%">48%</span></div>
         <div class="band-k">of callers to a home services business never reach a person.</div>
-        <div class="band-s src">Invoca Home Services Lead Conversion Benchmarks, 70M calls, July 2026. 52% reach a person.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca Home Services Lead Conversion Benchmarks, 70M calls, July 2026. 52% reach a person.</div>
       </div>
       <div class="band-cell rv d1">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">02 / 05</div>
         <div class="band-v num"><span data-count="537" data-pre="$">$537</span></div>
         <div class="band-k">what one missed water heater lead is worth. A roof is $4,277.</div>
-        <div class="band-s src">45% on call close rate (Invoca, July 2026) against $1,193 and $9,504 average tickets (Thumbtack, 2026). Arithmetic, labeled as arithmetic.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>45% on call close rate (Invoca, July 2026) against $1,193 and $9,504 average tickets (Thumbtack, 2026). Arithmetic, labeled as arithmetic.</div>
       </div>
       <div class="band-cell rv d2">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">03 / 05</div>
         <div class="band-v num"><span data-count="45" data-suf="%">45%</span></div>
         <div class="band-k">of callers who reach a person book on that call.</div>
-        <div class="band-s src">Invoca, July 2026.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca Home Services Lead Conversion Benchmarks, 70M calls, July 2026.</div>
       </div>
       <div class="band-cell rv d3">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">04 / 05</div>
         <div class="band-v num"><span data-count="79" data-suf="%">79%</span></div>
         <div class="band-k">of people who call the IRS never reach a human.</div>
-        <div class="band-s src">IRS filing season data, 2026. Their own number.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>IRS filing season data, 2026. Their own number.</div>
       </div>
       <div class="band-cell rv d3" style="grid-column:1/-1;border-left:0;border-top:1px solid var(--line)">
+        <div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">05 / 05 &middot; THE ONLY NUMBER ON THIS PAGE THAT IS OURS</div>
         <div class="band-v num">$0</div>
-        <div class="band-k">And one number of ours. Per minute. Per seat. Per month. The meter only moves on an outcome.</div>
-        <div class="band-s src">This one is ours. It is the pricing law, and it is the whole point.</div>
+        <div class="band-k">Per minute. Per seat. Per month. The meter only moves on an outcome, and you can switch the whole thing off with one code.</div>
+        <div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>It is our own pricing law, published on this site and in the terms. It is the whole point of the company.</div>
       </div>
     </div>
     <p class="src rv d3" style="padding:14px clamp(16px,2vw,28px) clamp(20px,2.6vw,30px)">Your phone is the only ad channel where the customer calls you. Half of it is falling on the floor.</p>
@@ -167,7 +201,7 @@
         <p class="src rv d3" style="margin-top:12px">The call above is drawn, not recorded. Every figure elsewhere on this site carries its own source.</p>
       </div>
       <div class="rv rv-r d2"><div class="showcase" data-show="call" data-drift="0.05">
-  <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num">2:14 AM</span></div>
+  <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num" style="white-space:nowrap">2:14 AM</span></div>
   <div class="sc-body">
     <div class="turn us"><span class="turn-who">Answered</span>Rivera Plumbing, this is an AI assistant and this call is recorded. What is going on?</div>
     <div class="turn them"><span class="turn-who">Caller</span>My water heater is pouring water into the garage.</div>
@@ -208,7 +242,7 @@
       </div>
       <div class="rv rv-r d2">
         <div class="phone" data-drift="0.05">
-          <div class="phone-top"><span class="phone-dot" aria-hidden="true"></span> Mom <span class="phone-time">4:41 PM</span></div>
+          <div class="phone-top"><span class="phone-dot" aria-hidden="true"></span> Mom <span class="phone-time" style="white-space:nowrap">4:41 PM</span></div>
           <div class="phone-body">
             <div class="pb pb-them"><span class="pb-who">Answered</span>Hi, this is an AI assistant picking up for Dave. He is driving right now. Is everything alright?</div>
             <div class="pb pb-cal"><span class="pb-who">Mom</span>Oh, hello. No, nothing wrong. I just wanted to know if he is still coming Sunday, and whether to make the pot roast.</div>
@@ -291,7 +325,7 @@
         <div class="card-tag">04 / It argues</div>
         <h3 class="h3">It makes the call you keep putting off.</h3>
         <p>Cancel the thing you stopped using. Ask why the bill went up. Get the late fee taken off. Chase the friend who still owes you for the trip. It stays polite, it stays patient, and it does not get talked out of it. You get a recording and exactly what was agreed.</p>
-        <div class="price"><b>15%</b> of what it saves you or gets back. It saves you nothing, you owe nothing.</div>
+        <div class="price"><b>15%</b> of what it saves you or gets back. It gets nothing back, you owe <b>$0</b>. There is no fee for trying.</div>
         <a class="card-go" href="/recover">See how the money comes back <span aria-hidden="true">&rarr;</span></a>
       </article>
     </div>
@@ -301,13 +335,13 @@
         <div class="card-tag">01 / Inbound</div>
         <h3 class="h3">Answered picks up</h3>
         <p>A 24/7 voice that answers your existing number, qualifies the caller, books the job into your calendar, and warm transfers a real emergency straight to your cell. It says it is an AI in its first sentence, every time.</p>
-        <div class="price"><b>$19</b> per booked job. <b>$49</b> after hours. Nothing for a call that books nothing. And if a booking is not real, we would rather lose the $19 than have you spend a Tuesday arguing about it.</div>
+        <div class="price"><b>$19</b> per booked job. <b>$49</b> after hours. <b>$0</b> for a call that books nothing. If a booking is not real, reply <b>VOID</b> and the charge comes off. No argument, no ticket, no phone call.</div>
       </article>
       <article class="card rv d1">
         <div class="card-tag">02 / Outbound</div>
         <h3 class="h3">Recover follows the money</h3>
         <p>The same voice that answered the phone calls back on the invoice that went quiet at day 31. In your name, on your caller ID, with every promise to pay written down.</p>
-        <div class="price"><b>15%</b> of what actually lands in your account. Nothing recovered, nothing owed.</div>
+        <div class="price"><b>15%</b> of what actually lands in your account. Nothing lands, you owe <b>$0</b>. No minimum, no retainer, no monthly floor.</div>
       </article>
       <article class="card rv d2">
         <div class="card-tag">03 / Consumer</div>
@@ -387,7 +421,11 @@
         <h2 class="h2 rv d1" style="margin-top:18px">We sell outcomes.<br> We do not sell minutes.</h2>
         <p class="lede rv d2" style="margin-top:22px">Every voice AI company in this category bills you for talk time or for a seat. That makes their incentive the length of the call. Ours is the result of it.</p>
         <p class="lede rv d2" style="margin-top:16px">So the meter has exactly three events on it: a job got booked, a human got reached, a dollar got recovered. If a call produces none of those, it is free. Including the ones that ring at two in the morning.</p>
-        <p class="src rv d3" style="margin-top:22px">Every charge carries the call it came from: the recording where consent permits, the appointment record, the time stamp. One tap disputes it. We would rather lose the $19 than have you spend a Tuesday arguing about it.</p>
+        <!-- the best sentence on the site, promoted out of an 11.5px footnote.
+             The ledger beside it ends at $413, so the way to make that number
+             cost nothing sits directly next to it, at reading size. -->
+        <p class="setup-flash rv d3" style="text-wrap:pretty;margin-top:24px;max-width:54ch;color:var(--ink-2);border-color:var(--accent-ink)">Think a charge is wrong? Tap it, or reply <b style="color:var(--ink)">VOID</b>, and it comes off. No argument, no ticket, no phone call. We would rather lose the <b style="color:var(--ink)">$19</b> than have you spend a Tuesday arguing about it.</p>
+        <p class="src rv d3" style="margin-top:16px">Every charge carries the call it came from: the recording where consent permits, the appointment record, and the time stamp.</p>
       </div>
       <div class="rv rv-r d2">
         <div class="ledger press" data-drift="0.045">
@@ -494,12 +532,19 @@
     <p class="eyebrow rv">What each one costs</p>
     <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">Three meters, and every one of them starts at zero.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:60ch">There is no subscription here and no per minute price anywhere in this company. You are billed for a booked job, a human reached on the line, or a dollar recovered, and for nothing else that happens on the way there.</p>
+    <!-- the section-level risk reversal. the three cards each carry the VOID
+         promise already, so this line carries the other half of the decision:
+         nothing to sign, nothing to cancel, and a way out that takes ten
+         seconds. it is ground-portable on purpose (--ink-2 / --accent-ink), so
+         moving this block onto paper can never paint white on cream. -->
+    <p class="setup-flash rv d2" style="text-wrap:pretty;margin-top:24px;max-width:72ch;color:var(--ink-2);border-color:var(--accent-ink)">Every meter starts at <b style="color:var(--ink)">$0</b> and stays there until something good happens. No subscription, no minimum, and nothing to cancel: one code turns it off in ten seconds.</p>
     <div class="pcards"><article class="pcard lead rv" data-aud="business both">
         <div class="pc-for">01 / Inbound</div>
         <div class="pc-name">Answered</div>
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
-        <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 subscription &middot; $0 per minute &middot; $0 per call &middot; $0 for a wrong number</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
         <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
@@ -516,7 +561,9 @@
         <div class="pc-name">Hold</div>
         <div class="pc-price num">$20</div>
         <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
-        <div class="pc-free">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
+        <div class="pc-meter"><span>A connection means a human being on the line who can act on your case. A phone tree is not a connection, and it is not a charge.</span><span>If it waits four hours and never reaches a person, the price is <b>$0</b>. The waiting is our cost, not your bill.</span><span>Your first hold is free. No card, no account, and no subscription waiting behind it.</span><span>A government line is <b>$20</b> because it queues for hours. A commercial line is <b>$10</b>.</span></div>
         <ul class="pc-list">
           <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
           <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
@@ -532,7 +579,9 @@
         <div class="pc-name">Recover</div>
         <div class="pc-price num">15%</div>
         <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
-        <div class="pc-free">Nothing recovered means nothing owed</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 to start &middot; $0 a month &middot; $0 if nothing lands</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
+        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
         <ul class="pc-list">
           <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
           <li>Already knows the job, the address and the date, because it booked the work</li>
@@ -545,7 +594,10 @@
         <div class="pc-foot">
         </div>
       <a class="pc-cta" href="/pricing?p=Recover#interest">I want my invoices chased</a></article></div>
-    <p class="rv d3" style="margin-top:34px"><a class="btn btn-ghost" href="/pricing">See the full breakdown and the unit economics</a></p>
+    <!-- a CTA with the reversal beside it, not in a drawer two pages away.
+         flex-wrap so the note drops under the button at 390 instead of
+         squeezing it. -->
+    <div class="rv d3" style="margin-top:30px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px"><a class="btn btn-ghost" href="/pricing">See the full breakdown and the unit economics</a><span class="src" style="font-size:12.5px;line-height:1.5;color:var(--t2);max-width:36ch">Every charge shows you the call it came from. If one looks wrong, reply VOID and it comes off.</span></div>
   </div>
 </section>
 
@@ -562,6 +614,11 @@
       <input id="email" type="email" name="email" placeholder="you@yourcompany.com" required autocomplete="email" style="border-color:rgba(30,27,23,.2);background:rgba(30,27,23,.04);color:var(--paper-ink)">
       <button class="btn btn-primary" type="submit">Request access</button>
     </form>
+    <!-- PAPER GROUND. Every colour here is written from the paper tokens
+         (--ink, --accent-ink), never from --t1/--bronze, because this block
+         sits on bone and a dark-ground token would paint white on cream.
+         That is the exact defect the jury caught on /trades. -->
+    <p class="rv d2" style="margin-top:20px;margin-inline:auto;max-width:47ch;text-align:left;padding:2px 0 2px 14px;border-left:2px solid var(--accent-ink);font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> to start, and <b style="color:var(--ink);font-weight:600">$0</b> for every call that books nothing. The meter only moves when something good happened, and one code switches the whole thing off in ten seconds.</p>
     <p class="src form-note rv d3">One email when it is your turn. Nothing else, ever.</p>
   </div>
 </section>
@@ -628,6 +685,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=540a9276" defer></script>
+<script src="/assets/answered.js?v=8c6327ab" defer></script>
 </body>
 </html>

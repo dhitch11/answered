@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/trades.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=0b83571b">
+<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -46,6 +46,11 @@
           <a class="btn btn-primary" href="/#early">Get on the list</a>
           <a class="btn btn-ghost" href="#math">Do the math on one missed call</a>
         </div>
+        <!-- THE DECISION MOMENT, on the first screen of the page a contractor
+             lands on. The offer and the way out of it, adjacent to the button,
+             at 16px instead of in a footnote. Ground-portable tokens. -->
+        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)"><b style="color:var(--ink)">$0</b> to start. <b style="color:var(--ink)">$19</b> when it books a job, <b style="color:var(--ink)">$49</b> after hours, and <b style="color:var(--ink)">$0</b> for every call that books nothing. If a booking is not real, reply <b style="color:var(--ink)">VOID</b> and the charge comes off.</p>
+        <p class="price-law rv d3" style="margin-top:14px">NO SUBSCRIPTION. NO PER-MINUTE CHARGE.</p>
       </div>
       <div class="rv d2">
         <div class="ring-stage" style="max-width:420px">
@@ -64,11 +69,15 @@
 
 <section class="band">
   <div class="wrap" style="padding-inline:0">
+    <p class="eyebrow rv" style="padding:clamp(20px,2.6vw,30px) clamp(16px,2vw,28px) 0">Four numbers. None are ours.</p>
+    <!-- PROOF DENSITY: plate number, figure, claim, then a ruled HOW WE KNOW
+         footing at 12.5px. The citation is the line a sceptic leans in for, so
+         it stops being an 11.5px whisper at 66% alpha. -->
     <div class="band-grid">
-      <div class="band-cell rv"><div class="band-v num">48%</div><div class="band-k">of callers never reach a person at a home services business.</div><div class="band-s src">Invoca, 70M calls, July 2026.</div></div>
-      <div class="band-cell rv d1"><div class="band-v num">45%</div><div class="band-k">of the ones who do reach a person book on that call.</div><div class="band-s src">Invoca, July 2026.</div></div>
-      <div class="band-cell rv d2"><div class="band-v num">$4,277</div><div class="band-k">is one missed roof lead, at a $9,504 average ticket.</div><div class="band-s src">Thumbtack average cost data, 2026.</div></div>
-      <div class="band-cell rv d3"><div class="band-v num">93.7%</div><div class="band-k">of the 696,690 firms in these trades have under 20 people. Nobody is free to answer.</div><div class="band-s src">US Census SUSB, 2022.</div></div>
+      <div class="band-cell rv"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">01 / 04</div><div class="band-v num">48%</div><div class="band-k">of callers never reach a person at a home services business.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca Home Services Lead Conversion Benchmarks, 70M calls, July 2026.</div></div>
+      <div class="band-cell rv d1"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">02 / 04</div><div class="band-v num">45%</div><div class="band-k">of the ones who do reach a person book on that call.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca, July 2026. The same 70M call benchmark.</div></div>
+      <div class="band-cell rv d2"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">03 / 04</div><div class="band-v num">$4,277</div><div class="band-k">is one missed roof lead, at a $9,504 average ticket.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>45% of a $9,504 average ticket (Thumbtack, 2026), at Invoca's 2026 close rate. Arithmetic, labeled as arithmetic.</div></div>
+      <div class="band-cell rv d3"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">04 / 04</div><div class="band-v num">93.7%</div><div class="band-k">of the 696,690 firms in these trades have under 20 people. Nobody is free to answer.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>US Census, Statistics of US Businesses, 2022.</div></div>
     </div>
   </div>
 </section>
@@ -80,10 +89,11 @@
         <p class="eyebrow rv">The 2 AM call, handled</p>
         <h2 class="h2 rv d1" style="margin-top:16px;max-width:18ch">It knows your trade before the caller finishes the sentence.</h2>
         <p class="lede rv d2" style="margin-top:20px">It answers as your business, works out what is actually wrong, checks your real availability, books the slot, and texts the confirmation. If it is a genuine emergency it puts them straight through to your cell instead.</p>
-        
+        <p class="src rv d3" style="margin-top:18px">Read the first line of that call again. It said it was an AI before it did anything else. That is not the fine print, that is the feature.</p>
+        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:50ch;color:var(--ink-2);border-color:var(--accent-ink)">The <b style="color:var(--ink)">$49</b> in the corner of that card is the only moment money moves. The ringing, the questions and the texting are all <b style="color:var(--ink)">$0</b>.</p>
       </div>
       <div class="rv d2"><div class="showcase" data-show="call">
-  <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num">2:14 AM</span></div>
+  <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num" style="white-space:nowrap">2:14 AM</span></div>
   <div class="sc-body">
     <div class="turn us"><span class="turn-who">Answered</span>Rivera Plumbing, this is an AI assistant and this call is recorded. What is going on?</div>
     <div class="turn them"><span class="turn-who">Caller</span>My water heater is pouring water into the garage.</div>
@@ -125,7 +135,8 @@
           <div class="ledger-row"><span class="lbl">Booked, after hours</span><span class="amt num">3</span><span class="bill num">$147</span></div>
           <div class="ledger-row total"><span class="lbl">You pay</span><span class="amt num">17 jobs</span><span class="bill num">$413</span></div>
         </div>
-        <p class="src" style="margin-top:14px">Example arithmetic on the published rates, not a customer record. The 48% miss rate is Invoca's measured figure. The share of answered calls that turn into a booking is our own planning assumption and is not yet measured in production.</p>
+        <p class="setup-flash" style="text-wrap:pretty;margin-top:20px;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)">Seventeen real jobs for <b style="color:var(--ink)">$413</b>, and <b style="color:var(--ink)">$0</b> for the other 83 calls. If one of those bookings is not real, reply <b style="color:var(--ink)">VOID</b> and it comes off the bill.</p>
+        <p class="src" style="margin-top:16px">Example arithmetic on the published rates, not a customer record. The 48% miss rate is Invoca's measured figure. The share of answered calls that turn into a booking is our own planning assumption and is not yet measured in production.</p>
       </div>
     </div>
   </div>
@@ -246,14 +257,16 @@
         <p class="eyebrow rv">What it costs</p>
         <h2 class="h2 rv d1" style="margin-top:16px;max-width:17ch">Free until it books you work.</h2>
         <p class="lede rv d2" style="margin-top:20px">No subscription and no per minute charge. The line can ring all day, and the meter does not move until a real job is on your calendar with a name, an address, a callback number and a confirmed window against it.</p>
-        <p class="rv d3" style="margin-top:26px"><a class="btn btn-ghost" href="/pricing">See all three meters and the economics</a></p>
+        <p class="setup-flash rv d2" style="text-wrap:pretty;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)">Your bill stops at <b style="color:var(--ink)">$549</b> no matter how good the month gets, and the cap never moves without you.</p>
+        <div class="rv d3" style="margin-top:26px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px"><a class="btn btn-ghost" href="/pricing">See all three meters and the economics</a><span class="src" style="font-size:12.5px;line-height:1.5;color:var(--t2);max-width:30ch">Off again in ten seconds, with one code.</span></div>
       </div>
       <div class="rv d2" style="max-width:420px;width:100%;justify-self:end"><article class="pcard lead rv" data-aud="business both">
         <div class="pc-for">01 / Inbound</div>
         <div class="pc-name">Answered</div>
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
-        <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 subscription &middot; $0 per minute &middot; $0 per call &middot; $0 for a wrong number</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
         <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
@@ -275,7 +288,16 @@
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:18px">Free until it books you work.</h2>
     <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:50ch">Put it on the line for a week. If it does not book a job, you have paid nothing, and you turn it off with one code.</p>
-    <p class="rv d2" style="margin-top:26px"><a class="btn btn-primary" href="/#early">Get on the list</a></p>
+    <!-- THE HEALTH GATE. What ships is the ghost below: a plain list CTA. The
+         module in answered.js swaps it for the live call control, and un-hides
+         the two lines around it, ONLY when /api/demo-health answers
+         healthy:true. The demo number is never in this file. -->
+    <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:44ch">Call it. It answers as a plumbing shop.</p>
+    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" data-callslot><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <!-- the reversal, adjacent to the last button on the page. paper ground, so
+         every colour comes from --ink / --ink-2, never from a dark token. -->
+    <p class="rv d3" style="margin-top:18px;margin-inline:auto;max-width:42ch;font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> base. <b style="color:var(--ink);font-weight:600">$19</b> when it books a job. Reply <b style="color:var(--ink);font-weight:600">VOID</b> and the charge comes off.</p>
+    <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. It is the engine this page describes, answering live.</p>
   </div>
 </section>
 
@@ -316,6 +338,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=540a9276" defer></script>
+<script src="/assets/answered.js?v=8c6327ab" defer></script>
 </body>
 </html>

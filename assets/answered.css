@@ -147,8 +147,8 @@ body {
   letter-spacing: -0.014em;
   font-size: clamp(20px, 2vw, 26px);
 }
-.lede { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.6; color: var(--t2); }
-.small { font-size: 14.5px; line-height: 1.6; color: var(--t3); }
+.lede { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.6; color: var(--ink-2); }
+.small { font-size: 14.5px; line-height: 1.6; color: var(--ink-3); }
 
 .eyebrow {
   font-family: var(--mono);
@@ -182,10 +182,15 @@ body {
    partner leans in to read. */
 .src {
   font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.55;
+  /* 11.5px mono is a whisper, and these are the lines a partner leans in to
+     read: the citation is the credibility engine of the whole page. 12.25 is
+     the first step where Martian Mono's x-height clears the 11px band the
+     jury called illegible, without the footnote starting to compete with the
+     claim above it. */
+  font-size: 12.25px;
+  line-height: 1.6;
   letter-spacing: 0.01em;
-  color: var(--t3);
+  color: var(--ink-3);
 }
 .src a { border-bottom: 1px solid var(--line2); }
 
@@ -254,7 +259,7 @@ body {
   font-weight: 500;
   color: var(--ink-1000);
   background: var(--bronze);
-  transition: filter .14s var(--e);
+  transition: filter .14s var(--e), translate 140ms var(--e), scale 140ms var(--e);
 }
 .nav-cta:hover { filter: brightness(1.05); }
 
@@ -278,15 +283,51 @@ body {
 .burger[aria-expanded='true'] span::before { transform: translateY(5px) rotate(-90deg); }
 .burger[aria-expanded='true'] span::after  { opacity: 0; }
 
+/* ── THE MOBILE SHEET. ──────────────────────────────────────────────────────
+   It opens over the page, so the page behind it has to recede: without a
+   scrim the menu and the article underneath compete at the same value and
+   the sheet reads as a panel that failed to load a background. The scrim is
+   a real element (::after on the sheet's own stacking context is not enough
+   because the sheet is anchored below the nav), painted by the sheet's own
+   ::before, pinned to the viewport, behind the sheet's content.
+   Only transform and opacity move. `display` cannot be transitioned, so
+   visibility carries the discrete part and the sheet keeps its own paint. */
 .sheet {
   position: fixed; inset: var(--nav-h) 0 auto 0; z-index: 190;
   background: color-mix(in srgb, var(--ink-1000) 96%, transparent);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--line);
   padding: 14px var(--gut) 26px;
-  display: none;
+  display: block;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity .26s var(--e), transform .26s var(--e), visibility 0s linear .26s;
 }
-.sheet.open { display: block; }
+.sheet.open {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition: opacity .26s var(--e), transform .26s var(--e), visibility 0s;
+}
+/* the scrim starts at the sheet's own bottom edge and runs to the foot of the
+   viewport, so it dims the page WITHOUT double-painting the sheet's surface.
+   absolute inside a fixed ancestor, so its overflow never lengthens the
+   document (verified: no vertical or horizontal scroll gained while open). */
+.sheet::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto 0;
+  height: 100vh;
+  background: rgba(5,6,8,.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .26s var(--e);
+}
+.sheet.open::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sheet { transform: none; }
+}
 .sheet a {
   display: block; padding: 15px 2px; font-size: 19px; font-weight: 500;
   border-bottom: 1px solid var(--line);
@@ -310,7 +351,8 @@ body {
   border: 1px solid transparent;
   cursor: pointer;
   position: relative; overflow: hidden; isolation: isolate;
-  transition: color .14s var(--e), background .26s var(--e), border-color .26s var(--e);
+  transition: color .14s var(--e), background .26s var(--e), border-color .26s var(--e),
+              translate 140ms var(--e), scale 140ms var(--e);
 }
 .btn-primary {
   color: var(--ink-1000);
@@ -335,6 +377,32 @@ body {
   outline: 2px solid var(--bronze-2); outline-offset: 3px;
 }
 
+/* ── THE PRESS. ─────────────────────────────────────────────────────────────
+   Every control on this site acknowledges the finger before anything else
+   happens. The jury's note was that the CTAs took a press and gave nothing
+   back, which reads as a dead control even when the click works.
+
+   This uses the INDEPENDENT translate/scale properties, not `transform`, and
+   that choice is load-bearing: the pointer engine writes an inline
+   `transform: translate3d(...)` onto exactly these elements for the magnetic
+   lean, and an inline transform beats any stylesheet transform. translate and
+   scale compose with it instead of fighting it, and they composite on the
+   same thread, so the press is still transform-only motion.
+   Under prefers-reduced-motion the global duration cap makes it instantaneous,
+   which is the honest degradation: the affordance survives, the travel does
+   not. Base state (translate 0 / scale 1) is always the resting state. */
+.btn:active, .nav-cta:active, .pc-cta:active, .seg-b:active,
+.card-go:active, .mic-btn:active, .burger:active, .vo-btn:active,
+.gc:active, .disc summary:active {
+  translate: 0 1px;
+  scale: .985;
+}
+/* .mic-btn and .gc append the press to their OWN transition further down the
+   file, because a bare shorthand here would be overwritten by theirs. */
+.card-go, .burger, .vo-btn, .disc summary {
+  transition: translate 140ms var(--e), scale 140ms var(--e);
+}
+
 /* the press arc: every button press emits ONE concentric arc from the press
    point on the mark's own axis. 420ms, opacity .5 to 0, transform+opacity only. */
 .parc {
@@ -353,20 +421,75 @@ body {
 
 /* ── sections ────────────────────────────────────────────────────────────── */
 section { position: relative; }
-.pad   { padding-block: clamp(72px, 11vw, 150px); }
-.pad-s { padding-block: clamp(54px, 7vw, 96px); }
+/* THE SEAM BUDGET. Measured at 1440 before this change: the standard seam
+   between two .pad sections opened 264px of nothing, and honesty -> price
+   opened 300px. A void that large reads as content that failed to load, not
+   as tempo. The baseline drops to a deliberate ~215px, and the crescendo is
+   put back where it earns something: a GROUND CHANGE (.paper) still gets the
+   full breath, because that is the one seam the page wants you to feel. */
+.pad   { padding-block: clamp(66px, 8.6vw, 124px); }
+.pad-s { padding-block: clamp(50px, 5.8vw, 84px); }
+.paper.pad   { padding-block: clamp(76px, 10vw, 146px); }
+.paper.pad-s { padding-block: clamp(58px, 7vw, 104px); }
+
+/* ── THE INK CONTRACT ────────────────────────────────────────────────────────
+   THE SURFACE BINDS THE INK. THE COMPONENT SPENDS IT. Nothing on this site
+   is allowed to work out its own ink from whatever section it was dropped
+   into, in either direction.
+
+   Measured 2026-08-13 through the serving path, three separate paint
+   failures of the same shape, thirty-six invisible cells:
+     · the /trades ledger painted #F2F4F0 on #F2F4F0 (1.00:1). A cream card
+       authored for a paper section, mounted on a dark one, inheriting
+       Halogen. Nine cells, including the total row.
+     · the /pricing derivation chain painted Halogen and Hi-Vis on bone
+       (1.00:1). The opposite direction: a dark-ground component hardcoding
+       --t1 / --t3 / --bronze-2, mounted on paper. Twenty cells, the five
+       operator glyphs among them.
+     · the second /terms rate table, a cream .ptable on a dark section.
+   Every one of them passed a computed-style check, because every one of
+   them computed exactly what it was told to. Only the composite was wrong.
+
+   So the ground declares four tokens and every component reads them. A card
+   that carries its own surface (a cream ledger, a white input) rebinds them
+   itself, which is what makes it portable onto either ground. */
+:root {
+  --ink:   var(--t1);          /* the glyph a human must read */
+  --ink-2: var(--t2);          /* body */
+  --ink-3: var(--t3);          /* metadata, muted cells */
+  --accent-ink: var(--bronze-2);
+}
+.paper,
+.ledger,
+.ptable:not(.dark),
+.receipt,
+.ifield input, .ifield select, .ifield textarea {
+  --ink:   var(--paper-ink);
+  --ink-2: rgba(11,12,14,.76);
+  --ink-3: rgba(11,12,14,.66);
+  --accent-ink: var(--dialtone-day);
+}
+/* and the mirror of the same law: a component that paints its own DARK
+   surface rebinds BACK to dark, so dropping a card into a paper section can
+   never paint Obsidian on Graphite either. */
+.card, .pcard, .mode, .gc, .showcase, .phone, .bp, .rung, .inv-row {
+  --ink:   var(--t1);
+  --ink-2: var(--t2);
+  --ink-3: var(--t3);
+  --accent-ink: var(--bronze-2);
+}
 
 /* the ground switch. this is the compositional weapon: the page runs dark and
    drops to bone paper exactly where the product must be believed. */
 .paper {
   background: var(--bone);
-  color: var(--paper-ink);
+  color: var(--ink);
 }
-.paper .h2, .paper .display { color: var(--paper-ink); }
-.paper .lede { color: rgba(11,12,14,.76); }
-.paper .small, .paper .src { color: rgba(11,12,14,.66); }
-.paper .eyebrow { color: var(--dialtone-day); }
-.paper .eyebrow::before { background: var(--dialtone-day); }
+/* .lede / .small / .src now spend --ink-2 / --ink-3, which .paper has already
+   rebound above, so the old per-surface duplicates are gone. */
+.paper .h2, .paper .display { color: var(--ink); }
+.paper .eyebrow { color: var(--accent-ink); }
+.paper .eyebrow::before { background: var(--accent-ink); }
 
 /* the seam between sections is the flatlined call: one solid Hi-Vis hairline */
 .seam { position: relative; }
@@ -504,7 +627,8 @@ section { position: relative; }
   padding: 10px 16px; border-radius: 999px;
   background: rgba(242,244,240,.05); border: 1px solid var(--line2);
   font-size: 13.5px; font-weight: 500; color: var(--t2); cursor: pointer;
-  transition: background .2s var(--e), border-color .2s var(--e), color .2s var(--e);
+  transition: background .2s var(--e), border-color .2s var(--e), color .2s var(--e),
+              translate 140ms var(--e), scale 140ms var(--e);
 }
 .mic-btn:hover { background: rgba(242,244,240,.09); color: var(--t1); border-color: rgba(242,244,240,.3); }
 .mic-btn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--t3); transition: background .3s var(--e), box-shadow .3s var(--e); }
@@ -578,6 +702,10 @@ section { position: relative; }
   border: 1px solid rgba(11,12,14,.16);
   border-radius: 14px;
   background: var(--bone);
+  /* the card carries its own surface, so it carries its own ink. this line is
+     the P0 fix: without it the ledger reads correctly inside a .paper section
+     and paints white-on-white the moment it is mounted anywhere else. */
+  color: var(--ink);
   overflow: hidden;
 }
 .ledger-row {
@@ -593,12 +721,17 @@ section { position: relative; }
 .ledger-row.head {
   background: rgba(11,12,14,.05);
   font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
-  color: rgba(11,12,14,.62);
+  color: rgba(11,12,14,.62);   /* the muted cells, per the ruling */
 }
 .ledger-row.total { background: rgba(227,255,79,.09); font-weight: 600; }
 .ledger-row .lbl { font-family: var(--sans); font-size: 15px; }
-.ledger-row .amt { text-align: right; min-width: 84px; }
-.ledger-row .bill { text-align: right; min-width: 90px; color: var(--dialtone-day); }
+/* the two figure columns are their own alignment mechanism (every row is its
+   own grid, so an `auto` track cannot align across rows) but 84 and 90 were
+   reserving roughly three times the widest cell they ever hold: "17 jobs" is
+   59px and "$266" is 40px. The surplus was taken straight out of the label,
+   which then wrapped on every narrow-desktop width. */
+.ledger-row .amt { text-align: right; min-width: 68px; }
+.ledger-row .bill { text-align: right; min-width: 76px; color: var(--accent-ink); }
 @media (max-width: 560px) {
   .ledger-row { grid-template-columns: 1fr auto; }
   .ledger-row .amt { display: none; }
@@ -610,7 +743,7 @@ section { position: relative; }
   max-width: 430px;
   border-radius: 16px;
   background-color: var(--bone);
-  color: var(--paper-ink);
+  color: var(--ink);          /* own surface, own ink */
   overflow: hidden;
   border: 1px solid rgba(11,12,14,.14);
 }
@@ -726,11 +859,18 @@ html.js .rv.d3.in { transition-delay: .21s; }
   border-radius: 14px;
   overflow: hidden;
   background: var(--bone);
+  color: var(--ink);          /* own surface, own ink: the second /terms
+                                 table sits on a DARK section */
   max-width: 720px;
 }
+/* the dark variant carries a dark surface, so it rebinds the tokens BACK.
+   without this it would read the paper bindings off a .paper ancestor. */
 .ptable.dark {
   background: var(--ink-900);
   border-color: var(--line2);
+  --ink: var(--t1); --ink-2: var(--t2); --ink-3: var(--t3);
+  --accent-ink: var(--bronze-2);
+  color: var(--ink);
 }
 .prow {
   display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: baseline;
@@ -748,9 +888,8 @@ html.js .rv.d3.in { transition-delay: .21s; }
 }
 .ptable.dark .prow.head { background: rgba(242,244,240,.04); color: var(--t3); }
 .prow.hi { background: rgba(227,255,79,.09); font-weight: 600; }
-.prow.hi .num { color: var(--dialtone-day); }
+.prow.hi .num { color: var(--accent-ink); }
 .ptable.dark .prow.hi { background: rgba(227,255,79,.08); }
-.ptable.dark .prow.hi .num { color: var(--bronze-2); }
 
 /* two-column blocks collapse. these carry inline grid declarations in the
    markup, so the override has to win on specificity, not on order. */
@@ -1011,7 +1150,8 @@ html.js .hold-hit.in { opacity: 1; transform: none; }
   background: rgba(242,244,240,.055);
   border: 1px solid var(--line2);
   position: relative; overflow: hidden; isolation: isolate;
-  transition: color .14s var(--e), border-color .26s var(--e);
+  transition: color .14s var(--e), border-color .26s var(--e),
+              translate 140ms var(--e), scale 140ms var(--e);
 }
 .pc-cta::before {
   content: '';
@@ -1036,14 +1176,15 @@ html.js .hold-hit.in { opacity: 1; transform: none; }
 .ifield { display: flex; flex-direction: column; gap: 7px; }
 .ifield label {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
-  color: rgba(11,12,14,.66);
+  /* the label sits on the SECTION, not on the input's own white surface */
+  color: var(--ink-3);
 }
 .ifield input, .ifield select, .ifield textarea {
   padding: 13px 15px;
   border-radius: 11px;
   border: 1px solid rgba(11,12,14,.2);
   background: rgba(255,255,255,.65);
-  color: var(--paper-ink);
+  color: var(--ink);
   font-size: 16px;
   font-family: var(--sans);
   transition: border-color .2s var(--e), background .2s var(--e);
@@ -1181,20 +1322,26 @@ html.js .rv.split { opacity: 1; transform: none; transition: none; }
   background: rgba(227,255,79,.14);
   border-color: rgba(227,255,79,.2);
 }
+/* the chain is mounted on PAPER on /pricing and on the dark ground elsewhere,
+   so every glyph in it spends the ground's ink tokens rather than naming a
+   colour. Hi-Vis on bone measured 1.00:1 across all five operator glyphs. */
 .op {
   width: 34px; height: 34px; border-radius: 9px;
   display: grid; place-content: center;
   font-family: var(--mono); font-size: 15px;
-  color: var(--bronze-2); border: 1px solid rgba(227,255,79,.34); background: rgba(227,255,79,.2);
+  color: var(--accent-ink); border: 1px solid rgba(227,255,79,.34); background: rgba(227,255,79,.2);
 }
+.paper .op { border-color: rgba(11,12,14,.16); background: rgba(227,255,79,.34); }
 .step-t { font-size: 15.5px; line-height: 1.45; }
-.step-t b { color: var(--t1); font-weight: 600; }
-.step-t span { display: block; margin-top: 3px; font-size: 13px; color: var(--t3); }
+.step-t b { color: var(--ink); font-weight: 600; }
+.step-t span { display: block; margin-top: 3px; font-size: 13px; color: var(--ink-3); }
 .step-v {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: 18px; letter-spacing: -.02em; color: var(--t1); white-space: nowrap;
+  font-size: 18px; letter-spacing: -.02em; color: var(--ink); white-space: nowrap;
 }
-.step-row.out .step-v { color: var(--bronze-2); font-size: 22px; }
+.step-row.out .step-v { color: var(--accent-ink); font-size: 22px; }
+.paper .step-row { border-color: rgba(11,12,14,.12); background: rgba(11,12,14,.028); }
+.paper .step-row.out { background: rgba(227,255,79,.28); border-color: rgba(11,12,14,.14); }
 @media (max-width: 660px) {
   .step-row { grid-template-columns: 34px 1fr; row-gap: 8px; }
   .step-v { grid-column: 2; text-align: left; }
@@ -1220,7 +1367,7 @@ html.js .rv.split { opacity: 1; transform: none; transition: none; }
   border: 1px solid var(--line2);
   background: var(--ink-900);
   cursor: pointer;
-  transition: border-color .26s var(--e);
+  transition: border-color .26s var(--e), translate 140ms var(--e), scale 140ms var(--e);
   font: inherit; color: inherit;
 }
 .gc:hover { border-color: rgba(227,255,79,.34); }
@@ -1279,8 +1426,28 @@ html.js[data-aud='both']     [data-aud]:not([data-aud~='both']) { display: none;
 
 /* the two-surface law: Obsidian ground, Graphite elevation. the old painted
    atmosphere (radial washes, edge falloff, vignette, lit-paper key light) is
-   dead. planes separate by value and hairline, never by glow. */
-main, .nav, .foot, .sheet { position: relative; z-index: 1; }
+   dead. planes separate by value and hairline, never by glow.
+
+   ★ THIS LINE USED TO READ `main, .nav, .foot, .sheet { position: relative }`
+   AND IT UNPINNED THE ENTIRE SITE. Both .nav and .sheet declare
+   `position: fixed` ~1200 lines earlier at the SAME specificity (0,1,0), so
+   the later rule won on cascade order and silently returned both to flow.
+   Measured 2026-08-13 through the serving path, every page:
+     · .nav computed `relative`  -> the header scrolled away, .pinned never
+       mattered, and the fixed-nav padding budget in every hero was paying
+       for a header that was already taking its own 68px of layout.
+     · .sheet computed `relative` -> the CLOSED mobile menu became a 538px
+       tall invisible block IN FLOW at the top of every document. Nothing
+       painted (visibility:hidden, opacity:0), so no check ever caught it,
+       but it pushed .hero's top edge to y=606 and put the hero's call
+       control at y=1383 in a 900px viewport: 483px BELOW the fold, on the
+       one screen the whole page is judged on.
+   The intent here was only ever the STACKING CONTEXT, so it now sets z-index
+   and leaves `position` to each component. Nothing in this block may name
+   `position` for an element that pins itself. */
+main, .foot { position: relative; z-index: 1; }
+.nav, .sheet { z-index: 200; }
+.sheet { z-index: 190; }
 section > .wrap { position: relative; z-index: 1; }
 
 /* ── micro-detail. the things nobody names and everybody feels. ───────────── */
@@ -1373,14 +1540,26 @@ body.track-biz .cards[data-track="biz"] { display: grid; }
   border: 0; background: none; cursor: pointer; color: var(--static);
   font: inherit; font-size: 13.5px; font-weight: 500;
   padding: 0 16px; border-radius: 999px; min-height: 44px;
-  transition: color .26s var(--e);
+  /* LOSING selection is immediate: the thumb clears this button inside
+     ~120ms, so its Obsidian ink must not linger over bare Graphite. */
+  transition: color .2s var(--e), translate 140ms var(--e), scale 140ms var(--e);
   -webkit-tap-highlight-color: transparent;
 }
 /* the dark-on-thumb ink only once JS has actually placed the thumb: with JS
    off the thumb is 0px wide, and Obsidian text on the Graphite pill measured
    1.04:1, an invisible label. the no-JS rest state reads in Halogen. */
 .seg-b[aria-selected="true"] { color: var(--t1); }
-html.js .seg-b[aria-selected="true"] { color: var(--ink-1000); }
+/* ── THE SURFACE ARRIVES, THEN THE INK. ──────────────────────────────────
+   Measured 2026-08-13 on the flip: at the first frame the incoming label was
+   already 76% of the way to Obsidian while the thumb covered only 57% of it,
+   so the uncovered 43% was dark type on the dark pill, and the control read
+   as two pill surfaces mid-flip. A transition uses the AFTER-CHANGE style,
+   so putting the delay only on the selected state makes this asymmetric for
+   free: gaining selection trails the thumb, losing it does not. */
+html.js .seg-b[aria-selected="true"] {
+  color: var(--ink-1000);
+  transition: color .22s var(--e) .18s, translate 140ms var(--e), scale 140ms var(--e);
+}
 .seg-b:focus-visible { outline: 2px solid var(--bronze); outline-offset: 3px; }
 .seg-t { white-space: nowrap; }
 .seg-thumb {
@@ -1594,8 +1773,29 @@ html.js.answering .brand-mark .bm-a2 { animation-delay: .05s; }
   font-feature-settings: 'tnum' 1, 'zero' 1;
   font-size: 15px;
   letter-spacing: .01em;
+  /* A PHONE NUMBER IS ONE WORD. Measured at 390 the primary CTA broke its own
+     number across two lines ("+1 (916) 350-" / "4869") on the hyphen, which is
+     the one string on the page a reader is going to copy by eye. */
+  white-space: nowrap;
 }
 .btn-call.is-text { cursor: default; }
+
+/* under 420 the label stacks over the number instead of racing it for the
+   row, and the mono steps down so the whole control fits the gutter. */
+@media (max-width: 420px) {
+  .btn-call {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 11px 18px;
+    line-height: 1.25;
+  }
+  .btn-call .call-l { font-size: 15px; }
+  .btn-call .call-n { font-size: 13.5px; letter-spacing: 0; }
+}
+@media (max-width: 344px) {
+  .btn-call .call-n { font-size: 12.5px; }
+}
 
 /* ══ NAV SEG PLACEMENT ══ */
 .nav .seg { margin-left: 0; }
@@ -1885,9 +2085,452 @@ html.js .convey.stage.up .cv-chip {
    container quirk while catching what body misses. */
 html { overflow-x: clip; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPE SCALE MODULATION
+   Every H2 on the site set at the identical 62px, which means the page has no
+   opinion about which sentence matters. A scale with one step is a list, not
+   a hierarchy. Three registers now:
+
+     MANIFESTO (74px)  the two places the company states its position rather
+                       than explaining its product: the pricing law on the
+                       ledger, and the crossover to the other side of the call.
+     EDITORIAL (62px)  the default, unchanged. Everything narrative.
+     UTILITY   (52px)  headings over a procedure, a card rack or a price rack.
+                       These label a mechanism, so they set smaller and run to
+                       a wider measure, which reads faster and gets the reader
+                       into the mechanism instead of holding them at the title.
+
+   Selected structurally rather than by class because the markup is another
+   lane's surface: a section whose body is a numbered procedure IS a workflow
+   section, whatever it is called. When a later lane moves these onto real
+   modifier classes, this block is what those classes should carry.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#ledger .h2,
+section[data-track="me"]:has(.receipt) .h2 {
+  font-size: clamp(40px, 5.9vw, 76px);
+  line-height: .99;
+  letter-spacing: -.022em;
+  /* a five line manifesto with one word alone on line three is a rag, not a
+     poster. balance evens the lines; the column widening below gives it the
+     measure to land in four. */
+  text-wrap: balance;
+}
+/* the manifesto needs measure as much as it needs size. both moments sit in
+   the narrow column of a two column band that was authored against the 62px
+   step, so the column is widened for exactly these two sections and nothing
+   else. `.two` carries an inline grid-template-columns, so this has to win on
+   weight, the same way the 900px collapse below already does. */
+@media (min-width: 1001px) {
+  /* the crossover band's artifact is a receipt with a 430px ceiling, so its
+     copy column can take more than the ledger's can. Measured before this:
+     "handed back." needs 599px at 76px and the column held 569, which
+     stranded "back." on a line of its own at 1440 and 1920. */
+  section[data-track="me"]:has(.receipt) .two {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) !important;
+    align-items: start !important;
+  }
+  /* between 1001 and 1260 the artifact column is genuinely tight, so the
+     ledger sets one step down rather than wrapping a label onto two lines
+     with baseline-aligned figures beside it. Measured: 4 wrapped rows at
+     1020 before this, 0 after. */
+  @media (max-width: 1260px) {
+    #ledger .ledger-row { padding-inline: 16px; }
+    #ledger .ledger-row .lbl { font-size: 14px; }
+    #ledger .ledger-row .amt { min-width: 58px; }
+    #ledger .ledger-row .bill { min-width: 64px; }
+  }
+  #ledger .two {
+    /* 1.21fr is measured, not chosen: at 76px "sell minutes." sets 555px, so
+       any measure under that breaks the manifesto GREEDILY into
+       "We do not" / "sell" / "minutes." and strands one four-letter word on
+       its own line. 1.21fr puts the measure at 569px at 1440 and the ratio
+       holds down to 1001 because the clamp scales the type with it.
+       This matters in BOTH paths and only one of them was checked at first:
+       under prefers-reduced-motion answered.js does not split the heading
+       into per-line blocks, `text-wrap: balance` stops rescuing the rag, and
+       the greedy break is all there is. The rag was real and only visible
+       with the reduce query on. */
+    grid-template-columns: minmax(0, 1.21fr) minmax(0, 1fr) !important;
+    /* and the proof object hangs from the top of its column, not from the
+       middle of it: a manifesto column runs 200px taller than the artifact
+       beside it, so `center` was parking the sheet in the middle of half a
+       screen of empty paper. */
+    align-items: start !important;
+  }
+}
+section:has(> .wrap > .steps) .h2,
+section:has(> .wrap > .pcards) .h2,
+#what .h2,
+#price .h2 {
+  font-size: clamp(30px, 3.4vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -.008em;
+  /* the wider measure. these headings carry inline max-width in ch, authored
+     against the 62px step, so the override has to win on weight not order. */
+  max-width: 27ch !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DEAD-ZONE RHYTHM
+   Measured at 1440: the page's baseline seam is 246px, but three seams opened
+   300px of nothing, every one of them where a section ended on a quiet tail
+   and still paid a full 150px pad, with the next section paying another 150
+   on top of it. A tail that is already quiet IS most of the space.
+
+   Two tails qualify, and they are the three spots the jury named:
+     · an 11.5px mono footnote  (the carrier-codes note under #setup, the
+       source line under the ledger's pricing law)
+     · a lone secondary link    ("See the full breakdown", under the price rack)
+   Everything else keeps 246px, because the fix is rhythm, not compression.
+
+   The selector is deliberately structural and narrow (a direct child of the
+   wrap, or of a two column band's own column) rather than a descendant match:
+   a `.src` that ends a CARD is not a section tail, and tightening the seam
+   after a stat band would break a rhythm that measures correctly today.
+
+   A THIRD TAIL joined the list on the 08-13 award pass: a DISCLOSURE STACK
+   (#honesty ends on the sixth <details>, whose body already carries 24px of
+   its own bottom padding). That seam measured 300px, the largest on the page,
+   and it was invisible to the two selectors above because the tail is not a
+   .src and not a link.
+
+   Note the one deliberate exception: `.paper.pad` above is specificity (0,2,0)
+   and beats these (0,1,0) rules, so a GROUND-CHANGE section keeps its full
+   breath even when it ends on a footnote. That is the crescendo, and it is
+   the only place the page is allowed to open up. */
+:where(section:has(> .wrap > .src:last-child),
+       section:has(> .wrap > .two > div > .src:last-child),
+       section:has(> .wrap > details:last-child),
+       section:has(> .wrap > p:last-child > .btn-ghost:only-child)).pad {
+  padding-bottom: clamp(48px, 6.2vw, 90px);
+}
+:where(section:has(> .wrap > .src:last-child),
+       section:has(> .wrap > .two > div > .src:last-child),
+       section:has(> .wrap > details:last-child),
+       section:has(> .wrap > p:last-child > .btn-ghost:only-child)).pad-s {
+  padding-bottom: clamp(40px, 4.6vw, 66px);
+}
+:where(section:has(> .wrap > .src:last-child),
+       section:has(> .wrap > .two > div > .src:last-child),
+       section:has(> .wrap > details:last-child),
+       section:has(> .wrap > p:last-child > .btn-ghost:only-child)) + .pad {
+  padding-top: clamp(50px, 6.6vw, 96px);
+}
+:where(section:has(> .wrap > .src:last-child),
+       section:has(> .wrap > .two > div > .src:last-child),
+       section:has(> .wrap > details:last-child),
+       section:has(> .wrap > p:last-child > .btn-ghost:only-child)) + .pad-s {
+  padding-top: clamp(42px, 5vw, 72px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIG 1 BREAKS OUT
+   The call-path drawing was served into the 1.28fr column of a two column
+   band, which rendered its 900 unit viewBox at about two thirds scale: the
+   node captions landed at 7 to 8px, below the size at which anyone reads a
+   diagram. It is the only picture of how the product actually works, so it
+   gets the full measure and sits under the copy that introduces it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 901px) {
+  .two:has(.bp) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start !important;
+  }
+  .two:has(.bp) > :first-child { max-width: 74ch; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE PROOF OBJECTS
+   The ledger, the receipt, the handset and the console are the four things on
+   this site a stranger is asked to BELIEVE. Every one of them was a styled
+   div: a border, a radius, a fill, and no plane. On the paper section the
+   ledger was bone on bone with a 16% hairline, which is a table drawn on the
+   page rather than a sheet lying on it.
+
+   An object reads as an object when four things are true: it sits on a plane
+   (a shadow that falls the right way), it has an edge (a lit top rim, a torn
+   bottom, a punched perforation), it is made of a material (stock with a
+   tooth, not a flat fill), and its numbers are set as figures (tabular, one
+   column, slashed zero, already true here).
+
+   ON THE TWO-SURFACE LAW: the flat-Obsidian rule is about the GROUND and the
+   elevation planes cut from it. It has never applied to the paper family,
+   which exists precisely because it is a different material. The tooth added
+   below is 1.4% ink on a 4px pitch, lives ONLY on .ledger / .receipt /
+   .ptable, and never touches the dark ground.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── the stock. paper, not a fill. A fresh sheet is BRIGHTER than the desk it
+   is lying on, and the tooth below costs about 1.5% of value, so the sheet
+   colour is lifted off --bone by the same amount and lands back on it. ── */
+.ledger, .receipt, .ptable:not(.dark) {
+  background-color: #F8FAF6;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(11,12,14,.014) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(0deg,  rgba(11,12,14,.010) 0 1px, transparent 1px 4px);
+}
+
+/* ── the plane. a sheet lying on the page, lit from above. the top rim is the
+   sheet catching the light; the three shadow layers are contact, near and
+   ambient, so the object reads at any distance. ── */
+.ledger, .ptable:not(.dark) {
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.72) inset,
+    0 -1px 0 rgba(11,12,14,.045) inset,
+    0 1px 2px rgba(11,12,14,.10),
+    0 14px 26px -14px rgba(11,12,14,.30),
+    0 42px 62px -42px rgba(11,12,14,.44);
+}
+
+/* ── the ledger keeps accounting manners. the head is ruled in the accent, and
+   the total carries the double underline every paper ledger in the world has
+   carried for four hundred years. ── */
+.ledger-row.head {
+  box-shadow: 0 -1px 0 rgba(11,12,14,.34) inset;
+  color: rgba(11,12,14,.72);
+}
+.ledger-row.total::before {
+  content: '';
+  position: absolute;
+  left: clamp(16px, 2.4vw, 26px); right: clamp(16px, 2.4vw, 26px); bottom: 5px;
+  height: 3px;
+  border-top: 1px solid rgba(11,12,14,.30);
+  border-bottom: 1px solid rgba(11,12,14,.30);
+  pointer-events: none;
+}
+.ledger-row.total { padding-bottom: 19px; }
+/* the drift parallax translates the sheet by up to ~26px while its caption
+   stays put, so the caption needs the clearance in the flow. */
+.ledger { margin-bottom: 12px; }
+
+/* ── the receipt tears. a bottom edge cut in scallops, and two punched
+   perforation lines where the dashed borders used to be. A mask clips the
+   element's own box-shadow, so the plane is carried by a drop-shadow on the
+   wrapper instead, which is applied AFTER the child has been masked and so
+   follows the scalloped silhouette rather than the box. ── */
+.receipt {
+  --tear: 8px;
+  border-radius: 16px 16px 0 0;
+  border-bottom: 0;
+  padding-bottom: var(--tear);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.72) inset,
+    0 0 0 1px rgba(11,12,14,.05) inset;
+  /* the tile is 2.4x the bite radius, not 2x: at exactly 2x the arcs meet at a
+     cusp and the edge reads as a saw blade. The extra flat between bites is
+     what makes it read as paper torn off a roll. */
+  -webkit-mask:
+    radial-gradient(var(--tear) at 50% 0, #0000 98%, #000)
+      50% 100% / calc(2.4 * var(--tear)) var(--tear) repeat-x,
+    linear-gradient(#000 0 0) 0 0 / 100% calc(100% - var(--tear)) no-repeat;
+  mask:
+    radial-gradient(var(--tear) at 50% 0, #0000 98%, #000)
+      50% 100% / calc(2.4 * var(--tear)) var(--tear) repeat-x,
+    linear-gradient(#000 0 0) 0 0 / 100% calc(100% - var(--tear)) no-repeat;
+}
+div:has(> .receipt) {
+  filter: drop-shadow(0 2px 2px rgba(11,12,14,.30))
+          drop-shadow(0 20px 24px rgba(11,12,14,.42));
+}
+/* the punch. round holes on a 7px pitch, in ink, so it reads the same on
+   either ground and needs nothing from the surface behind it. */
+.receipt-top {
+  border-bottom: 0;
+  background-image: radial-gradient(circle, rgba(11,12,14,.34) 0 1.15px, transparent 1.3px);
+  background-size: 7px 4px;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+}
+.receipt-foot {
+  border-top: 0;
+  background-image: radial-gradient(circle, rgba(11,12,14,.34) 0 1.15px, transparent 1.3px);
+  background-size: 7px 4px;
+  background-repeat: repeat-x;
+  background-position: 0 0;
+  padding-top: 18px;
+}
+.receipt-big { letter-spacing: -.045em; }
+
+/* ── the handset. a bezel, an earpiece slit and a screen inside it, instead of
+   a bordered box with a coloured header. ── */
+.phone {
+  position: relative;
+  border-radius: 30px;
+  padding: 6px;
+  background: #0D0F12;
+  border-color: rgba(242,244,240,.14);
+  box-shadow:
+    0 1px 0 rgba(242,244,240,.10) inset,
+    0 26px 44px -24px rgba(0,0,0,.86),
+    0 64px 92px -64px rgba(0,0,0,1);
+}
+.phone::before {
+  content: '';
+  position: absolute; z-index: 3;
+  left: 50%; top: 14px; width: 54px; height: 5px; margin-left: -27px;
+  border-radius: 3px;
+  background: rgba(242,244,240,.14);
+  pointer-events: none;
+}
+.phone-top {
+  padding: 28px 18px 14px;
+  border-radius: 24px 24px 0 0;
+  background: rgba(242,244,240,.03);
+}
+.phone-sms { border-radius: 0 0 24px 24px; }
+
+/* ── the console. the transcript is an instrument, so it gets a rim and a
+   plane, and its bar reads as a lit chassis edge. ── */
+.showcase {
+  box-shadow:
+    0 1px 0 rgba(242,244,240,.06) inset,
+    0 24px 44px -26px rgba(0,0,0,.9),
+    0 72px 92px -72px rgba(0,0,0,1);
+}
+.sc-bar { box-shadow: 0 1px 0 rgba(242,244,240,.05) inset; }
+
+/* ── EVERY GRAPHITE PLANE IS CUT, NOT DRAWN. ────────────────────────────────
+   Elevation on this site was a 1px 10%-Halogen hairline and nothing else, so
+   a card, a price rack, a forwarding-code key and a chooser tile were all the
+   same flat fill sitting directly on the ground. Two things separate a plane
+   from a fill and neither is a glow: the lit top rim (the edge of the plate
+   catching the same overhead light the paper does) and the contact shadow
+   under it. Both are flat, both are cheap, and neither paints colour on the
+   ground the way the retired atmosphere layer did. ── */
+.card, .pcard, .mode, .gc, .bp {
+  box-shadow:
+    0 1px 0 rgba(242,244,240,.05) inset,
+    0 2px 4px -2px rgba(0,0,0,.7),
+    0 20px 36px -24px rgba(0,0,0,.85);
+}
+/* the lead price card is the recommended path, so it sits one step further
+   off the ground than the two beside it. */
+.pcard.lead {
+  box-shadow:
+    0 1px 0 rgba(227,255,79,.14) inset,
+    0 3px 6px -2px rgba(0,0,0,.75),
+    0 30px 52px -30px rgba(0,0,0,.95);
+}
+
+/* ── the stat band is an instrument strip, not four paragraphs on the ground.
+   One value step of elevation off Obsidian, a Hi-Vis tick that draws down the
+   leading edge of the tile the pointer is on, and a measure on the source
+   footing so it sets as a caption instead of running the full cell. ── */
+.band { background: var(--ink-950); }
+.band-cell { position: relative; transition: background .3s var(--e); }
+.band-cell::before {
+  content: '';
+  position: absolute; left: 0; top: 0; width: 2px; height: 0;
+  background: var(--bronze);
+  transition: height .42s var(--e);
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .band-cell:hover { background: rgba(242,244,240,.022); }
+  .band-cell:hover::before { height: 100%; }
+}
+.band-s { max-width: 38ch; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE DECISION MOMENT
+   Every price on this page is one sentence away from the way out of it, and
+   that sentence was set as body copy beside a 2px rule. It is the single best
+   thing the company has to say, so it gets a surface of its own: a Hi-Vis
+   plate that stops the eye at exactly the moment the reader is deciding.
+   Both hosts carry inline margin/measure, so only paint and padding are set
+   here and nothing fights the markup lane.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.setup-flash {
+  padding: 13px 16px 13px 18px;
+  background: rgba(227,255,79,.055);
+  border-radius: 0 12px 12px 0;
+}
+.pc-void {
+  background: rgba(227,255,79,.075);
+  border-radius: 0 11px 11px 0;
+  padding: 11px 14px 12px;
+}
+/* the demo line is the whole argument, so its control is the largest on the
+   site. Nothing else in this rule set touches the health gate: the element is
+   still built by JS and still ships absent. */
+#call-it .btn-call { padding: 17px 28px; font-size: 17px; }
+#call-it .btn-call .call-n { font-size: 17px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSED FOR 390 FIRST
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* no last-line orphans. `pretty` costs one extra line-breaking pass and only
+   changes the last two lines, which is exactly the defect: 15 paragraphs at
+   390 ended on a single 39 to 79px word. Headings are excluded because they
+   already run `balance`. */
+p, li, dd, .lede, .src, .band-k, .price-law, .sms-b, .disc-body, .pc-unit, .card p, .step p {
+  text-wrap: pretty;
+}
+
+@media (max-width: 560px) {
+  /* two pills of two different widths, left aligned under a full bleed
+     headline, read as leftovers. On a phone the actions are a stack, and a
+     stack is full measure. */
+  .hero-actions { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .hero-actions .btn { width: 100%; justify-content: center; text-align: center; }
+  .hero-actions .btn-call { align-items: center; }
+}
+
+@media (max-width: 430px) {
+  /* the mission eyebrow wrapped and left the word PHONE. alone on its own
+     line under a 22px rule. mono tracking is the cheapest thing to spend. */
+  .eyebrow { font-size: 10px; letter-spacing: .13em; gap: 8px; }
+  .eyebrow::before { width: 16px; }
+  .price-law { letter-spacing: .045em; }
+}
+
+@media (max-width: 380px) {
+  /* below 380 the eyebrow genuinely cannot hold one line at a legible size,
+     so it wraps on purpose and the rule moves to the FIRST line's optical
+     centre. A leading rule floating beside the middle of a two line label is
+     the tell that nobody looked at 320. */
+  .eyebrow { align-items: flex-start; }
+  .eyebrow::before { margin-top: .68em; }
+  /* and the pricing law stops breaking itself across the hyphen of
+     PER-MINUTE, which is the one hyphen on the page a reader must not see
+     land at the end of a line. */
+  .price-law { font-size: 11px; letter-spacing: .03em; }
+}
+
+@media (max-width: 780px) {
+  /* a 15px footer link in a 9px stack is a 19px tap target. */
+  .foot li + li { margin-top: 0; }
+  .foot ul a { display: inline-block; padding-block: 11px; }
+}
+
+/* ── A SECTION WITH A LABEL AND NO CONTENT IS AN EMPTY RESERVED PANEL. ──────
+   The walkthrough row ships its player [hidden] and only reveals it once the
+   browser confirms the audio is loadable, which is the right law. But the
+   SECTION around it shipped visible either way, so a failed or absent audio
+   file left a heading over nothing, directly above the footer. The section
+   now follows its own control: no playable audio, no section. ── */
+section.listen:has(.vo[hidden]) { display: none; }
+
+/* ── the disclosure stack answers. an open row grows a Hi-Vis tick in the
+   margin, so the honesty section reads as a set of records being opened
+   rather than a list of links. transform-free, one property, reduced motion
+   still lands it open. ── */
+.disc { position: relative; }
+.disc summary::before {
+  content: '';
+  position: absolute; left: -14px; top: 50%;
+  width: 2px; height: 0; margin-top: 0;
+  background: var(--bronze);
+  transition: height .3s var(--e), margin-top .3s var(--e);
+  pointer-events: none;
+}
+.disc[open] summary::before { height: 26px; margin-top: -13px; }
+
 /* ── REDUCED MOTION: every one of the above rests finished, legible, at
    opacity 1. decoration that is only motion is absent. ── */
 @media (prefers-reduced-motion: reduce) {
+  .band-cell::before { display: none; }
   html.js .press, html.js .ledger.press .ledger-row,
   html.js .turn, html.js .sc-result, html.js .hold-hit,
   html.js .turn .tw, html.js .pb .tw,

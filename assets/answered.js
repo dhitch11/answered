@@ -371,11 +371,12 @@
     };
     resize();
     /* on any real resize under reduced motion, repaint the static frame:
-       a resized canvas is an erased canvas. draw() is defined below; these
-       callbacks only ever run asynchronously, after it exists. */
+       a resized canvas is an erased canvas. draw() and restFrame() are both
+       defined below; these callbacks only ever run asynchronously, after
+       they exist. */
     var onResize = function () {
       resize(); fresize();
-      if (reduced.matches) { draw(0); cancelAnimationFrame(raf); }
+      if (reduced.matches) { restFrame(); }
     };
     var ro = ('ResizeObserver' in window) ? new ResizeObserver(onResize) : null;
     if (ro) { ro.observe(cv); if (fcv) ro.observe(fcv); }
@@ -396,8 +397,14 @@
        resolves to the product's own name. */
     var countEl = stage.querySelector('.ring-count');
     var lastLabel = '';
+    // A page whose whole argument is the hold clock must not have its ring
+    // overwritten with a ring cadence. /hold ships its own state in the markup
+    // ("On hold / 1:47:03"); the ring animates, the readout stays the page's.
+    var ownsReadout = !document.querySelector('[data-ring-keep]')
+      && !/^\/hold(\.html)?$/.test(location.pathname);
+
     var readout = function (ms) {
-      if (!countEl) return;
+      if (!countEl || !ownsReadout) return;
       var label, state;
       if (live) { label = 'live'; state = 'Listening'; }
       else {
@@ -467,10 +474,18 @@
         var x1 = cx + Math.cos(ang) * r1, y1 = cy + Math.sin(ang) * r1;
 
         var heat = Math.min(1, smooth[i] * 1.5 + burst * 0.5);
-        // hi-vis at rest, dialtone cyan at the peaks. the line coming alive.
-        var rr = Math.round(227 - heat * 172);
-        var gg = Math.round(255 - heat * 55);
-        var bb = Math.round(79 + heat * 161);
+        /* ACCENT DISCIPLINE. This ramp used to run Hi-Vis at rest and land on
+           exactly #37C8F0 at the peaks, which put a SECOND accent hue on the
+           dark ground for the loudest half of the cadence: measured on the
+           /trades hero, the whole ring reads teal on obsidian at the strike.
+           Dialtone is the "a human is live" signal and it keeps its own
+           jobs; the ring is the Hi-Vis instrument, so it stays inside the
+           Hi-Vis family and gets HOTTER rather than bluer, running from
+           #E3FF4F at rest to its own tint #F2FFA6 at the peak while the
+           alpha ramp carries the intensity. One accent on dark, still. */
+        var rr = Math.round(227 + heat * 15);
+        var gg = 255;
+        var bb = Math.round(79 + heat * 87);
         ctx.strokeStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + (0.30 + heat * 0.62) + ')';
         ctx.lineWidth = Math.max(1, 1.35 * dpr);
         ctx.lineCap = 'round';
@@ -534,10 +549,27 @@
       if (run) raf = requestAnimationFrame(draw);
     };
 
-    if (reduced.matches) {
-      // one static frame. still handsome, zero motion.
+    /* THE REDUCED-MOTION REST STATE. One static frame, and it must rest on
+       the beat the caption claims: drawing at t=0 froze the readout at
+       "Ringing / 0.0s" underneath copy that says the line gets picked up,
+       which is a stopped clock presented as a running one. 3000ms is inside
+       the answered half of the 6000ms cadence, so the readout resolves to
+       "Picked up on the first ring / Answered", exactly the pattern the SSR
+       markup already ships on /recover and /thanks. t0ref is pinned first so
+       draw() does not re-anchor the clock back to zero, and wasRinging is
+       cleared so the resolve wave is not born into a frame that never
+       advances to kill it. */
+    var restFrame = function () {
       for (var s = 0; s < N; s++) { smooth[s] = 0.16 + Math.sin(s / 5) * 0.05; }
-      draw(0); cancelAnimationFrame(raf);
+      wasRinging = false;
+      t0ref = 0;
+      lastLabel = '';
+      draw(3000);
+      cancelAnimationFrame(raf);
+    };
+
+    if (reduced.matches) {
+      restFrame();
     } else {
       running = true;
       raf = requestAnimationFrame(draw);
@@ -604,6 +636,70 @@
      ──────────────────────────────────────────────────────────────────────── */
   var shows = document.querySelectorAll('.showcase');
 
+  /* ── GHOST SKELETONS ──────────────────────────────────────────────────────
+     Both typing cards reserve their FULL final height before a single word
+     lands, so between scroll-in and first bubble the panel renders as an
+     empty vessel, which reads as broken rather than as pending. Every turn
+     that has not landed yet therefore rests as a SLAB IN ITS FINAL GEOMETRY:
+     you see the shape of the conversation about to happen, the panel is
+     never empty, and because the slab is already the size of the finished
+     bubble the landing costs exactly zero layout.
+
+     ★ WHY THIS IS A PAINTED SLAB AND NOT AN OPACITY. The first version set
+     opacity .02 on the pending turn, which is arithmetically present and
+     optically absent. MEASURED 2026-08-13 on /trades, by freezing the scene
+     observer and sampling the pixels of the first bubble's box against the
+     panel ground beside it: the old recipe read a mean channel delta of
+     0.85/255, i.e. under one level, below the just-noticeable difference of
+     any display. The new recipe reads 11.67/255. Every computed-style check
+     passed the whole time, because .02 really was the computed opacity, so
+     only the pixels could settle it.
+
+     Two things the slab fixes, not one. It is VISIBLE, so the reserved panel
+     reads as pending structure instead of as a void. And it is BLANK: at .02
+     the only thing rendering was the finished dialogue, so such signal as
+     there was spoiled the scene rather than reserving space for it. The ghost
+     therefore paints its own surface at full opacity and suppresses the INK.
+
+     Neutral on purpose, too: .turn.us and .turn.them have different grounds,
+     and a coloured skeleton would let you read who speaks next before they
+     speak.
+
+     Two rules this obeys. Reduced motion never ghosts: it gets the finished,
+     legible scene at once. JS-off never ghosts either, because the resting
+     hidden state itself only exists under html.js.
+     ─────────────────────────────────────────────────────────────────────── */
+  var GHOST_SEL = '.turn, .pb, .sc-result, .hold-hit';
+  var GHOST_BG = 'rgba(242,244,240,.055)';
+  var GHOST_LINE = 'rgba(242,244,240,.09)';
+  var ghostPending = function (host) {
+    if (reduced.matches) return;
+    [].slice.call(host.querySelectorAll(GHOST_SEL)).forEach(function (n) {
+      if (n.classList.contains('in')) return;
+      n.style.opacity = '1';
+      n.style.transform = 'none';
+      n.style.background = GHOST_BG;
+      n.style.borderColor = GHOST_LINE;
+      n.style.boxShadow = 'none';
+      n.style.color = 'transparent';
+      n.dataset.ghost = '1';
+      [].slice.call(n.querySelectorAll('*')).forEach(function (k) { k.style.color = 'transparent'; });
+    });
+  };
+  /* clear inline first, then land the class, in the SAME task: the browser
+     coalesces both into one style resolution, so the element never paints an
+     intermediate state on its way to .in. The slab already sits at opacity 1
+     and transform none, and .in resolves to exactly that, so the bubble's own
+     surface and ink simply replace the skeleton's in place. Nothing fades
+     from nothing, and nothing jumps. */
+  var unghost = function (n) {
+    n.style.opacity = ''; n.style.transform = '';
+    if (n.dataset.ghost !== '1') return;
+    n.style.background = ''; n.style.borderColor = ''; n.style.boxShadow = ''; n.style.color = '';
+    [].slice.call(n.querySelectorAll('*')).forEach(function (k) { k.style.color = ''; });
+    n.dataset.ghost = '';
+  };
+
   /* words become spans only at play time, so JS-off and reduced motion keep
      the untouched, fully legible markup. returns the word spans in order. */
   var prepWords = function (host) {
@@ -624,8 +720,19 @@
     });
     return out;
   };
-  /* speech cadence: short words arrive fast, long words take longer. */
-  var wordMs = function (w) { return 50 + Math.min(220, w.textContent.length * 28); };
+  /* Speech cadence: short words arrive fast, long words take longer.
+
+     ★ RETUNED 2026-08-13 AGAINST A MEASUREMENT, not a feeling. The old curve
+     (50 + min(220, len*28)) put the /trades call scene at 14.2s end to end
+     and the home phone scene at 12.0s, timed through the serving path from
+     the instant each panel crossed its 28% threshold. Nobody watches a
+     fourteen second typing animation; past about eight seconds the scene
+     stops reading as a competent machine working and starts reading as a
+     slow one. The curve below lands the same scenes near eight and seven
+     seconds while keeping the long-word/short-word contrast that makes it
+     read as speech instead of as a progress bar. Time to first bubble is
+     untouched and stays far inside the 1.5s budget. */
+  var wordMs = function (w) { return 28 + Math.min(120, w.textContent.length * 16); };
 
   if (shows.length) {
     var play = function (el) {
@@ -649,11 +756,14 @@
            that just landed, never a ::after on the turn: hidden words still
            occupy layout, so a turn-level caret parks after the LAST word,
            an orphan cursor on an empty line (measured 2026-08-13). */
-        var at = 360;
+        /* first bubble lands well inside the 1.5s the room asked for, counted
+           from the moment the card is 30% visible. the observer opens at 28%,
+           so 220ms after that is the whole budget spent. */
+        var at = 180;
         [].slice.call(el.querySelectorAll('.turn')).forEach(function (tn) {
           var words = prepWords(tn);
-          setTimeout(function () { tn.classList.add('in', 'speaking'); }, at);
-          at += 260;
+          setTimeout(function () { unghost(tn); tn.classList.add('in', 'speaking'); }, at);
+          at += 170;
           words.forEach(function (w, wn) {
             setTimeout(function () {
               w.classList.add('on', 'cur');
@@ -664,19 +774,19 @@
           setTimeout(function () {
             tn.classList.remove('speaking');
             if (words.length) words[words.length - 1].classList.remove('cur');
-          }, at + 80);
-          at += 380;
+          }, at + 70);
+          at += 240;
         });
         var res = el.querySelector('.sc-result');
         if (res) {
-          setTimeout(function () { res.classList.add('in'); }, at);
-          at += 340;
+          setTimeout(function () { unghost(res); res.classList.add('in'); }, at);
+          at += 230;
           [].slice.call(res.querySelectorAll('.sc-kv dt, .sc-kv dd')).forEach(function (n) {
             setTimeout(function () { n.classList.add('on'); }, at);
-            at += 90;
+            at += 62;
           });
           var bill = el.querySelector('.sc-bill');
-          if (bill) setTimeout(function () { bill.classList.add('on'); }, at + 180);
+          if (bill) setTimeout(function () { bill.classList.add('on'); }, at + 130);
         }
       }
 
@@ -701,7 +811,7 @@
           }, 60);
         }
         var hit = el.querySelector('.hold-hit');
-        if (hit) setTimeout(function () { hit.classList.add('in'); }, 500 + rungs.length * 900 + 700);
+        if (hit) setTimeout(function () { unghost(hit); hit.classList.add('in'); }, 500 + rungs.length * 900 + 700);
       }
 
       if (kind === 'recover') {
@@ -735,7 +845,7 @@
       var sio = new IntersectionObserver(function (es) {
         es.forEach(function (e) { if (e.isIntersecting) { sio.unobserve(e.target); play(e.target); } });
       }, { threshold: 0.28 });
-      shows.forEach(function (s) { sio.observe(s); });
+      shows.forEach(function (s) { ghostPending(s); sio.observe(s); });
     } else {
       shows.forEach(play);
     }
@@ -755,24 +865,24 @@
       }
       /* slightly brisker than the showcase: four bubbles, and the payoff is
          the SMS at the end, so the whole scene stays inside ~12 seconds. */
-      var at = 300;
+      var at = 180;
       [].slice.call(ph.querySelectorAll('.pb')).forEach(function (pb) {
         var words = prepWords(pb);
-        setTimeout(function () { pb.classList.add('in'); }, at);
-        at += 220;
+        setTimeout(function () { unghost(pb); pb.classList.add('in'); }, at);
+        at += 150;
         words.forEach(function (w) {
           setTimeout(function () { w.classList.add('on'); }, at);
           at += Math.round(wordMs(w) * 0.72);
         });
-        at += 300;
+        at += 200;
       });
-      if (sms) setTimeout(function () { sms.classList.add('on'); }, at + 380);
+      if (sms) setTimeout(function () { sms.classList.add('on'); }, at + 300);
     };
     if ('IntersectionObserver' in window) {
       var pio = new IntersectionObserver(function (es) {
         es.forEach(function (e) { if (e.isIntersecting) { pio.unobserve(e.target); playPhone(e.target); } });
       }, { threshold: 0.28 });
-      phones.forEach(function (p) { pio.observe(p); });
+      phones.forEach(function (p) { ghostPending(p); pio.observe(p); });
     } else {
       phones.forEach(playPhone);
     }
@@ -1109,102 +1219,166 @@
 })();
 
 /* ══ THE HEALTH GATE ═══════════════════════════════════════════════════════
-   The hero's primary slot server-renders as a ghost "Get on the list". This
-   module asks /api/demo-health once per page load, and ONLY on healthy:true
-   does it upgrade the slot to the Hi-Vis call control. The demo number is
-   NEVER in the initial HTML. On red or on any failure the upgrade simply
-   never happens: the ghost CTA stays, no dead control ever renders, and at
-   most one info line reaches the console.
+   SITE WIDE, ONE FETCH. Every slot that server-renders as a ghost carries
+   [data-callslot]; every section that must stay dark until the line is green
+   carries [data-callgate] plus the hidden attribute. This module asks
+   /api/demo-health once per page load and ONLY on healthy:true does it
+   upgrade EVERY slot on the page and reveal EVERY gated section.
+
+   The demo number is NEVER in the initial HTML of any page. On red, on a
+   non-200, on malformed JSON or on a network failure the upgrade simply
+   never happens: the ghost CTA stays exactly as it shipped, no dead control
+   ever renders anywhere, and at most one info line reaches the console.
+
+   ONE CONTROL SHAPE, EVERY GROUND. A coarse pointer gets an anchor that
+   dials. A fine pointer gets a button that copies. There is no second ghost
+   pill beside it, for three measured reasons: two pills wrapped the hero
+   action row to 124px and pushed the call control past the fold at
+   1440x900; the ghost's own tokens are dark-ground only, so a second pill
+   could not follow this control onto the bone paper closes; and a one-row
+   ghost upgrading into a two-row pair shifted the hero after paint, which
+   is page CLS. Ghost and control are both one row, so the upgrade shifts
+   nothing.
+
+   EVERY SLOT, NOT THE FIRST ONE. The upgrade walks the whole document, and
+   a slot may name its own label in the attribute value (data-callslot="Hear
+   it before you pick"), because the sentence that earns the tap on the
+   pricing page is not the sentence that earns it in a hero. An empty value
+   takes the default. The pass is idempotent: a slot already carrying a live
+   control is skipped rather than rebuilt, so a second call cannot orphan an
+   already-bound listener or wipe a control mid-press.
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  var slot = document.getElementById('cta-primary');
-  if (!slot || !window.fetch) return;
+  if (!window.fetch) return;
+  var slots = document.querySelectorAll('[data-callslot]');
+  var gated = document.querySelectorAll('[data-callgate]');
+  if (!slots.length && !gated.length) return;
 
   var NUM_TEL = '+19163504869';
   var NUM_TEXT = '+1 (916) 350-4869';
+  var LABEL = 'Hear it answer';
 
-  // Builds one call control; used for the hero slot and the #call-it moment.
-  // The number exists only here, injected only on green, never in the HTML.
+  // one place that swaps children, so the whole module has a single fallback
+  // for engines without replaceChildren rather than one per branch.
+  function put(host, node) {
+    if (host.replaceChildren) { host.replaceChildren(node); return; }
+    while (host.firstChild) host.removeChild(host.firstChild);
+    host.appendChild(node);
+  }
+
+  function pill(tag, label) {
+    var el = document.createElement(tag);
+    el.className = 'btn btn-primary btn-call';
+    // pinned centering: the label swaps to a shorter word on copy, and the
+    // pill is width-pinned for that beat so nothing beside it moves.
+    el.style.justifyContent = 'center';
+    el.innerHTML = '<span class="call-l"></span><span class="call-n"></span>';
+    // the slot's own words, when it named some. stored on the node so flash()
+    // resolves back to THIS pill's label and never to the global default.
+    el.dataset.callLabel = label || LABEL;
+    el.querySelector('.call-l').textContent = el.dataset.callLabel;
+    el.querySelector('.call-n').textContent = NUM_TEXT;
+    return el;
+  }
+
+  // says a word on the pill for a beat, then always resolves back. the old
+  // clipboard-refused path swapped in the number permanently and never came
+  // back, which left two identical pills on the row.
+  function flash(el, word, ms) {
+    var lab = el.querySelector('.call-l');
+    if (!lab || el.dataset.flashing === '1') return;
+    el.dataset.flashing = '1';
+    el.style.minWidth = Math.ceil(el.getBoundingClientRect().width) + 'px';
+    lab.textContent = word;
+    setTimeout(function () {
+      lab.textContent = el.dataset.callLabel || LABEL;
+      el.style.minWidth = '';
+      el.dataset.flashing = '';
+    }, ms);
+  }
+
   function buildControl(slotEl) {
+    // idempotent: never rebuild a slot that already carries a live control.
+    if (slotEl.querySelector('.btn-call')) return;
+    var label = (slotEl.getAttribute('data-callslot') || '').trim() || LABEL;
     var coarse = window.matchMedia('(pointer: coarse)').matches;
     if (coarse) {
-      var a = document.createElement('a');
-      a.className = 'btn btn-primary btn-call';
+      // a phone in a hand: the whole control dials
+      var a = pill('a', label);
       a.href = 'tel:' + NUM_TEL;
-      a.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
-      slotEl.replaceChildren(a);
+      a.addEventListener('click', function () {
+        if (typeof window.answeredEvent === 'function') window.answeredEvent('demo_call_tapped');
+      });
+      put(slotEl, a);
       return;
     }
-    var wrap2 = document.createElement('span');
-    wrap2.className = 'btn btn-primary btn-call is-text';
-    wrap2.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
-    var copy2 = document.createElement('button');
-    copy2.type = 'button';
-    copy2.className = 'btn btn-ghost btn-copy';
-    copy2.textContent = 'Copy the number';
-    copy2.addEventListener('click', function () {
+    // a desktop: the pill itself is the copy control. it is a real button, so
+    // it is focusable, keyboard-operable and cursor:pointer from .btn.
+    var b = pill('button', label);
+    b.type = 'button';
+    b.setAttribute('aria-label', 'Copy the demo number ' + NUM_TEXT);
+    b.title = 'Copy the number';
+    b.addEventListener('click', function () {
       var write = navigator.clipboard && navigator.clipboard.writeText
         ? navigator.clipboard.writeText(NUM_TEL)
         : Promise.reject();
       write.then(function () {
-        copy2.textContent = 'Copied';
-        setTimeout(function () { copy2.textContent = 'Copy the number'; }, 1600);
+        flash(b, 'Copied', 1400);
+        if (typeof window.answeredEvent === 'function') window.answeredEvent('demo_number_copied');
       }).catch(function () {
-        copy2.textContent = NUM_TEXT;
+        // clipboard refused: select the number so a keyboard copy works, say
+        // so for two seconds, then resolve back to the normal label.
+        try {
+          var r = document.createRange();
+          r.selectNodeContents(b.querySelector('.call-n'));
+          var s = window.getSelection();
+          s.removeAllRanges();
+          s.addRange(r);
+        } catch (e) {}
+        flash(b, 'Press copy', 2000);
       });
     });
-    slotEl.replaceChildren(wrap2, copy2);
+    put(slotEl, b);
   }
 
   function upgrade() {
-    var coarse = window.matchMedia('(pointer: coarse)').matches;
-    if (coarse) {
-      // a phone in a hand: the whole control dials
-      var a = document.createElement('a');
-      a.className = 'btn btn-primary btn-call';
-      a.href = 'tel:' + NUM_TEL;
-      a.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
-      slot.replaceChildren(a);
-    } else {
-      // a desktop: the number is text, with a copy control beside it
-      var wrap = document.createElement('span');
-      wrap.className = 'btn btn-primary btn-call is-text';
-      wrap.innerHTML = '<span class="call-l">Hear it answer</span><span class="call-n">' + NUM_TEXT + '</span>';
-      var copy = document.createElement('button');
-      copy.type = 'button';
-      copy.className = 'btn btn-ghost btn-copy';
-      copy.textContent = 'Copy the number';
-      copy.addEventListener('click', function () {
-        var write = navigator.clipboard && navigator.clipboard.writeText
-          ? navigator.clipboard.writeText(NUM_TEL)
-          : Promise.reject();
-        write.then(function () {
-          copy.textContent = 'Copied';
-          setTimeout(function () { copy.textContent = 'Copy the number'; }, 1600);
-        }).catch(function () {
-          // clipboard refused: show the number as selectable text instead
-          copy.textContent = NUM_TEXT;
-        });
-      });
-      slot.replaceChildren(wrap, copy);
+    // re-query: a slot could have been written into the page after load.
+    var live = document.querySelectorAll('[data-callslot]');
+    for (var i = 0; i < live.length; i++) buildControl(live[i]);
+    var g = document.querySelectorAll('[data-callgate]');
+    var revealed = [];
+    for (var k = 0; k < g.length; k++) {
+      g[k].hidden = false;
+      if (g[k].classList.contains('rv')) revealed.push(g[k]);
+      var kids = g[k].querySelectorAll('.rv');
+      for (var m = 0; m < kids.length; m++) revealed.push(kids[m]);
+    }
+    /* FAIL-SAFE, not decoration. These nodes shipped with display:none, so
+       they had no box for the reveal observer to intersect. The observer
+       does pick them up once they gain one, but an element that ends up in
+       the viewport and never gets .in is invisible, and an invisible element
+       reads exactly like a broken one. A second later, force any that are
+       on screen and still resting at opacity 0. */
+    if (revealed.length) {
+      setTimeout(function () {
+        for (var n = 0; n < revealed.length; n++) {
+          var el = revealed[n];
+          if (el.classList.contains('in')) continue;
+          var r = el.getBoundingClientRect();
+          if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('in');
+        }
+      }, 1000);
     }
     if (typeof window.answeredEvent === 'function') {
-      window.answeredEvent('demo_button_rendered');
+      window.answeredEvent('demo_button_rendered', { slots: live.length });
     }
   }
 
   fetch('/api/demo-health', { cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (j) {
-      if (j && j.healthy === true) {
-        upgrade();
-        // the demo-number moment mid-page: un-hide it and arm its slot
-        var callit = document.getElementById('call-it');
-        var cslot = document.getElementById('callit-slot');
-        if (callit && cslot) { buildControl(cslot); callit.hidden = false; }
-        return;
-      }
+      if (j && j.healthy === true) { upgrade(); return; }
       console.info('Answered: demo line is not green right now; keeping the list CTA.');
     })
     .catch(function () {
@@ -1226,11 +1400,24 @@
   var reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   if (!fine.matches || reduced.matches) return;
 
-  /* THE DIAL */
-  var dial = document.createElement('div');
-  dial.className = 'dial';
-  dial.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(dial);
+  /* THE DIAL. Built LAZILY, and only on evidence of a real mouse.
+     `pointer: fine` is necessary but it is not sufficient: every desktop
+     browser narrowed to a phone width still reports fine, and so does a
+     touchscreen laptop. Measured 2026-08-13 at a 390 viewport, the ring was
+     rendering parked dead centre (178-212 x 405-439) on top of the copy.
+     So the element does not exist until a real mousemove has landed AND the
+     pointer is still fine at that moment. Touch input does not emit
+     mousemove without a tap, and nothing downstream may assume the node
+     exists. */
+  var dial = null;
+  var ensureDial = function () {
+    if (dial || !fine.matches) return null;
+    dial = document.createElement('div');
+    dial.className = 'dial';
+    dial.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(dial);
+    return dial;
+  };
   var px = -100, py = -100, dx = -100, dy = -100;
   var sc = 1, sct = 1, shown = false;
 
@@ -1252,11 +1439,13 @@
   var loop = function () {
     var busy = false;
 
-    // dial follow
-    dx += (px - dx) * 0.22; dy += (py - dy) * 0.22;
-    sc += (sct - sc) * 0.25;
-    dial.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(3) + ')';
-    if (Math.abs(px - dx) > 0.3 || Math.abs(py - dy) > 0.3 || Math.abs(sct - sc) > 0.01) busy = true;
+    // dial follow. the node may legitimately never exist on this device.
+    if (dial) {
+      dx += (px - dx) * 0.22; dy += (py - dy) * 0.22;
+      sc += (sct - sc) * 0.25;
+      dial.style.transform = 'translate3d(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px,0) scale(' + sc.toFixed(3) + ')';
+      if (Math.abs(px - dx) > 0.3 || Math.abs(py - dy) > 0.3 || Math.abs(sct - sc) > 0.01) busy = true;
+    }
 
     // magnet
     mx += (mtx - mx) * 0.18; my += (mty - my) * 0.18;
@@ -1292,11 +1481,22 @@
   };
 
   var vis = false;
+  /* the gate: a genuine mousemove is what proves a mouse. it is separate from
+     the pointermove handler below because pointermove also fires for touch
+     and pen, and neither of those should ever build the ring. */
+  document.addEventListener('mousemove', function (e) {
+    if (!ensureDial()) return;
+    px = e.clientX; py = e.clientY;
+    dx = px; dy = py;                       // no swoop in from -100,-100
+    if (!vis) { vis = true; shown = true; dial.style.opacity = '1'; }
+    wake();
+  }, { passive: true });
+
   document.addEventListener('pointermove', function (e) {
     px = e.clientX; py = e.clientY;
     /* re-show on every move, not only the first: a missed mouseenter after
        the pointer leaves the window must never strand the dial hidden. */
-    if (!vis) { vis = true; shown = true; dial.style.opacity = '1'; }
+    if (dial && !vis) { vis = true; shown = true; dial.style.opacity = '1'; }
 
     // magnet: nearest CTA within its own halo leans toward the hand
     scanMags(e.timeStamp || Date.now());
@@ -1341,6 +1541,7 @@
 
   // lock-on over anything pressable
   document.addEventListener('pointerover', function (e) {
+    if (!dial) return;
     var hot = e.target && e.target.closest
       ? e.target.closest('a, button, summary, [role="tab"], input, select, textarea, .vo-bar')
       : null;
@@ -1348,8 +1549,8 @@
     sct = hot ? 1.35 : 1;
     wake();
   });
-  document.addEventListener('pointerdown', function () { sct = 0.72; wake(); }, { passive: true });
-  document.addEventListener('pointerup', function () { sct = dial.classList.contains('hot') ? 1.35 : 1; wake(); }, { passive: true });
-  document.documentElement.addEventListener('mouseleave', function () { vis = false; dial.style.opacity = '0'; });
-  document.documentElement.addEventListener('mouseenter', function () { if (shown) { vis = true; dial.style.opacity = '1'; } });
+  document.addEventListener('pointerdown', function () { if (dial) { sct = 0.72; wake(); } }, { passive: true });
+  document.addEventListener('pointerup', function () { if (dial) { sct = dial.classList.contains('hot') ? 1.35 : 1; wake(); } }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', function () { if (dial) { vis = false; dial.style.opacity = '0'; } });
+  document.documentElement.addEventListener('mouseenter', function () { if (dial && shown) { vis = true; dial.style.opacity = '1'; } });
 })();

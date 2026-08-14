@@ -16,7 +16,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/pricing.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=0b83571b">
+<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -35,8 +35,9 @@
 <section class="gate pad-s" id="choose">
   <div class="wrap">
     <p class="eyebrow rv">Before the numbers</p>
-    <h1 class="display rv d1" style="font-size:clamp(32px,4.2vw,58px);text-wrap:balance;margin-top:16px">Who is the phone<br> <span class="lit">ringing for?</span></h1>
+    <h1 class="display rv d1" style="font-size:clamp(40px,5.4vw,74px);line-height:1;text-wrap:balance;margin-top:16px">Who is the phone<br> <span class="lit">ringing for?</span></h1>
     <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Three products, three different meters, and you almost certainly only care about one of them. Pick the one that is you and the page will show that.</p>
+    <p class="rv d2" style="margin-top:18px;max-width:60ch;display:flex;gap:12px;align-items:flex-start;border-left:2px solid var(--bronze);padding-left:14px;font-size:clamp(16px,1.35vw,19px);line-height:1.45;color:var(--t1)"><span>Whichever one you are, the rule underneath it is the same. <b style="font-weight:500">You are charged when something good happened to you, and never for the attempt.</b></span></p>
 
     <div class="gate-grid">
       <button class="gc rv" type="button" data-pick="consumer">
@@ -64,15 +65,15 @@
       </button>
     </div>
 
-    <p class="src rv d3" style="margin-top:26px;max-width:70ch">This only changes what the page shows you. Nothing is hidden or protected by it, and you can switch at any time from the line at the top of the page.</p>
+    <p class="src rv d3" style="margin-top:24px;max-width:70ch;font-size:12.5px;color:rgba(242,244,240,.74)">This only changes what the page shows you. Nothing is hidden or protected by it, and you can switch at any time from the line at the top of the page.</p>
   </div>
 </section>
 
-<section class="pad" data-aud="consumer business both" style="padding-top:calc(var(--nav-h) + clamp(30px,4vw,56px))">
+<section class="pad" data-aud="consumer business both" style="padding-top:clamp(38px,4.6vw,68px)">
   <div class="wrap">
     <div class="aud-chip">Showing prices for <b class="aud-name">everyone</b> <button type="button" class="aud-change">change</button></div>
     <p class="eyebrow rv" style="margin-top:26px">What it costs</p>
-    <p class="display h2 rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px" role="heading" aria-level="2">Three products.<br> Three meters. <span class="lit">One rule.</span></p>
+    <p class="display h2 rv d1" style="font-size:clamp(48px,5.4vw,76px);line-height:1.0;letter-spacing:-.022em;text-wrap:balance;margin-top:16px" role="heading" aria-level="2">Three products.<br> Three meters. <span class="lit">One rule.</span></p>
     <p class="lede rv d2" style="margin-top:22px;max-width:62ch">The rule is that money only moves when something good happened. A job got booked. A human got reached. A dollar got recovered. There is no subscription anywhere in this company and no per minute price anywhere in this company, which means the incentive on our side of the table is identical to the incentive on yours.</p>
 
     <div class="pcards">
@@ -81,7 +82,8 @@
         <div class="pc-name">Answered</div>
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
-        <div class="pc-free">$0 subscription &middot; $0 per minute &middot; $0 per call</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 subscription &middot; $0 per minute &middot; $0 per call &middot; $0 for a wrong number</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
         <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
@@ -102,7 +104,9 @@
         <div class="pc-name">Hold</div>
         <div class="pc-price num">$20</div>
         <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
-        <div class="pc-free">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
+        <div class="pc-meter"><span>A connection means a human being on the line who can act on your case. A phone tree is not a connection, and it is not a charge.</span><span>If it waits four hours and never reaches a person, the price is <b>$0</b>. The waiting is our cost, not your bill.</span><span>Your first hold is free. No card, no account, and no subscription waiting behind it.</span><span>A government line is <b>$20</b> because it queues for hours. A commercial line is <b>$10</b>.</span></div>
         <ul class="pc-list">
           <li>Places the call, works the phone tree, enters your reference, survives the transfer</li>
           <li>Holds for as long as it takes, across multiple attempts and reconnects</li>
@@ -122,7 +126,9 @@
         <div class="pc-name">Recover</div>
         <div class="pc-price num">15%</div>
         <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
-        <div class="pc-free">Nothing recovered means nothing owed</div>
+        <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 to start &middot; $0 a month &middot; $0 if nothing lands</div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
+        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
         <ul class="pc-list">
           <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
           <li>Already knows the job, the address and the date, because it booked the work</li>
@@ -139,19 +145,19 @@
       </article>
     </div>
     <p class="lede rv d2" style="margin-top:26px;max-width:66ch">Two things sit under the Answered meter, and both exist to protect you rather than us. <b>The cap</b> means a busy month can never surprise you, and you set where it sits. <b>The quiet-line rate</b> only ever applies to a line that has gone quiet, it is credited back against your bookings, and it means a line stays answered for a price that is honest instead of nothing.</p>
-    <p class="src rv d3" style="margin-top:26px;max-width:88ch">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below.</p>
+    <p class="src rv d3" style="margin-top:24px;max-width:88ch;font-size:12.5px;color:rgba(242,244,240,.74)">These figures are worked out from published vendor rates, not measured from our own running system. Sources and the full arithmetic are below.</p>
   </div>
 </section>
 
-<section class="pad-s seam" data-aud="business both">
+<section class="pad-s seam" data-aud="business both" style="padding-top:clamp(40px,5vw,72px)">
   <div class="wrap">
-    <div style="display:grid;grid-template-columns:minmax(0,.72fr) minmax(0,1.28fr);gap:clamp(26px,4vw,60px);align-items:center" class="two">
+    <div>
       <div>
         <p class="eyebrow rv">The whole system</p>
-        <h2 class="h2 rv d1" style="margin-top:16px;max-width:15ch">Five parts. One of them is a phone code.</h2>
-        <p class="lede rv d2" style="margin-top:20px">Nothing is installed, nothing is ported, and your number never changes. The carrier does the forwarding it has always been able to do, and we answer the line on the other side of it.</p>
+        <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;max-width:30ch">Five parts. One of them is a phone code.</h2>
+        <p class="lede rv d2" style="margin-top:20px;max-width:64ch">Nothing is installed, nothing is ported, and your number never changes. The carrier does the forwarding it has always been able to do, and we answer the line on the other side of it.</p>
       </div>
-      <div class="rv d2"><div class="bp run">
+      <div class="rv d2" style="margin-top:clamp(28px,3.4vw,48px);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain"><div class="bp run" style="min-width:820px">
   <svg viewBox="0 0 900 300" role="img" aria-labelledby="bpt bpd">
     <title id="bpt">How a call reaches Answered</title>
     <desc id="bpd">A caller dials the business number. The carrier forwards the call to a line Answered owns. Answered answers, qualifies the caller, and either books the job into the calendar or transfers a real emergency to the owner's cell.</desc>
@@ -191,7 +197,9 @@
       <text x="470" y="155" text-anchor="middle" class="bp-lab">03</text>
       <text x="470" y="200" text-anchor="middle" class="bp-t">Answered</text>
       <text x="470" y="218" text-anchor="middle" class="bp-sub">picks up, qualifies</text>
-      <text x="470" y="98" text-anchor="middle" class="bp-sub">says it is an AI, first sentence</text>
+      <!-- anchored END at 455 so the words run LEFT, away from the emergency
+           branch that leaves node 03 to the right at the same height. -->
+      <text x="455" y="98" text-anchor="end" class="bp-sub">says it is an AI, first sentence</text>
       <path d="M470 106 V118" class="bp-wire"/>
     </g>
     <g>
@@ -211,12 +219,15 @@
     <path d="M470 120 C470 70 620 70 690 70 H800 C820 70 830 80 830 100 V128" class="bp-wire dash"/>
     <text x="640" y="58" text-anchor="middle" class="bp-sub">a real emergency transfers straight to your cell</text>
 
-    <!-- the reversal -->
-    <path d="M250 176 C250 240 250 250 300 250 H430" class="bp-wire dash"/>
-    <text x="470" y="254" text-anchor="middle" class="bp-sub">one code turns it off again, ten seconds</text>
+    <!-- the reversal. the path STOPS where the caption starts: it used to run
+         to x=430 under a caption anchored middle at x=470, i.e. straight
+         through its own words for 130 units. -->
+    <path d="M250 176 C250 240 250 250 302 250" class="bp-wire dash"/>
+    <text x="314" y="254" text-anchor="start" class="bp-sub">one code turns it off again, ten seconds</text>
   </svg>
   <span class="bp-cap">Fig 1 &middot; call path</span>
 </div></div>
+      <p class="src rv d3" style="margin-top:10px;font-size:12.2px;color:var(--ink-3)">Five nodes, left to right. On a narrow screen the figure scrolls sideways inside its own frame rather than shrinking its labels out of readability.</p>
     </div>
   </div>
 </section>
@@ -224,8 +235,9 @@
 <section class="paper seam pad-s" data-aud="business both">
   <div class="wrap">
     <p class="eyebrow rv">What the customer gets for it</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">You pay about four cents for every dollar it makes you.</h2>
-    <div class="ptable rv d2">
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;max-width:26ch">You pay about four cents for every dollar it makes you.</h2>
+    <div class="ptable rv d2" style="box-shadow:0 24px 60px -28px rgba(0,0,0,.72),0 2px 0 rgba(11,12,14,.06)">
+      <div class="prow" style="border-top:0;padding-block:11px;background:rgba(11,12,14,.05);font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:rgba(11,12,14,.66)"><span>Fig 2 &middot; the price against the work</span><span>Answered, per booked job</span></div>
       <div class="prow head"><span>What Answered produced</span><span>Its price as a share of that</span></div>
       <div class="prow"><span>A booked service call, $350 to $500 average ticket</span><span class="num">4 to 5%</span></div>
       <div class="prow"><span>A booked after hours call, about $1,400</span><span class="num">3.5%</span></div>
@@ -233,14 +245,14 @@
       <div class="prow hi"><span>A saved roof lead, $9,504 ticket</span><span class="num">0.5%</span></div>
       <div class="prow"><span>An afternoon of your life, back</span><span class="num">$20</span></div>
     </div>
-    <p class="src rv d3" style="margin-top:20px;max-width:84ch">Ticket figures from Thumbtack average cost data, 2026. Lead values apply Invoca's measured 45% on call close rate (70M calls, July 2026) to those tickets. Human answering services for the same work publish $250 to $2,100 a month.</p>
+    <p class="src rv d3" style="margin-top:20px;max-width:84ch;font-size:12.5px;line-height:1.6;color:rgba(11,12,14,.72)">Ticket figures from Thumbtack average cost data, 2026. Lead values apply Invoca's measured 45% on call close rate (70M calls, July 2026) to those tickets. Human answering services for the same work publish $250 to $2,100 a month.</p>
   </div>
 </section>
 
-<section class="pad seam" data-aud="both">
+<section class="pad seam" data-aud="both" style="padding-top:clamp(48px,6vw,92px)">
   <div class="wrap">
     <p class="eyebrow rv">Where the money goes</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Where each dollar goes.</h2>
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;max-width:26ch">Where each dollar goes.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:64ch">Every bar below is <b>one dollar of revenue from one event</b>, split into what that event costs us to run and what is left. Same scale on every row, so they can be read against each other. The dollar figures on the right are the size of that single event, not a monthly or annual total.</p>
 
     <div class="dollars rv d2">
@@ -291,14 +303,14 @@
       <i><b style="background:rgba(227,255,79,.22)"></b> what is left after them</i>
     </div>
 
-    <p class="src rv d3" style="margin-top:22px;max-width:86ch">Hold costs more per event because holding is the product: the line stays connected for the whole wait, so an hour of queue is an hour of telephony. Answering and collecting are short calls, which is why those two rows look the way they do.</p>
+    <p class="src rv d3" style="margin-top:22px;max-width:86ch;font-size:12.5px;color:rgba(242,244,240,.74)">Hold costs more per event because holding is the product: the line stays connected for the whole wait, so an hour of queue is an hour of telephony. Answering and collecting are short calls, which is why those two rows look the way they do.</p>
   </div>
 </section>
 
-<section class="paper seam pad-s" data-aud="both">
+<section class="paper seam pad-s" data-aud="both" style="padding-top:clamp(46px,5.6vw,84px)">
   <div class="wrap">
     <p class="eyebrow rv">The math, step by step</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">How a $19 booking costs us about a dollar fifty.</h2>
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;max-width:30ch">How a $19 booking costs us about a dollar fifty.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Four steps, in order, each one following from the line above it. Every input is either a published vendor rate or an assumption we have labeled as ours.</p>
 
     <div class="chain rv d2">
@@ -329,23 +341,24 @@
       </div>
     </div>
 
-    <p class="src rv d3" style="margin-top:22px;max-width:88ch">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 priced by part, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
+    <p class="src rv d3" style="margin-top:22px;max-width:88ch;font-size:12.5px;line-height:1.62;color:rgba(11,12,14,.72)">Per minute rates from published vendor pricing accessed 2026-08-10: Vapi platform fee $0.05 a minute plus models at cost, Retell $0.07 to $0.31 priced by part, Bland $0.11 to $0.14 all inclusive, Twilio ConversationRelay $0.07 plus $0.0085 inbound voice and $1.15 a month for a local number. <b>The 35% booking rate and the 45% recovery rate are our own planning assumptions and are not yet measured in production.</b> The first pilot exists to measure them, and whatever they turn out to be will be published here.</p>
   </div>
 </section>
 
-<section class="paper seam pad-s" data-aud="consumer business both">
+<section class="paper seam pad-s" data-aud="consumer business both" style="padding-top:clamp(52px,6.4vw,96px)">
   <div class="wrap">
     <p class="eyebrow rv">Why the shape matters more than the number</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:24ch">A per minute vendor wants a longer call. We want a booked job.</h2>
+    <h2 class="h2 rv d1" style="font-size:clamp(48px,5.4vw,76px);line-height:1.0;letter-spacing:-.022em;text-wrap:balance;margin-top:16px;max-width:18ch">A per minute vendor wants a longer call. <span class="lit">We want a booked job.</span></h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:64ch">That is not a slogan, it is an accounting fact. When the meter runs on talk time, every extra minute is margin, so the product has no reason to be efficient and every reason to be chatty. When the meter runs on the outcome, a shorter call that still books the job is strictly better for both sides.</p>
     <p class="lede rv d2" style="margin-top:16px;max-width:64ch">It also makes the free part genuinely free. Wrong numbers, sales calls, somebody's cousin looking for a different business, the call at 2 AM that turns out to be nothing: all of it costs us and none of it costs you. Nobody selling minutes can copy that without breaking their own revenue model.</p>
   </div>
 </section>
 
-<section class="pad seam" data-aud="business both">
+<section class="pad seam" data-aud="business both" style="padding-top:clamp(52px,6.4vw,100px)">
   <div class="wrap narrow">
     <p class="eyebrow rv">Your protection</p>
-    <h2 class="h2 rv d1" style="margin-top:16px">Every charge, provable.<br> Every dispute, yours.</h2>
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px">Every charge, provable.<br> <span class="lit">Every dispute, yours.</span></h2>
+    <p class="rv d2" style="margin-top:22px;padding-left:14px;border-left:2px solid var(--bronze);font-size:clamp(17px,1.5vw,21px);line-height:1.45;color:var(--t1);max-width:52ch">$0 base. <b class="num" style="color:var(--bronze-2);font-weight:600">$19</b> when it books. Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> and it comes off.</p>
     <details class="disc rv d2" style="margin-top:30px" open>
       <summary>Every charge shows you the call it came from.</summary>
       <div class="disc-body"><p>The recording where consent permits, the transcript, and the appointment record. If you cannot see why you were charged, you should not be charged, so you will always be able to see it.</p></div>
@@ -366,11 +379,26 @@
 </section>
 
 
+<section class="pad-s seam" data-aud="consumer business both" style="padding-block:clamp(46px,5.4vw,80px)">
+  <div class="wrap narrow" style="text-align:center">
+    <p class="eyebrow rv" style="justify-content:center">Before you decide</p>
+    <h2 class="h2 rv d1" style="font-size:clamp(34px,3.9vw,58px);line-height:1.06;letter-spacing:-.018em;text-wrap:balance;margin-top:16px">Do not take the page's word for it. <span class="lit">Call it.</span></h2>
+    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:52ch">Every number above describes a voice you have not heard yet. The demo line is answering right now, it is the same engine behind all three meters, and it costs you nothing to find out whether it is any good.</p>
+    <!-- THE HEALTH GATE. What ships is the ghost: a plain anchor to the form
+         below. answered.js swaps it for the live call control, and un-hides the
+         line under it, ONLY when /api/demo-health answers healthy:true. The
+         demo number is never in this file. -->
+    <p class="rv d2" style="margin-top:24px"><span class="cta-slot" data-callslot="Hear it answer"><a class="btn btn-primary" href="#interest">Tell us what you need</a></span></p>
+    <p class="src rv d3" data-callgate hidden style="margin-top:14px;font-size:12.8px;color:var(--ink-2)">Free, no account, and nobody calls you back. It answers as a plumbing shop. Push it for a price and watch it refuse, which is the guardrail on the trust page doing its job.</p>
+  </div>
+</section>
+
 <section class="paper seam pad" id="interest" data-aud="consumer business both">
   <div class="wrap narrow">
     <p class="eyebrow rv" style="justify-content:center">Tell us what you need</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;text-align:center">No checkout. Just tell us,<br> and we will build it around you.</h2>
+    <h2 class="h2 rv d1" style="font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.012em;text-wrap:balance;margin-top:16px;text-align:center">No checkout. Just tell us,<br> and we will build it around you.</h2>
     <p class="lede rv d2" style="margin-top:20px;text-align:center;margin-inline:auto;max-width:54ch">There is nothing to buy on this page on purpose. The first group goes live free and stays free until it produces something, so the only thing worth doing right now is telling us which part you want and letting us set it up with you.</p>
+    <p class="rv d2" style="margin-top:24px;margin-inline:auto;text-align:left;width:fit-content;max-width:min(56ch,100%);padding-left:15px;border-left:2px solid var(--accent-ink);font-size:clamp(16.5px,1.45vw,20px);line-height:1.46;color:var(--ink)">$0 base. <b class="num" style="color:var(--accent-ink);font-weight:600">$19</b> when it books. Reply <b class="num" style="color:var(--accent-ink);font-weight:600;letter-spacing:.04em">VOID</b> and it comes off.</p>
 
     <form class="iform rv d2" name="interest" method="POST" action="/api/interest">
       <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
@@ -443,6 +471,6 @@
     </div>
   </div>
 </footer>
-<script src="/assets/answered.js?v=540a9276" defer></script>
+<script src="/assets/answered.js?v=8c6327ab" defer></script>
 </body>
 </html>
