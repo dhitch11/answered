@@ -13,9 +13,10 @@
 //   /api/answered-brain/customer   customer  a paying business's own line
 //
 // ElevenLabs appends /chat/completions to a custom LLM server URL, so each of
-// those also serves the suffixed form. The full list is generated from the
-// registry by routeTable(), which is what config.path below exports, so a new
-// persona cannot be added without its routes existing.
+// those also serves the suffixed form. config.path at the bottom of this file
+// lists all ten as a STATIC LITERAL, because Netlify reads that export by
+// static analysis and silently drops anything computed. Read the note down
+// there before you tidy it: the tidy version took the demo line off the air.
 //
 // ★ THE LIVE DEMO LINE IS THE THING THIS FILE MUST NOT BREAK. +1 916 350 4869
 // answers as Riley, a canary places a real call every two hours and asserts the
@@ -52,7 +53,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import {
-  PERSONAS, personaFor, routeTable, describe,
+  PERSONAS, personaFor, describe,
   guardClause, guardWhole, deterministicLine, contextDigits, noteHeader,
   nextBoundary, trimToSentence,
 } from './lib/personas.mjs';
@@ -474,8 +475,39 @@ export default async (req) => {
   return new Response(stream, { headers: SSE_HEADERS });
 };
 
-// Generated from the registry, never hand maintained: a persona without routes
-// is unreachable, and a route without a persona is a 404 that the vendor
-// console shows as a dead agent. The first entry, /api/answered-brain, is the
-// live demo line's path and must stay first in fact as well as in habit.
-export const config = { path: routeTable() };
+// ★★ THIS ARRAY MUST BE A STATIC LITERAL. IT COST A LIVE OUTAGE TO LEARN.
+//
+// MEASURED 2026-08-14, in production. This line used to read
+//     export const config = { path: routeTable() };
+// which is clean, self maintaining, and WRONG. Netlify reads a v2 function's
+// `config` export by STATIC ANALYSIS at bundle time; it does not execute the
+// module. A computed value it cannot evaluate is not an error and not a
+// warning, it is simply dropped, and the function silently falls back to its
+// default /.netlify/functions/<name> route.
+//
+// The signature of the failure, if you ever see it again:
+//     /api/answered-brain            -> 404
+//     /.netlify/functions/answered-brain -> 200
+// A declared path REMOVES the default route, so a live default route means no
+// path was ever registered. Both facts were true on deploy 6a7f600d at
+// 18:35:57Z: the function was healthy, its URL did not exist, and the demo
+// line's ElevenLabs agent was pointing at a 404. Nothing failed loudly. The
+// build was green, the function was 200, and the phone had no brain.
+//
+// So the routes are written out by hand, and lib/personas.test.mjs asserts this
+// literal is exactly equal to routeTable(). The bundler gets a literal; the
+// humans get the guarantee; neither depends on the other being remembered.
+export const config = {
+  path: [
+    '/api/answered-brain',
+    '/api/answered-brain/chat/completions',
+    '/api/answered-brain/riley',
+    '/api/answered-brain/riley/chat/completions',
+    '/api/answered-brain/scout',
+    '/api/answered-brain/scout/chat/completions',
+    '/api/answered-brain/onboard',
+    '/api/answered-brain/onboard/chat/completions',
+    '/api/answered-brain/customer',
+    '/api/answered-brain/customer/chat/completions',
+  ],
+};

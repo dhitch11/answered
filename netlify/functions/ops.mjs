@@ -38,6 +38,24 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // ── style. Dark, dense, readable on a phone at arm's length in a truck ───────
+//
+// The explanations for the two load bearing rules live HERE, in JavaScript,
+// rather than inside the CSS string, because the CSS string is served to
+// ANONYMOUS visitors on the login page. A gate should hand a stranger as close
+// to nothing as it can, and eight hundred bytes of my reasoning is not nothing.
+//
+//   li>span { min-width: 0 }
+//     A flex item will not shrink below its own min-content width unless it is
+//     told it may. Without this a long <code> run inside a runbook line pushed
+//     the page 6px past a 320px viewport and the whole document scrolled
+//     sideways. Measured in a real browser; every geometry assertion above the
+//     element passed, which is why the screenshot is the check that matters.
+//
+//   .fix { display: block }
+//     .fix is a <span>, so it inherits inline layout, and inline boxes ignore
+//     vertical margin and never start a new line. The runbook ran on from the
+//     end of the red sentence as one wall of text and read as part of it.
+//     Every assertion passed. The screenshot caught it.
 const CSS = `*{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{background:#0B0C0E;color:#F2F4F0;font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;padding:22px 16px 80px;max-width:1000px;margin:0 auto;overflow-wrap:break-word}
@@ -61,11 +79,6 @@ a{color:#37C8F0}
 .dot.red{background:#FF3355}.dot.amber{background:#E3A21F}.dot.green{background:#3ED07E}.dot.grey{background:#4A5058}
 ul{margin:8px 0 2px;padding-left:0;list-style:none}
 li{margin:8px 0;display:flex;gap:9px;align-items:flex-start}
-/* A flex item will not shrink below its own min-content width unless it is told
-   it may. Without this, a long <code> run inside a runbook line pushed the page
-   6px wider than a 320px viewport and the whole document scrolled sideways.
-   Measured in a real browser at 320px; every geometry assertion above the
-   element passed, which is why the screenshot is the check that matters. */
 li>span{min-width:0;flex:1 1 auto}
 .tag{display:inline-block;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:#0B0C0E;background:#E3FF4F;border-radius:4px;padding:2px 7px;font-weight:700}
 .tag.red{background:#FF3355;color:#fff}.tag.amber{background:#E3A21F}.tag.grey{background:#3A4048;color:#C9CFD6}.tag.green{background:#3ED07E}
@@ -76,11 +89,6 @@ li>span{min-width:0;flex:1 1 auto}
 .mono-row:last-child{border-bottom:0}
 .st{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;min-width:44px;color:#8B939C}
 .pill{font-size:12px;border:1px solid #2a2e35;border-radius:20px;padding:2px 9px;color:#B6BDC5}
-/* display:block is load bearing. This is a <span>, so it inherits inline
-   layout, and inline boxes ignore vertical margin and do not start a new line.
-   The runbook then ran on from the end of the red sentence as one wall of text
-   and read as part of it. Every assertion passed. The screenshot is what
-   caught it. */
 .fix{display:block;margin-top:8px;padding:10px 12px;background:#0E1013;border-left:3px solid #37C8F0;border-radius:0 6px 6px 0;font-size:14px;color:#C9CFD6}
 .fix b{color:#F2F4F0}
 .fix code,code{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:#0B0C0E;border:1px solid #262a30;border-radius:4px;padding:1px 5px;color:#E3FF4F;word-break:break-all;overflow-wrap:anywhere}
@@ -118,6 +126,8 @@ const RUNBOOK = [
     body: 'This is the serious one, because it means the whole seam was exercised and something in it is wrong. Read the reason on the canary card below, it names the exact probe that failed. Then call <span class="u">+1 (916) 350-4869</span> yourself and listen to the first sentence.' },
   { match: 'RESEND_API_KEY', title: 'Nothing can email',
     body: 'Two things break at once. The interest form on /pricing returns 503 to every person who fills it in, and this operations watch cannot tell anyone that anything is wrong. Set <code>RESEND_API_KEY</code> in the Netlify environment for this project from the credentials vault. Do not paste it anywhere else.' },
+  { match: '/api/answered-brain', title: 'The demo line has no brain',
+    body: 'The ElevenLabs agent points at this URL for every turn of thinking. When it 404s the agent still speaks its configured greeting, so a quick test call SOUNDS fine, and then it cannot hold a conversation. Check the shape of the failure before anything else: if <code>/api/answered-brain</code> is 404 but <code>/.netlify/functions/answered-brain</code> is 200, no path was ever registered. Netlify reads a v2 function\'s <code>config</code> export by static analysis at bundle time and does not execute the module, so a COMPUTED path array is silently dropped and the function falls back to its default route. The array has to be a static literal. This was diagnosed in production on 2026-08-14 and the literal is in the repo; if you are seeing it live, the fix has not been deployed yet.' },
   { match: 'NOT DEPLOYED', title: 'A route answers 404',
     body: 'The page or function is in the repo but not in the deploy. Deploy from a clean staged copy that mirrors the repo layout, with <code>netlify/functions</code> passed as the functions directory. A flattened functions directory also breaks the cockpit, which imports across directories.' },
   { match: 'THE GATE IS LEAKING', title: 'An internal page is serving its content to strangers',

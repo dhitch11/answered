@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// _accounts-check.mjs — the accounts lane, exercised through its serving path.
+// _accounts-check.mjs : the accounts lane, exercised through its serving path.
 //
 // This is not a unit test. It boots the real Netlify v2 handlers behind a real HTTP server, on
 // real credentials pulled from the Netlify project at run time, against the real production
@@ -189,13 +189,97 @@ const accounts = await import('./netlify/functions/lib/accounts.mjs');
 const auth = await import('./netlify/functions/lib/account-auth.mjs');
 process.env.URL = ORIGIN;
 
+// Start clean. A run that inherits the last run's account inherits its rate-limit budget and its
+// state machine, and then reports failures that belong to the previous run.
+{
+  const { rpc } = await import('./netlify/functions/lib/db.mjs');
+  const prior = await rpc('sv_accounts', { p_status: null, p_limit: 200 }).catch(() => []);
+  for (const a of (Array.isArray(prior) ? prior : [])) {
+    if (a.owner_email === QA_EMAIL) {
+      await rpc('sv_qa_delete_account', { p_account_id: a.id }).catch(() => {});
+      console.log(`cleared a leftover QA account from an earlier run (${a.id})`);
+    }
+  }
+}
+
 const routes = await buildRouter();
 const server = await serve(routes);
 console.log(`serving the real handlers on ${ORIGIN}\n`);
 
+// --serve: stand a fully configured, live QA business up and hold the server open so a real
+// browser can be pointed at it. Screenshots catch what assertions cannot.
+if (process.argv.includes('--serve')) {
+  // Local only, in this process only. The real PIN stays where it is; nothing is written to
+  // Netlify and nothing is printed. This exists so the operator page can be opened in a real
+  // browser without a credential ever passing through a terminal.
+  process.env.ANSWERED_DIRECTORY_PIN = '000000';
+  console.log('note: this process is using a throwaway internal PIN, local only, never deployed.');
+  const { raw: r0, hash: h0 } = auth.mintLoginToken();
+  const s = await accounts.startAccount({
+    email: QA_EMAIL, businessName: QA_BUSINESS, trade: 'Plumbing', tokenHash: h0,
+    ttlMinutes: 120, ip: '127.0.0.1', ua: 'accounts-check --serve',
+  });
+  const id = s.account.id;
+  await accounts.consumeToken(auth.hashToken(r0), '127.0.0.1');
+  await accounts.saveConfig(id, {
+    greeting_name: 'Dana', business_says: 'QA Harness Plumbing', owner_phone: '+19168663918',
+    services: ['Water heater replacement', 'Slab leak detection', 'Drain clearing'],
+    service_area: 'Sacramento and forty miles around it',
+    hours: { mon: [['07:00', '17:00']], tue: [['07:00', '17:00']], wed: [['07:00', '17:00']], thu: [['07:00', '17:00']], fri: [['07:00', '17:00']], sat: [['08:00', '12:00']], sun: [] },
+    after_hours: 'urgent_only', booking_mode: 'sends_invite',
+    booking_destination: 'jobs@qa-harness-plumbing.example',
+    always_ask: ['their name', 'the best number to reach them on', 'the address', 'whether water is running right now'],
+    quote_policy: 'never', escalation_when: 'emergency', escalation_phone: '+19168663918',
+    never_say: ['anything about a warranty', 'how many trucks we run'], monthly_cap_cents: 40000,
+  }, 'accounts-check');
+  const { raw, hash } = auth.mintLoginToken();
+  await accounts.startAccount({ email: QA_EMAIL, businessName: QA_BUSINESS, tokenHash: hash, ttlMinutes: 120, ip: '127.0.0.1', ua: 'serve' });
+  console.log(`\nQA business ${id} is ready.`);
+  console.log(`sign in:  ${ORIGIN}/account/enter?t=${encodeURIComponent(raw)}`);
+  console.log(`operator: ${ORIGIN}/internal/accounts`);
+  console.log('\nCtrl-C when done. Run without --serve afterwards to clean up.\n');
+  const bye = async () => {
+    const { rpc } = await import('./netlify/functions/lib/db.mjs');
+    await rpc('sv_qa_delete_account', { p_account_id: id }).catch(() => {});
+    console.log('\nQA business removed.');
+    process.exit(0);
+  };
+  // SIGTERM as well as SIGINT: a pkill sends TERM, and the first time this was written the QA
+  // business survived the shutdown and poisoned the next run's rate limit.
+  process.on('SIGINT', bye);
+  process.on('SIGTERM', bye);
+  await new Promise(() => {});
+}
+
 console.log('1. configuration');
 check('the account database is reachable', accounts.dbConfigured());
 check('a session signing key exists', auth.configured());
+
+console.log('\n1b. the database door');
+{
+  // Every sv_* function is callable by the anonymous role by design; the shared secret is the
+  // only thing standing in front of it. That claim is worth measuring, not assuming, and a NULL
+  // secret is tested on purpose: an absent field sailing through a gate is this estate's
+  // most-repeated defect.
+  const U = process.env.ANSWERED_DB_URL; const A = process.env.ANSWERED_DB_ANON;
+  const call = async (fn, body) => (await fetch(`${U}/rest/v1/rpc/${fn}`, {
+    method: 'POST', headers: { apikey: A, Authorization: `Bearer ${A}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })).status;
+  for (const secret of ['', 'x'.repeat(64), null]) {
+    const label = secret === null ? 'a null secret' : secret ? 'a wrong secret' : 'no secret';
+    check(`the account list refuses ${label}`, (await call('sv_accounts', { p_secret: secret, p_status: null, p_limit: 10 })) === 403);
+    check(`the number resolver refuses ${label}`, (await call('sv_account_for_number', { p_secret: secret, p_phone: QA_NUMBER })) === 403);
+    check(`signup refuses ${label}`, (await call('sv_account_start', {
+      p_secret: secret, p_email: 'attacker@example.com', p_business_name: 'X', p_owner_name: '',
+      p_phone: '', p_trade: '', p_token_hash: 'deadbeef', p_ttl_minutes: 20, p_ip: '', p_ua: '',
+    })) === 403);
+  }
+  for (const tbl of ['accounts', 'account_tokens', 'account_config', 'account_numbers']) {
+    const r = await fetch(`${U}/rest/v1/${tbl}?select=*`, { headers: { apikey: A, Authorization: `Bearer ${A}` } });
+    check(`the publishable key cannot read ${tbl}`, r.status === 401, `status ${r.status}`);
+  }
+}
 
 console.log('\n2. the door, signed out');
 {
@@ -240,6 +324,8 @@ const started = await accounts.startAccount({
   ttlMinutes: 20, ip: '127.0.0.1', ua: 'accounts-check',
 });
 check('a second signup is the same business, not a second one', started.created === false, `created=${started.created}`);
+check('a failed send never fills the rate-limit budget', started.throttled === false,
+  'the throttle counted tokens issued rather than links actually sent');
 const ACCOUNT_ID = started.account.id;
 
 console.log('\n4. the emailed link');

@@ -147,6 +147,7 @@ export const createDraftInvoice = (customerId, { description, metadata, daysUnti
 
 export const getInvoice = (id) => call('GET', `invoices/${id}`);
 export const deleteDraftInvoice = (id) => call('DELETE', `invoices/${id}`);
+export const listInvoices = (params) => call('GET', 'invoices', params);
 
 // ── the armed half: these two move real money ────────────────────────────────────────────────────
 

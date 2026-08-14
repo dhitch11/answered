@@ -1,4 +1,4 @@
-// account-auth.mjs — how a business owner proves who he is.
+// account-auth.mjs : how a business owner proves who he is.
 //
 // No passwords. A contractor checks email on a phone between jobs; a password is one more thing
 // to lose and one more thing for us to store badly. He types his email, he gets a link, the link

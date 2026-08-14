@@ -1,4 +1,4 @@
-// /api/account/start — the front door. An email in, a sign-in link out.
+// /api/account/start : the front door. An email in, a sign-in link out.
 //
 // THE ANSWER IS THE SAME EVERY TIME, ON PURPOSE. New account, existing account, throttled,
 // missing business name: one page, one message, one timing. An endpoint that answers differently
@@ -11,7 +11,7 @@
 // your email while nothing was sent is the worst outcome available here, so a Resend failure is
 // reported as a failure and the person is told to try again.
 
-import { startAccount, dbConfigured } from './lib/accounts.mjs';
+import { startAccount, markTokenSent, dbConfigured } from './lib/accounts.mjs';
 import {
   mintLoginToken, configured as authConfigured, PRIVATE_HEADERS, html, json, slow, clientIp,
 } from './lib/account-auth.mjs';
@@ -124,10 +124,14 @@ export default async (req) => {
   });
 
   if (!sent.ok) {
+    // The token stays unsent, so it never counts against this address's rate limit and the next
+    // attempt is not answered with a cheerful "check your email".
     console.error(`account-start: login link NOT sent (${sent.why}) ${sent.detail || ''}`);
     return wantsJson(req) ? json(502, { ok: false, error: 'the sign-in email did not send', why: sent.why })
       : html(502, failed(sent.why));
   }
+  await markTokenSent(hash).catch((e) =>
+    console.error('account-start: link sent but not marked sent:', String(e.message).slice(0, 160)));
 
   if (r.created) {
     logAccountToHubSpot(account, 'signed_up').catch(() => {});

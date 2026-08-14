@@ -47,18 +47,59 @@ const rawBody = (event) => (event.isBase64Encoded
   ? Buffer.from(event.body || '', 'base64').toString('utf8')
   : (event.body || ''));
 
-/** The account's Stripe customer, created once and remembered. */
+/**
+ * The account's Stripe customer, created once and remembered.
+ *
+ * ★ A REMEMBERED ID IS NOT A LIVING ONE. This used to return ctx.stripe_customer_id on sight, and
+ * the moment a customer was deleted on the Stripe side, every op on that account died with an
+ * unhelpful 500: "No such customer". Reproduced here after a QA cleanup deleted the customer while
+ * the ledger kept the id. A billing system that cannot survive somebody tidying the Stripe
+ * dashboard is a billing system that will be down on the day somebody tidies the Stripe dashboard.
+ *
+ * ★ AND THE REPLACEMENT NEEDS A NEW IDEMPOTENCY KEY. Stripe replays a stored response for 24 hours
+ * against the same key, so recreating under `answered-customer-${key}` would hand back the very
+ * dead customer we are replacing. The key carries the reason it is being reissued.
+ */
 async function ensureCustomer(key, ctx) {
-  if (ctx.stripe_customer_id) return ctx.stripe_customer_id;
+  if (ctx.stripe_customer_id) {
+    try {
+      const existing = await stripe.getCustomer(ctx.stripe_customer_id);
+      if (existing && !existing.deleted) return existing.id;
+    } catch (e) {
+      if (e.status !== 404) throw e;      // a network blip is not a missing customer
+    }
+    console.error(`billing: stripe customer ${ctx.stripe_customer_id} for ${key} is gone, reissuing`);
+  }
   const s = await statement(key);
   const c = await stripe.createCustomer({
     account_key: key,
     business_name: s?.account?.business_name || key,
     email: s?.account?.email,
     phone: s?.account?.phone,
-  }, `answered-customer-${key}`);
+  }, `answered-customer-${key}-${ctx.stripe_customer_id ? `reissue-${Date.now()}` : 'first'}`);
   await setCustomer(key, c.id);
   return c.id;
+}
+
+/**
+ * One draft per account per cycle, found before it is created.
+ *
+ * A close is a RE-RUNNABLE operation whose parameters legitimately change between runs: a line got
+ * voided, a new outcome landed, the customer was reissued. So it cannot be protected by a fixed
+ * idempotency key, which is what "answered-invoice-{key}-{cycle}" was. Stripe rejected the second
+ * close outright with a parameter-mismatch 400, and the cycle became permanently unclosable for 24
+ * hours. Stripe is the authority on what exists in Stripe, so ask it, then fall back to creating
+ * one under a key that includes every parameter that can vary.
+ */
+async function findOrCreateDraft(customerId, key, cycle) {
+  const list = await stripe.listInvoices({ customer: customerId, status: 'draft', limit: 20 });
+  const existing = (list.data || []).find((i) => i.metadata?.answered_cycle === cycle
+    && i.metadata?.answered_account_key === key);
+  if (existing) return existing;
+  return stripe.createDraftInvoice(customerId, {
+    description: `Answered, outcomes for ${cycle}. Every line is an outcome you can see on your statement.`,
+    metadata: { answered_account_key: key, answered_cycle: cycle },
+  }, `answered-invoice-${key}-${cycle}-${customerId}`);
 }
 
 // ── the webhook ──────────────────────────────────────────────────────────────────────────────────
@@ -186,6 +227,17 @@ export const handler = async (event) => {
       case 'close': {
         if (!key) return bad(400, 'close needs an account_key');
         const cycle = String(body.cycle || '').trim() || new Date().toISOString().slice(0, 8) + '01';
+
+        // ★ THE ARMING CHECK COMES FIRST, BEFORE ANY WORK. It used to sit at the bottom, after the
+        // draft was built, which meant a close with nothing left to invoice returned the cheerful
+        // "nothing chargeable" 200 and never reached the disarm at all. A caller asking to charge
+        // money on a disarmed deploy must be told no by the FIRST thing that reads the request,
+        // not by the last, or the refusal depends on the state of the ledger rather than on the
+        // state of the switch.
+        if (body.confirm && !stripe.billingArmed()) {
+          return bad(409, 'confirm:true was passed but this deploy is disarmed. Nothing was drafted and nothing was charged. Set ANSWERED_BILLING_ARMED=1 to allow a charge.', { charged: false });
+        }
+
         const ctx = await context(key);
         if (!ctx || ctx.error) return bad(404, ctx?.error || 'unknown account');
 
@@ -197,22 +249,22 @@ export const handler = async (event) => {
         const total = lines.reduce((n, l) => n + l.cents, 0);
         const customer = await ensureCustomer(key, ctx);
 
-        const draft = await stripe.createDraftInvoice(customer, {
-          description: `Answered, outcomes for ${cycle}. Every line is an outcome you can see on your statement.`,
-          metadata: { answered_account_key: key, answered_cycle: cycle },
-          daysUntilDue: undefined,
-        }, `answered-invoice-${key}-${cycle}`);
+        const draft = await findOrCreateDraft(customer, key, cycle);
 
         const items = [];
         for (const l of lines) {
-          // The idempotency key is the LEDGER EVENT ID, so a retried close cannot double-bill a
-          // line even if the draft is rebuilt.
+          // The idempotency key pairs the LEDGER EVENT ID with the invoice it is going onto. The
+          // event id alone was wrong: Stripe replays a stored response for 24 hours against the
+          // same key ONLY when the parameters match, and a rebuilt draft has a different invoice
+          // id, so the second close died with a parameter-mismatch 400 instead of adding the line.
+          // Pairing them keeps the real guarantee, which is that one close cannot add the same
+          // outcome to the same invoice twice, while letting a rebuilt draft be filled at all.
           const item = await stripe.createInvoiceItem(customer, {
             amountCents: l.cents,
             description: `${l.label} — ${new Date(l.occurred_at).toISOString().slice(0, 10)}`,
             invoiceId: draft.id,
             metadata: { answered_event_id: l.id, answered_account_key: key },
-          }, `answered-item-${l.id}`);
+          }, `answered-item-${l.id}-${draft.id}`);
           items.push(item.id);
         }
         await mark(lines.map((l) => l.id), 'invoiced', draft.id);
@@ -229,10 +281,6 @@ export const handler = async (event) => {
             charged: false,
             note: 'Drafted, not charged. Nobody has been billed. Send confirm:true, with ANSWERED_BILLING_ARMED=1, to finalize and charge.',
           });
-        }
-        if (!stripe.billingArmed()) {
-          return bad(409, 'confirm:true was passed but this deploy is disarmed. The draft is saved and nothing was charged. Set ANSWERED_BILLING_ARMED=1 to allow a charge.',
-            { invoice: draft.id, total: usd(total), charged: false });
         }
         if (!ctx.card_on_file) {
           return bad(409, 'no card is on file for this account, so nothing can be charged. The draft invoice is saved.',

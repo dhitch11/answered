@@ -13,9 +13,11 @@
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   PERSONAS, personaFor, routeTable, describe,
   guardClause, guardWhole, deterministicLine, contextDigits, isAbusive,
+  noteHeader, DEFAULT_NOTE_HEADER,
 } from './personas.mjs';
 
 let pass = 0;
@@ -28,6 +30,7 @@ function t(name, fn) {
 const riley = PERSONAS.riley;
 const scout = PERSONAS.scout;
 const onboard = PERSONAS.onboard;
+const customer = PERSONAS.customer;
 
 // ── 1. RILEY IS FROZEN ──────────────────────────────────────────────────────
 // The live demo line. If any of these change, a real call and a canary pass are
@@ -107,6 +110,34 @@ t('every persona route is exported for netlify, suffixed form included', () => {
     }
   }
   assert.equal(new Set(rt).size, rt.length, 'no duplicate routes');
+});
+
+// ★ THE ASSERTION THAT REPLACES A LIVE OUTAGE.
+// answered-brain.mjs must declare config.path as a STATIC LITERAL, because
+// Netlify reads it by static analysis and silently drops anything it cannot
+// evaluate. On 2026-08-14 that exact mistake put /api/answered-brain at 404 in
+// production while the function itself answered 200 on its default route: the
+// demo line's agent was pointing at a URL that did not exist, and every build,
+// probe and unit test was green. So there are two assertions here, and they
+// are different assertions on purpose: the literal must BE a literal, and the
+// literal must MATCH the registry.
+t('config.path is a static literal, not a computed value', () => {
+  const src = readFileSync(new URL('../answered-brain.mjs', import.meta.url), 'utf8');
+  const m = src.match(/export const config = \{\s*path:\s*(\[[\s\S]*?\])/);
+  assert.ok(m, 'config.path must be written as an array literal in the file');
+  assert.ok(!/routeTable\(\)/.test(m[1]), 'a function call here is dropped by the bundler');
+  const declared = JSON.parse(m[1].replace(/'/g, '"').replace(/,(\s*\])/g, '$1'));
+  assert.deepEqual(declared, routeTable(), 'the declared routes have drifted from the registry');
+  assert.equal(declared[0], '/api/answered-brain', 'the live demo line path must be declared first');
+});
+
+t('a declared path removes the default route, so the default must not be relied on', () => {
+  // Recorded because this is the signature that identifies the failure in one
+  // curl: if /.netlify/functions/answered-brain answers while /api/answered-brain
+  // 404s, no path was registered at all.
+  const src = readFileSync(new URL('../answered-brain.mjs', import.meta.url), 'utf8');
+  assert.ok(/\/\.netlify\/functions\/answered-brain\s+->\s+200/.test(src),
+    'the outage signature must stay written down in the file');
 });
 
 // ── 3. THE FLOORS, EACH ONE FIRED AND EACH ONE HELD ─────────────────────────
@@ -206,6 +237,77 @@ t('onboard: no price, no date, no card', () => {
   fires(onboard, 'We will have you going by Monday.', 'date-promise');
   fires(onboard, 'I can take a credit card now.', 'payment');
   quiet(onboard, 'Every number is on the site, and I do not set them.');
+});
+
+// ── the customer line: the owner's numbers are his, and only his ────────────
+// This is the persona that answers for a REAL business, under rules a real
+// owner typed. Its floors have to let his truth through and stop everything
+// else, so every assertion below comes in a pair.
+
+const OWNER_RULES = [
+  'You are Dana, answering the phone for Delgado Electric.',
+  'Hours: open 7:00 to 5:00 Monday to Friday.',
+  'The owner wrote this down about pricing, and it is the only pricing you may repeat:',
+  'A diagnostic visit is $145. Panel quotes are free.',
+  'After hours a caller gets a message taken and the owner calls back.',
+].join('\n');
+const ownerCtx = (said = []) => contextDigits(customer, said, OWNER_RULES);
+
+t('customer: a price the OWNER wrote down is speakable', () => {
+  quiet(customer, 'A diagnostic visit is $145, and a panel quote is free.', ownerCtx());
+  quiet(customer, 'We are open 7:00 to 5:00, Monday through Friday.', ownerCtx());
+});
+
+t('customer: a price the owner did NOT write is not speakable', () => {
+  fires(customer, 'A diagnostic visit is $220.', 'numeral', ownerCtx());
+  fires(customer, 'We can be there at 6:45.', 'numeral', ownerCtx());
+});
+
+t('customer: a SPELLED price is held to the same allowlist as a written one', () => {
+  // the sentence with no digits in it, which is how a numeral firewall gets
+  // walked straight past
+  fires(customer, 'It is about two hundred dollars for that.', 'money-invention', ownerCtx());
+  quiet(customer, 'That one is a hundred and forty five dollars.', ownerCtx());
+});
+
+t('customer: the money floor does not eat ordinary counting', () => {
+  quiet(customer, 'One moment while I write that down.', ownerCtx());
+  quiet(customer, 'I have two quick questions for you.', ownerCtx());
+  quiet(customer, 'There is no charge to come and look.', ownerCtx());
+});
+
+t('customer: a callback is allowed because it is true, a text is not', () => {
+  quiet(customer, 'I will take a message and the owner will call you back.', ownerCtx());
+  fires(customer, 'I will text you when he is on his way.', 'message-promise', ownerCtx());
+  fires(customer, 'I can email you the quote.', 'message-promise', ownerCtx());
+});
+
+t('customer: it cannot claim to be a person and cannot claim other jobs', () => {
+  fires(customer, 'No, I am a real person here at the office.', 'ai-denial', ownerCtx());
+  fires(customer, 'We have helped hundreds of homeowners with this.', 'claim', ownerCtx());
+  quiet(customer, 'I am an AI assistant answering this line.', ownerCtx());
+});
+
+t('customer: a caller number is a read back, not an invention', () => {
+  const ctx = ownerCtx(['my number is 559 555 0148']);
+  quiet(customer, 'Got it, 5595550148, and what is the address?', ctx);
+});
+
+t('customer: the emergency branch is on a REAL line, so it ends the call', () => {
+  const d = deterministicLine(customer, 'there is smoke pouring out of the panel', 0);
+  assert.equal(d.by, 'crisis');
+  assert.equal(d.end, true);
+});
+
+t('customer: the owner rules get a header that says they win on facts', () => {
+  const h = noteHeader(customer);
+  assert.ok(/win on every fact/i.test(h), h);
+  assert.ok(/safety rules above still bind/i.test(h), h);
+  // and the three voices we author keep the opposite layering
+  for (const p of [riley, scout, onboard]) {
+    assert.equal(noteHeader(p), DEFAULT_NOTE_HEADER, p.id);
+    assert.ok(/rules above always win/.test(noteHeader(p)), p.id);
+  }
 });
 
 t('the buffered guard stops at the first bad clause and keeps what was clean', () => {

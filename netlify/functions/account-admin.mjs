@@ -1,4 +1,4 @@
-// /internal/accounts — the operator side of the accounts spine, and /api/agent-config, the
+// /internal/accounts : the operator side of the accounts spine, and /api/agent-config, the
 // resolver a voice runtime can ask "who owns this number and what does it say".
 //
 // WHY AN OPERATOR PAGE EXISTS AT ALL: turning a business on means putting a real phone number in
@@ -34,7 +34,7 @@ h2{font-size:1.05rem;margin:0 0 .3rem}p{margin:.35rem 0}.muted{color:#8B939C}.er
 label{display:block;font-size:.8rem;color:#8B939C;margin:.7rem 0 .25rem}
 input,select{width:100%;background:#0B0C0E;color:#F2F4F0;border:1px solid #2C3037;border-radius:8px;padding:.6rem .7rem;font:inherit;min-height:44px}
 button{background:#E3FF4F;color:#0B0C0E;border:0;border-radius:8px;padding:.7rem 1.2rem;font:inherit;font-weight:700;cursor:pointer;min-height:44px}
-.row{display:grid;grid-template-columns:1fr;gap:.6rem}@media(min-width:640px){.row{grid-template-columns:1fr 1fr 1fr}}
+.row{display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem}@media(min-width:640px){.row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}}
 .tag{display:inline-block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid #2C3037;border-radius:999px;padding:.15rem .55rem;color:#8B939C}
 .tag.live{color:#37C8F0;border-color:#37C8F0}.tag.wait{color:#E3FF4F;border-color:#E3FF4F}
 pre{white-space:pre-wrap;background:#0B0C0E;border:1px solid #24272C;border-radius:8px;padding:.8rem;font:12px/1.5 ui-monospace,Menlo,monospace;color:#C8CDD3;overflow-x:auto}
@@ -51,13 +51,19 @@ const LOGIN = (msg = '') => shell(`<h1>Internal</h1>
 <p style="margin-top:.9rem"><button type="submit">Enter</button></p></form></div>`);
 
 const TAG = { live: 'live', awaiting_line: 'wait' };
+// The database's status values are machine tokens. An operator page that prints AWAITING_LINE is
+// showing its schema, not its state.
+const STATUS_WORDS = {
+  draft: 'never signed in', configuring: 'writing rules', ready: 'rules done, no number',
+  awaiting_line: 'waiting on a number', live: 'live', paused: 'paused', closed: 'closed',
+};
 
 function listPage(accounts, flash) {
   const rows = accounts.map((a) => {
     const missing = humanMissing(a.missing);
     const nums = (a.numbers || []).filter((n) => n.status === 'provisioned').map((n) => n.phone);
     return `<div class="card">
-      <h2>${h(a.business_name)} <span class="tag ${TAG[a.status] || ''}">${h(a.status)}</span></h2>
+      <h2>${h(a.business_name)} <span class="tag ${TAG[a.status] || ''}">${h(STATUS_WORDS[a.status] || a.status)}</span></h2>
       <p class="muted">${h(a.owner_email)}${a.owner_phone ? ` &middot; ${h(a.owner_phone)}` : ''}${a.trade ? ` &middot; ${h(a.trade)}` : ''}</p>
       <p>${nums.length ? `Number: <b>${nums.map(h).join(', ')}</b>` : 'No number.'}
          ${a.wanted_area_code ? `<span class="muted">Wanted area code ${h(a.wanted_area_code)}</span>` : ''}</p>

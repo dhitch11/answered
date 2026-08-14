@@ -100,6 +100,7 @@ const MARK = `<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="
 const shell = (title, inner) => `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>${esc(title)}</title><style>${CSS}</style></head>
 <body><div class="wrap"><div class="top">${MARK}<span class="name">ANSWERED</span></div>${inner}</div></body></html>`;
 

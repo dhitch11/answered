@@ -120,6 +120,8 @@ await t('a booking with all four pieces records $19', async () => {
   assert.equal(r.body.cents, 1900);
   assert.equal(r.body.price, '$19.00');
   assert.equal(r.body.recorded, true);
+  assert.equal(r.body.divergence, null,
+    'the engine preview and the ledger must agree when nothing is racing; a divergence here means the preview is reading a different account state than the write');
 });
 await t('THE SAME IDEM KEY BILLS ONCE. A retried webhook is a replay, not a second charge.', async () => {
   const r = await meter({
@@ -170,10 +172,21 @@ await t('recover with a band shown before the first call bills the band', async 
   });
   assert.equal(r.body.cents, 15000, '15% of $1,000.00 is $150.00');
 });
-await t('the first hold ever is free, the second is not', async () => {
-  const a = await meter({ op: 'record', account_key: KEY, event: { kind: 'hold_gov', idem_key: uniq() } });
-  const b = await meter({ op: 'record', account_key: KEY, event: { kind: 'hold_gov', idem_key: uniq() } });
-  assert.equal(a.body.cents + b.body.cents, 2000, 'exactly one of the two is free');
+await t('the first hold ever is free, the second is not, on a virgin account', async () => {
+  // A virgin account, because "your first hold, ever" is a property of an account's whole life and
+  // cannot be re-tested on one that has already spent it.
+  const fresh = `qa-hold-${Date.now()}`;
+  await meter({ op: 'account', account_key: fresh, email: 'info@reddenda.com', business_name: 'QA, first hold. Not a customer.' });
+  const a = await meter({ op: 'record', account_key: fresh, event: { kind: 'hold_gov', idem_key: uniq() } });
+  const b = await meter({ op: 'record', account_key: fresh, event: { kind: 'hold_gov', idem_key: uniq() } });
+  assert.equal(a.body.cents, 0, 'the first hold ever is free');
+  assert.match(a.body.reason, /first hold is free/);
+  assert.equal(b.body.cents, 2000, 'the second is $20');
+  // The statement must still SHOW the list price of the free one, or the customer cannot see what
+  // they were given.
+  const s2 = await meter({ op: 'statement', account_key: fresh });
+  const freeHold = s2.body.lines.find((l) => l.cents === 0 && l.kind === 'hold_gov');
+  assert.equal(freeHold.gross_cents, 2000, 'the free hold shows its $20 list price with a $0 charge');
 });
 await t('a quiet line with no written notice is refused', async () => {
   const r = await meter({
@@ -328,12 +341,33 @@ await t('THE DISARM HOLDS: confirm:true on a disarmed deploy charges nothing', a
   assert.equal(r.body.charged, false);
   assert.match(r.body.error, /disarmed/);
 });
-await t('a voided charge never reaches the invoice', async () => {
-  const inv = await bill({ op: 'close', account_key: KEY, cycle });
+await t('A VOIDED CHARGE NEVER REACHES THE INVOICE, read back off stripe itself', async () => {
+  // Not "the close op said so". This reads the invoice out of Stripe, walks its actual line items,
+  // and checks the voided event id is on none of them. A close that reported the right total while
+  // quietly billing a dead charge would pass the earlier assertion and fail this one.
+  assert.ok(draftId, 'the close test must have produced a draft');
+  const res = await fetch(`https://api.stripe.com/v1/invoices/${draftId}?expand[]=lines.data`, {
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+  });
+  const inv = await res.json();
+  assert.equal(inv.status, 'draft', 'nothing was finalized, so nobody could be charged');
+
   const s = await meter({ op: 'statement', account_key: KEY });
-  const voided = s.body.lines.filter((l) => l.state === 'voided').reduce((n, l) => n + l.gross_cents, 0);
-  assert.ok(voided > 0, 'the test voided something, so this should be non zero');
-  assert.equal(inv.body.total_cents === undefined ? 0 : inv.body.total_cents >= 0, true);
+  const voided = s.body.lines.filter((l) => l.state === 'voided');
+  assert.ok(voided.length > 0, 'the void test ran first, so there is a dead charge to look for');
+  const voidedIds = new Set(voided.map((l) => l.id));
+  const voidedGross = voided.reduce((n, l) => n + l.gross_cents, 0);
+  assert.ok(voidedGross > 0, 'the dead charge had a real price before it died');
+
+  const billedIds = (inv.lines?.data || []).map((li) => li.metadata?.answered_event_id).filter(Boolean);
+  const leaked = billedIds.filter((id) => voidedIds.has(id));
+  assert.deepEqual(leaked, [], `a voided event reached the invoice: ${leaked.join(', ')}`);
+
+  const live = s.body.lines.filter((l) => ['open', 'invoiced'].includes(l.state))
+    .reduce((n, l) => n + l.cents, 0);
+  assert.equal(inv.amount_due, live,
+    `stripe's amount_due ${inv.amount_due} must equal the live lines ${live}, with the voided ${voidedGross} nowhere in it`);
+  console.log(`       stripe amount_due ${inv.amount_due}, ledger live lines ${live}, voided ${voidedGross} excluded`);
 });
 
 // ── the webhook door ─────────────────────────────────────────────────────────────────────────────

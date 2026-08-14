@@ -1,4 +1,4 @@
-// /account — where a business owner signs in, writes the rules his line answers by, and asks for
+// /account : where a business owner signs in, writes the rules his line answers by, and asks for
 // a number.
 //
 // FIVE THINGS ABOUT THIS FILE
@@ -61,10 +61,18 @@ label{display:block;font-size:.82rem;color:#8B939C;margin:.9rem 0 .3rem;letter-s
 input,select,textarea{width:100%;background:#0B0C0E;color:#F2F4F0;border:1px solid #2C3037;border-radius:9px;padding:.7rem .8rem;font:inherit;font-size:.95rem;min-height:44px}
 textarea{min-height:6rem;resize:vertical}
 input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #E3FF4F;outline-offset:2px}
-.row{display:grid;grid-template-columns:1fr;gap:.6rem}
-@media(min-width:600px){.row{grid-template-columns:1fr 1fr}}
-.hours{display:grid;grid-template-columns:5.5rem 1fr 1fr;gap:.5rem;align-items:center;margin:.4rem 0}
-.hours span{font-size:.85rem;color:#8B939C}
+/* ★ minmax(0,1fr), never 1fr. A bare 1fr is minmax(AUTO,1fr), and the auto floor is the item's
+   min-content width. An input[type=time] has a wide intrinsic minimum, so three "equal" columns
+   silently grew past the viewport: 402px of content in a 390px window, with every element still
+   reporting a sensible width of its own. Nothing but a screenshot and a scrollWidth read catches
+   this, which is why both are in the check. */
+.row{display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem}
+@media(min-width:600px){.row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.hours{display:grid;grid-template-columns:4.5rem minmax(0,1fr) minmax(0,1fr);gap:.4rem;align-items:center;margin:.4rem 0}
+.hours span{font-size:.8rem;color:#8B939C}
+.hours input{padding:.6rem .4rem;min-width:0}
+@media(min-width:420px){.hours{grid-template-columns:5.5rem minmax(0,1fr) minmax(0,1fr);gap:.5rem}
+  .hours input{padding:.7rem .8rem}.hours span{font-size:.85rem}}
 button{background:#E3FF4F;color:#0B0C0E;border:0;border-radius:9px;padding:.8rem 1.4rem;font:inherit;font-weight:700;cursor:pointer;min-height:44px}
 button.quiet{background:transparent;color:#8B939C;border:1px solid #2C3037;font-weight:500}
 ul{margin:.4rem 0;padding-left:1.1rem}
@@ -129,7 +137,7 @@ function consolePage(a, flash) {
     + options.map(([v, t]) => `<option value="${h(v)}"${v === value ? ' selected' : ''}>${h(t)}</option>`).join('')
     + '</select>';
 
-  return page(`${a.business_name} — Answered`, `
+  return page(`${a.business_name} on Answered`, `
 ${flash ? `<p class="${flash.kind === 'err' ? 'err' : 'ok'}">${h(flash.text)}</p>` : ''}
 
 <h1>${h(a.business_name)}</h1>

@@ -1,4 +1,4 @@
-// /api/account-voice — the inbound webhook a CUSTOMER's number points at.
+// /api/account-voice : the inbound webhook a CUSTOMER's number points at.
 //
 // This is the whole point of the accounts lane. The demo line at /api/answered-voice bridges every
 // caller to one agent with one hardcoded persona. This one asks the database who owns the number

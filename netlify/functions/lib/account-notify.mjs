@@ -1,4 +1,4 @@
-// account-notify.mjs — the email and the CRM write that ride along with every account event.
+// account-notify.mjs : the email and the CRM write that ride along with every account event.
 //
 // Two rules shape this file.
 //

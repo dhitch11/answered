@@ -96,6 +96,7 @@ FOOT = f'''<footer class="foot">
       <div>
         <h4>Company</h4>
         <ul>
+          <li><a href="/account">Your account</a></li>
           <li><a href="/setup.html">How you set it up</a></li>
           <li><a href="/pricing.html">Pricing</a></li>
           <li><a href="/trust.html">Trust and guardrails</a></li>
@@ -290,16 +291,45 @@ STATES = [
               '<span data-callgate-off>A real call is placed to it every two hours, and every call '
               'button on this site reads that check before it hands you a number. That is why you '
               'sometimes get a list button here instead of a phone number.</span>'),
+    # 2026-08-14, @LANE-SITE-TRUTH, SECOND WRITE OF THE DAY. This row said "there is
+    # nothing to sign up for and no account to make, because neither one exists", and
+    # that stopped being true a few hours after it shipped. @ANSWERED-ACCOUNTS landed
+    # the account spine and posted 68 checks against the real production database.
+    # MEASURED HERE, THROUGH THE SERVING PATH, BEFORE REWRITING THE ROW: live prod
+    # answers /account with 200 and a real sign-in page, and /api/account/start and
+    # /api/meter both answer 405 to a GET, so they are deployed and method-gated
+    # rather than missing.
+    #
+    # A DISCLOSURE THAT UNDERSTATES IS STILL A DISCLOSURE THAT IS WRONG, and this is
+    # the exact rot the switchboard was built to stop: one row goes stale, four pages
+    # keep printing it, and the company is now lying about being smaller than it is.
+    # It stays NOT YET because the reader's question on this row is "is my line being
+    # answered", and until a person assigns the number the answer to that is still no.
+    # account.mjs says so in its own header: "Assigning a phone number is a human step
+    # today." The row says the same thing in the same words.
     dict(key='lines', name='Business lines', live=False,
-         short='no business line is on the system yet',
-         body='No customer line is on this system yet. The first ones go on one at a time, by hand, '
-              'with a person on the phone with you. There is nothing to sign up for and no account '
-              'to make, because neither one exists.'),
+         short='an account and your rules exist today, and a person assigns the number by hand',
+         body='You can make an account today, write the rules your line answers by, and ask for a '
+              'number. What a person still does by hand is assign the number itself, and we would '
+              'rather tell you that than show you a spinner. Until it is assigned your line is '
+              'unchanged, and nothing is answering for you.'),
+    # 2026-08-14, @LANE-BILLING. THIS ROW WAS TRUE THIS MORNING AND IS NOT TRUE
+    # TONIGHT, so it is rewritten rather than left standing. The meter now exists:
+    # it rates an outcome against the list on /terms, it caps a bill at the cap,
+    # it records the free events beside the paid ones, and a customer can kill a
+    # charge from their own statement. What still does not exist is the moment of
+    # payment. There is no card field on this site, the switch that would let a
+    # card be charged is off, and turning it on is a deliberate act by a person.
+    # The row stays NOT YET because the reader's question is "can this take my
+    # money", and the answer to that is still no.
     dict(key='billing', name='Billing', live=False,
-         short='nothing on this site can charge you',
-         body='Nothing on this site can charge you. There is no card field anywhere in it and no '
-              'meter is running. Every price here was published before we could take a single '
-              'dollar, which is the order we wanted it in.'),
+         short='the meter runs, and nothing on this site can charge you',
+         body='The meter is running. Every outcome is priced against the list on the terms page, '
+              'capped, and written down with the reason beside it, including the ones that cost '
+              'you nothing. What does not exist yet is the moment you pay. There is no card field '
+              'anywhere on this site, and the switch that would let a card be charged is off. Every '
+              'price here was published before we could take a single dollar, which is the order we '
+              'wanted it in.'),
     dict(key='texting', name='Texting', live=False,
          short='texting is not switched on, so what you ask for arrives by email',
          body='Our messaging program is not approved by the carriers yet, so we are not sending '
@@ -308,7 +338,15 @@ STATES = [
               'on one that cannot arrive.'),
 ]
 
-_SB_HEAD = 'What is on, and what is not'
+# THE CAPTION IS SHORT BECAUSE 320 IS REAL. At 27 characters this label wrapped
+# to THREE mono lines inside a 248px table at 320px wide, against a date sitting
+# on one, which reads as a broken header rather than a caption. The section
+# heading above already says the long version, so the caption only has to name
+# the object. MEASURED, at 320, twice: 'What is on, and what is not' took three
+# lines, 'What is on' still took two against a 16-character date, and one word
+# takes one. This is the kind of defect that passes every assertion and is only
+# ever visible in a screenshot.
+_SB_HEAD = 'State'
 
 
 def state_table(dark=False, delay='d2', top=26):
@@ -730,12 +768,20 @@ PRICING = '''
       <summary>Quality failures refund themselves before you notice.</summary>
       <div class="disc-body"><p>A nightly check re-reads every booking. A wrong address, a slot already taken, a callback never logged. Those reverse automatically and tell you why.</p></div>
     </details>
+    <details class="disc rv d3">
+      <summary>What happens at the moment you pay.</summary>
+      <div class="disc-body"><p>Nothing is charged as it happens. Every outcome goes on a running statement of your own, priced against the list on the <a href="/terms.html" style="color:var(--bronze-2)">terms page</a>, with the free ones shown beside the paid ones. At the end of the month that statement becomes one bill for one number. You see it before it is charged, and any line on it can be voided until it is.</p></div>
+    </details>
+    <details class="disc rv d3">
+      <summary>Which of these is running today, and which is not.</summary>
+      <div class="disc-body"><p>Running now: the price of every outcome, the cap, the free first hold, the four pieces a job needs before it can cost you anything, and the VOID button on your statement. Not running yet: the nightly re-read described above, and the moment of payment itself. There is no card field on this site and the switch that would let a card be charged is off.</p></div>
+    </details>
     <!-- Same disclosure the trust page carries, because these four are written
          in the present tense about a meter that has not billed anybody yet.
          They are the terms we are binding ourselves to, which is a different
          kind of statement from a measurement, and a reader is entitled to know
          which one he is reading before he reads four of them. -->
-    <p class="src rv d3" style="margin-top:22px;max-width:74ch">Stated 2026-08-13. These are the terms of the meter, written before it has billed anybody: no customer line is running yet, so none of them is a measurement. What is live today is on the <a href="/trust.html" style="color:var(--bronze-2)">trust page</a>.</p>
+    <p class="src rv d3" style="margin-top:22px;max-width:74ch">Stated 2026-08-14. These are the terms of the meter. The meter itself is running and writing them down, and it has still billed nobody, because no customer line is on the system yet, so none of these is a measurement. What is live today is on the <a href="/trust.html" style="color:var(--bronze-2)">trust page</a>.</p>
   </div>
 </section>
 
@@ -1516,7 +1562,8 @@ def _texting_guard():
     # Rendering it is not the same as it surviving to the file. A block that
     # silently stops emitting is the worst outcome available here, because every
     # sentence it was covering keeps shipping and nobody downstream knows.
-    must_carry = {'pricing.html': _SB_HEAD, 'trust.html': _SB_HEAD, 'terms.html': _SB_HEAD,
+    _TABLE = 'id="state-billing"'   # only state_table() can emit this
+    must_carry = {'pricing.html': _TABLE, 'trust.html': _TABLE, 'terms.html': _TABLE,
                   'recover.html': 'Stated ' + STATE_DATE, 'thanks.html': 'Stated ' + STATE_DATE,
                   'privacy.html': 'Stated ' + STATE_DATE, 'recording.html': 'Stated ' + STATE_DATE}
     for pg, needle in must_carry.items():

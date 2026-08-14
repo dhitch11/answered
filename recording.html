@@ -1,10 +1,13 @@
 <!doctype html>
-<!-- STANDALONE PAGE. Not emitted by _build.py, and its chrome normalizer, extensionless
-     rewriter and asset-version stamper do not touch this file (their PAGES lists do not
-     include it). The nav/footer below is a byte copy of the emitted chrome in trust.html
-     (minus aria-current, plus the legal cluster links in the footer base). AT INTEGRATION:
-     add recording.html to _build.py's guard PAGES, _extensionless() and _asset_version()
-     lists so the chrome and ?v= stamps stay in sync from then on.
+<!-- STANDALONE PAGE, GENERATED CHROME. The body below is hand written and stays that
+     way. Everything around it is now owned by _build.py: the nav, the footer, the
+     extensionless links, the ?v= asset stamps, and the block between the
+     STATE:START and STATE:END markers. Run `python3 _build.py` after editing this file.
+     WHY THIS CHANGED, 2026-08-14: the integration note that used to sit here was never
+     done, so this page's footer was a byte copy of the chrome as it stood the day the
+     page was written, and it had silently fallen FIVE links behind: /parley, /setup,
+     /terms, /privacy and /recording were all missing from it. A hand copy of shared
+     chrome is a copy that is already going out of date.
      This is the page a caller can be sent to after a call with the AI. Keep it readable
      by someone who is mildly annoyed and on a phone. -->
 <html lang="en">
@@ -87,7 +90,7 @@
     <h2 class="h2 rv d1" style="margin-top:16px">Demo line calls: 30 days. Then gone.</h2>
     <p class="lede rv d2" style="margin-top:20px;max-width:62ch">Calls to our demo line are kept for 30 days and then deleted. That is the retention actually configured on the demo line today, not a rounded number invented for this page. Business lines are not live yet; when they are, their retention prints on the <a href="/privacy">Privacy page</a> before the first call is taken.</p>
     <p class="rv d2" style="margin-top:16px;max-width:62ch">If you want your call gone sooner, ask. We delete it, including our copies, and we tell you when it is done.</p>
-<!-- STATE:START -->  <p class="src rv d3" style="margin-top:16px;max-width:66ch;">Stated 2026-08-14: no business line is on the system yet. The whole line between what runs today and what does not is <a href="/pricing#state">on the pricing page</a>.</p>
+<!-- STATE:START -->  <p class="src rv d3" style="margin-top:16px;max-width:66ch;">Stated 2026-08-14: an account and your rules exist today, and a person assigns the number by hand. The whole line between what runs today and what does not is <a href="/pricing#state">on the pricing page</a>.</p>
 <!-- STATE:END -->
 
   </div>
@@ -122,6 +125,7 @@
       <div>
         <h4>Company</h4>
         <ul>
+          <li><a href="/account">Your account</a></li>
           <li><a href="/setup">How you set it up</a></li>
           <li><a href="/pricing">Pricing</a></li>
           <li><a href="/trust">Trust and guardrails</a></li>

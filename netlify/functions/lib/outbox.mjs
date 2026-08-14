@@ -262,15 +262,27 @@ export async function webhook(eventName, payload) {
 // remote images, no tracking pixel: an email that phones home is an email a contractor's spam
 // filter throws away, and we do not need to know when he opened it.
 
+/**
+ * ★ MEASURED AT 390px, AND THE FIRST VERSION OVERFLOWED BY 37 PIXELS.
+ * The detail-rows table had no width and no layout algorithm, so it sized itself to its content
+ * and pushed 409px of table through a 354px column. A phone shows that as a body you have to drag
+ * sideways to read, which on a job receipt is the difference between a contractor trusting the
+ * thing and deleting it. Three properties fix it and all three matter:
+ *   width:100%          stop shrink-to-fit sizing the table to its widest cell
+ *   table-layout:fixed  honour the declared column width instead of the content's opinion
+ *   overflow-wrap:anywhere  a long street address or a job id has to be allowed to break
+ * `width` is also set on the label cell as an attribute-style value because Outlook's Word engine
+ * ignores table-layout and needs the column width stated outright.
+ */
 export function shell({ title, intro, rows = [], body = '', footer = '', cta = null }) {
   const line = (label, value) =>
-    `<tr><td style="padding:7px 20px 7px 0;color:#6B6459;vertical-align:top;white-space:nowrap;font-size:13px">${esc(label)}</td>` +
-    `<td style="padding:7px 0;color:#0B0C0E;font-size:15px"><b>${esc(value)}</b></td></tr>`;
+    `<tr><td width="96" style="width:96px;padding:7px 16px 7px 0;color:#6B6459;vertical-align:top;font-size:13px;overflow-wrap:anywhere">${esc(label)}</td>` +
+    `<td style="padding:7px 0;color:#0B0C0E;font-size:15px;overflow-wrap:anywhere"><b>${esc(value)}</b></td></tr>`;
   return [
     '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0B0C0E;max-width:640px">',
     `<h2 style="font-size:19px;margin:0 0 10px;font-weight:700">${esc(title)}</h2>`,
     intro ? `<p style="margin:0 0 18px;color:#3A3730">${intro}</p>` : '',
-    rows.length ? `<table style="border-collapse:collapse;margin:0 0 18px">${rows.map((r) => line(r[0], r[1])).join('')}</table>` : '',
+    rows.length ? `<table width="100%" style="width:100%;table-layout:fixed;border-collapse:collapse;margin:0 0 18px">${rows.map((r) => line(r[0], r[1])).join('')}</table>` : '',
     body,
     cta ? `<p style="margin:22px 0"><a href="${esc(cta.href)}" style="background:#0B0C0E;color:#E3FF4F;text-decoration:none;padding:13px 22px;border-radius:8px;font-weight:700;display:inline-block">${esc(cta.label)}</a></p>` : '',
     footer ? `<p style="font-size:12.5px;color:#6B6459;margin:24px 0 0;padding-top:14px;border-top:1px solid #E4E8E2">${footer}</p>` : '',

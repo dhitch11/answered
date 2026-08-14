@@ -97,10 +97,19 @@ function build({ callSid, from, to, startedAt, seconds, disposition, summary, li
     callSid ? ['Call', callSid] : null,
   ].filter(Boolean);
 
+  // ★ A TABLE, NOT AN INLINE-BLOCK LABEL. Rendered at 390px and looked at: a `min-width` span
+  // reserves its width on the FIRST line only, so every wrapped line of a long sentence ran back
+  // under the speaker label and the two columns stopped being columns. Email clients also drop
+  // flex and grid, so the layout that survives Gmail, Outlook and Mail is a table with a fixed
+  // first cell. This is the difference between a transcript a contractor can skim in a truck and
+  // one he has to re-read to work out who said what.
   const transcriptHtml = lines.length
-    ? `<div style="border:1px solid #D7DBD3;border-radius:9px;padding:4px 14px;margin:0 0 18px;background:#F7F8F5">${
-      lines.map((l) => `<p style="margin:11px 0"><span style="display:inline-block;min-width:74px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#57534B;font-weight:700;vertical-align:top">${out.esc(l.who || '')}</span> <span style="color:#0B0C0E">${out.esc(l.text)}</span></p>`).join('')
-    }</div>`
+    ? `<table width="100%" style="width:100%;table-layout:fixed;border-collapse:collapse;border:1px solid #D7DBD3;border-radius:9px;margin:0 0 18px;background:#F7F8F5">${
+      lines.map((l) => '<tr>'
+        + `<td width="80" style="width:80px;padding:9px 10px 9px 14px;vertical-align:top;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#57534B;font-weight:700">${out.esc(l.who || '')}</td>`
+        + `<td style="padding:9px 14px 9px 0;vertical-align:top;color:#0B0C0E;overflow-wrap:anywhere">${out.esc(l.text)}</td>`
+        + '</tr>').join('')
+    }</table>`
     : `<p style="margin:0 0 18px;padding:12px 14px;background:#FFF8D6;border-left:3px solid #0B0C0E;font-size:14px"><b>No transcript was captured for this call.</b><br>${out.esc(missingReason || 'No reason was recorded, which is itself a defect worth chasing.')}</p>`;
 
   const extras = [];

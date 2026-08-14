@@ -203,4 +203,11 @@ export default async (req) => {
   return new Response(render(job, token), { status: 200, headers: HEAD });
 };
 
-export const config = { path: ['/job/:token', '/job/:token/calendar.ics'] };
+// ★ A SPLAT, NOT `/job/:token`, AND THE REASON IS THE TOKEN'S SHAPE.
+// A job token is `v1.<payload>.<signature>`, so it carries dots, and whether a `:param` segment
+// matches a dotted value is a property of the router's URLPattern implementation rather than of
+// this code. I cannot test Netlify's router from a workstation, and the failure mode is silent:
+// the route simply would not match and every emailed booking link would 404, after the customer
+// had already been told to click it. A splat cannot have that argument with anyone. The handler
+// parses the pathname itself either way, so nothing above depends on a captured parameter.
+export const config = { path: '/job/*' };

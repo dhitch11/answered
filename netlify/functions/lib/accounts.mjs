@@ -1,4 +1,4 @@
-// accounts.mjs — the customer spine: identity, rules, and the path to a real line.
+// accounts.mjs : the customer spine: identity, rules, and the path to a real line.
 //
 // Everything here goes through the same security-definer RPCs the call spine uses (db.mjs), so
 // there is exactly one door into the database and it needs a secret held only in the Netlify
@@ -35,6 +35,16 @@ export const startAccount = (row) => rpc('sv_account_start', {
 export const consumeToken = (tokenHash, ip) =>
   rpc('sv_account_consume_token', { p_token_hash: tokenHash, p_ip: ip || '' });
 
+/**
+ * Mark a link as having actually left the building.
+ *
+ * ★ This is what the rate limiter counts. It used to count tokens ISSUED, and a token row is
+ * written before the send is attempted, so five failed sends filled the budget and the sixth
+ * attempt was answered "check your email" without trying to send anything at all. A failed send
+ * must never look like a delivered one, least of all to the rate limiter.
+ */
+export const markTokenSent = (tokenHash) => rpc('sv_account_token_sent', { p_token_hash: tokenHash });
+
 export const getAccount = (id) => rpc('sv_account', { p_account_id: id });
 
 export const saveConfig = (id, patch, author) =>
@@ -48,6 +58,17 @@ export const assignNumber = (id, phone, twilioSid, actor) =>
 
 export const listAccounts = (status = null, limit = 100) =>
   rpc('sv_accounts', { p_status: status, p_limit: limit });
+
+/**
+ * Point this business at its row in the billing lane's ledger.
+ *
+ * The two lanes key customers differently: this one by uuid, billing_accounts by a text
+ * account_key. THE CONTRACT, posted in .terminal-claims.md: accounts.id is the customer's
+ * identity, and an Answered customer's billing account_key is the text of that uuid. Until the
+ * billing lane creates a row, this stays null, which is the true state and not an error.
+ */
+export const linkBilling = (id, billingAccountKey) =>
+  rpc('sv_account_link_billing', { p_account_id: id, p_billing_account_key: billingAccountKey });
 
 /**
  * The voice seam. A dialled number in, that business's rules out, or null.

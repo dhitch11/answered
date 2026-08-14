@@ -159,11 +159,28 @@ export function normalize(input) {
 
 // ── token ────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * MEASURED SIZES, so nobody is surprised by a long link later: a realistic job (shop, customer,
+ * phone, street address, one line of notes) mints at about 680 characters, and a job with EVERY
+ * field pushed to its cap mints at about 2,100. Both are far inside what browsers, Netlify's
+ * router and email clients carry, and the reader never sees the string because it sits behind a
+ * button. MAX_TOKEN_CHARS is the hard stop that turns "too big" into a loud throw rather than a
+ * link that silently truncates in somebody's mail client.
+ *
+ * Empty fields are dropped before signing. A job with no notes, no address and no email carried
+ * `"n":"","a":"","ce":""` in every token, which is pure weight in a string whose whole job is to
+ * survive being pasted. Every reader here already treats a missing field and an empty one the
+ * same way, so this is invisible to the rest of the system.
+ */
 export function mint(job) {
   if (!canSign()) throw new Error('booking: no signing key (set ANSWERED_BOOKING_KEY)');
-  const payload = b64u(Buffer.from(JSON.stringify(job), 'utf8'));
+  const lean = {};
+  for (const [k, v] of Object.entries(job)) if (v !== '' && v !== null && v !== undefined) lean[k] = v;
+  const payload = b64u(Buffer.from(JSON.stringify(lean), 'utf8'));
   const token = `${TOKEN_VERSION}.${payload}.${mac(payload)}`;
-  if (token.length > MAX_TOKEN_CHARS) throw new Error('booking: job is too large to fit in a link');
+  if (token.length > MAX_TOKEN_CHARS) {
+    throw new Error(`booking: this job needs ${token.length} characters and the link cap is ${MAX_TOKEN_CHARS}; shorten the notes or the address`);
+  }
   return token;
 }
 

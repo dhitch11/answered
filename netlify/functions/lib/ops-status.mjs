@@ -56,8 +56,38 @@ export const ROUTES = [
   { path: '/api/truce',            kind: 'api', expect: [405, 400, 200], what: 'The text negotiation engine.' },
   { path: '/api/call-me',          kind: 'api', expect: [405, 400, 200], what: 'One click activation.' },
 
+  // ── accounts, booking and money. Added 2026-08-14 as those lanes landed. ──
+  // Every one of these is POST only and answers 405 to the GET this sweep
+  // makes, which was checked in the source before it was added here. Nothing in
+  // this list can be probed into doing something.
+  { path: '/account',              kind: 'page', expect: [200, 302, 401], what: 'The customer console.' },
+  { path: '/account/enter',        kind: 'page', expect: [200, 302, 401, 405], what: 'Customer sign in.' },
+  { path: '/api/account/start',    kind: 'api', expect: [405, 400, 200], what: 'Signup.' },
+  { path: '/api/account/save',     kind: 'api', expect: [405, 400, 401, 200], what: 'Saves a customerrule set.' },
+  { path: '/api/account/request-line', kind: 'api', expect: [405, 400, 401, 200], what: 'A customer asking for their own number.' },
+  { path: '/api/account-voice',    kind: 'api', expect: [405, 403, 200], what: 'The voice webhook for a customer line.' },
+  { path: '/api/booking',          kind: 'api', expect: [405, 400, 200], what: 'A booked job, which is the billable event.' },
+  { path: '/api/billing',          kind: 'api', expect: [405, 400, 401, 200], what: 'Billing.' },
+  { path: '/api/billing/webhook',  kind: 'api', expect: [405, 400, 401, 200], what: 'The payment processor webhook.' },
+  { path: '/api/meter',            kind: 'api', expect: [405, 400, 401, 200], what: 'Usage metering.' },
+  { path: '/api/statement',        kind: 'api', expect: [405, 400, 200], what: 'The bill, itemised.' },
+  { path: '/api/recap',            kind: 'api', expect: [405, 400, 200], what: 'The after call recap.' },
+  { path: '/api/el-postcall',      kind: 'api', expect: [405, 403, 200], what: 'The ElevenLabs post call hook.' },
+  { path: '/api/agent-config',     kind: 'api', expect: [405, 400, 401, 200], what: 'Per customer agent configuration.' },
+  { path: '/account/signout',      kind: 'page', expect: [200, 302, 303, 405], what: 'Customer sign out. Harmless to probe with no cookie.' },
+  { path: '/api/call-me/twiml',    kind: 'api', expect: [405, 403, 200], what: 'What Twilio asks for when a person picks up an activation call.' },
+  { path: '/api/call-me/status',   kind: 'api', expect: [405, 403, 200], what: 'Activation call state changes.' },
+
+  // DECLARED, DELIBERATELY NOT PROBED. A sweep must never be able to cause the
+  // thing it is watching. This route runs a real synchronisation into the call
+  // spine on a bare GET, so probing it every ten minutes would make the monitor
+  // a participant. Its health is covered by its own schedule and its own logs.
+  { path: '/api/consent-sync',     kind: 'api', probe: false,
+    what: 'Mirrors one click consent into the call spine. Runs on its own schedule; a GET would execute it, so the sweep leaves it alone.' },
+
   { path: '/internal',             kind: 'gate', expect: [200, 503], what: 'The site directory. Must serve the PIN form and nothing else.' },
   { path: '/internal/cockpit',     kind: 'gate', expect: [200, 503], what: 'The call console. Must serve the PIN form and nothing else.' },
+  { path: '/internal/accounts',    kind: 'gate', expect: [200, 503], what: 'The accounts admin. Must serve the PIN form and nothing else.' },
   // The watch checks the operating view too. A monitor that never checks itself
   // is one more thing that can die quietly. /internal/ops skips this row when it
   // sweeps, because a page probing itself is a loop, not a measurement.
@@ -269,6 +299,10 @@ async function sweepRoutes(base, timeoutMs, selfPath) {
   if (!base) return [];
   return Promise.all(ROUTES.map(async (route) => {
     if (route.path === selfPath) return { ...route, skipped: 'this page', landed: true, ok: true, status: null, ms: 0 };
+    // Marked probe:false because a request to it would DO something. Reported
+    // as skipped with the reason, never as a pass, so the page cannot imply it
+    // was checked.
+    if (route.probe === false) return { ...route, skipped: 'not probed on purpose', landed: true, ok: true, status: null, ms: 0 };
     const t0 = Date.now();
     try {
       const r = await fetch(base + route.path, {

@@ -395,8 +395,16 @@ export default async () => {
     console.error('ANSWERED CANARY: blob write FAILED, the gate cannot see this run: ' + String(e && e.message).slice(0, 140));
   }
 
+  // Three outcomes, three log lines. "it passed" and "it passed but the gate
+  // will never see it" are not the same event, and a log that calls the second
+  // one RED sends somebody looking for a broken phone that is not broken.
   if (record.ok && record.store_writable) {
-    console.log('answered-canary GREEN call_sid=' + record.call_sid + ' conversation_id=' + record.conversation_id);
+    console.log('answered-canary GREEN call_sid=' + record.call_sid + ' conversation_id=' + record.conversation_id
+      + ' first_sentence=' + JSON.stringify(String(record.first_sentence || '').slice(0, 120)));
+  } else if (record.ok) {
+    console.error('ANSWERED CANARY PASSED BUT UNRECORDED: the call was placed, answered and the disclosure was spoken, '
+      + 'but the result could not be written to the store, so /api/demo-health cannot see it and will go red on staleness. '
+      + 'call_sid=' + record.call_sid);
   } else {
     console.error('ANSWERED CANARY RED: ' + JSON.stringify(record));
   }

@@ -28,6 +28,20 @@ const server = http.createServer(async (req, res) => {
   const headers = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : v]));
 
   try {
+    // The real site serves /assets. The harness must too, or the statement's four @font-face
+    // requests 404 and every console-error assertion fails on a defect this server invented.
+    if (url.pathname.startsWith('/assets/')) {
+      const { readFile } = await import('node:fs/promises');
+      const { join, extname } = await import('node:path');
+      try {
+        const buf = await readFile(join(process.cwd(), url.pathname.replace(/^\//, '').split('?')[0]));
+        const type = { '.woff2': 'font/woff2', '.css': 'text/css', '.js': 'text/javascript' }[extname(url.pathname)] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': type });
+        res.end(buf);
+      } catch { res.writeHead(404); res.end('not found'); }
+      return;
+    }
+
     // v2 functions declare their own paths; mirror exactly what config.path says.
     if (url.pathname === '/api/statement' || url.pathname.startsWith('/statement/')) {
       const request = new Request(`http://localhost:${PORT}${req.url}`, {

@@ -90,8 +90,15 @@ export async function meterAndRecord(key, event) {
       product: rating.product || null,
       label: rating.label || null,
       occurred_at: event.occurred_at || new Date().toISOString(),
-      // The engine's price BEFORE cap and credit. The ledger applies both, atomically.
+      // TWO NUMBERS, NOT ONE, AND THE DIFFERENCE BETWEEN THEM IS A PROMISE.
+      // gross_cents is the LIST price from /terms, which the statement shows so a customer can see
+      // what an event normally costs. charge_cents is what the engine says to actually charge,
+      // which is lower whenever a published exception applies: the first hold ever is free, a
+      // booking missing one of its four pieces is free, money that landed outside the window is
+      // free. Recording the list price as the charge, which is what happened before this line
+      // existed, billed $20.00 for the free first hold on a real qa account.
       gross_cents: rating.gross_cents || 0,
+      charge_cents: typeof rating.cents === 'number' ? rating.cents : 0,
       counts_toward_cap: Boolean(rating.counts_toward_cap),
       credit_created_cents: rating.creates_credit_cents || 0,
       rated_ok: rating.ok !== false,
