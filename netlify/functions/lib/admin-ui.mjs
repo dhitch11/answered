@@ -1149,6 +1149,21 @@ VIEWS.crm = async () => {
   const f = S.filters.crm;
   const qs = crmQuery(f, 50, f.offset);
 
+  // ★ IS THE BOOK NARROWED RIGHT NOW? This mirrors crmQuery EXACTLY and must keep mirroring it: an
+  // empty table has to say WHY it is empty, and the two wrong answers are equally bad. Claiming
+  // "measured zero" while a filter is hiding every row is a lie about the data; claiming "nothing
+  // matches that filter" when no filter is set sends an operator hunting for a filter to clear.
+  //
+  // The subtle one is suppression. crmQuery sends suppressed=false when the state is null, so the
+  // DEFAULT view is already narrowed even though the operator set nothing. That is the right
+  // default (a do-not-contact lead should not appear in a working list by accident) but it means a
+  // bare "measured zero" would be hiding a condition the operator never chose, so it gets named
+  // below rather than left implicit.
+  const hidesSuppressed = f.suppressed !== 'any' && f.suppressed !== 'true';
+  const anyFilter = Boolean(S.q)
+    || ['disposition', 'state', 'trade', 'line_type', 'lane', 'reach', 'enriched'].some((k) => f[k])
+    || f.suppressed != null;
+
   const [d, facets] = await Promise.all([
     api('crm?' + qs),
     S.facets ? Promise.resolve(S.facets) : api('crm/facets'),
@@ -1233,7 +1248,13 @@ VIEWS.crm = async () => {
       (anyFilter
         ? emptyState('Nothing matches that filter',
             'Measured ' + esc(stamp(S.lastMeasuredAt)) + '. Clear the filters to see the whole book.')
-        : measuredZero('leads')) + '</div>';
+        : hidesSuppressed
+          ? emptyState('No leads to work',
+              'This is a measured zero, not a loading state and not a failure. The query ran and ' +
+              'returned nothing. One condition is on that you did not set: leads marked do-not-contact ' +
+              'are hidden by default. Set Suppressed to Any to see whether the book is empty or ' +
+              'entirely suppressed. Measured ' + esc(stamp(S.lastMeasuredAt)) + '.')
+          : measuredZero('leads')) + '</div>';
   }
 
   const sel = S.selected;

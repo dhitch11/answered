@@ -128,6 +128,12 @@
    "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
   },
   {
+   "table": "compliance_states",
+   "schema": "public",
+   "grantee": "service_role",
+   "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+  },
+  {
    "table": "compliance_training",
    "schema": "public",
    "grantee": "service_role",
@@ -309,6 +315,12 @@
   },
   {
    "table": "truce_parties",
+   "schema": "public",
+   "grantee": "service_role",
+   "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+  },
+  {
+   "table": "truce_payouts",
    "schema": "public",
    "grantee": "service_role",
    "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
@@ -2429,6 +2441,77 @@
     }
    ],
    "comment": "64.1200(d)(1) requires a written policy AVAILABLE ON DEMAND, (d)(5) a written affiliate scope, (d)(6) five-year retention. Stored as rows so \"does it exist\" is a query, not a memory."
+  },
+  {
+   "rls": true,
+   "name": "compliance_states",
+   "schema": "public",
+   "columns": [
+    {
+     "name": "state",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "reviewed",
+     "type": "boolean",
+     "comment": "Has the state's own statutory text been read for solicitor registration, bonding, artificial-voice restriction, recording consent, DNC treatment and damages exposure? False means unknown, not blocked. The difference is a work queue versus a dead lead.",
+     "default": "false",
+     "nullable": false
+    },
+    {
+     "name": "ai_voice_ok",
+     "type": "boolean",
+     "comment": null,
+     "default": "false",
+     "nullable": false
+    },
+    {
+     "name": "human_dial_ok",
+     "type": "boolean",
+     "comment": "A person dials and a person speaks, with no artificial voice anywhere on the call. This relaxes ONE thing: which line types are reachable. The registry, the window, the frequency cap, suppression and every state rule still bind.",
+     "default": "false",
+     "nullable": false
+    },
+    {
+     "name": "reason",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "statute",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "reviewed_at",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "reviewed_by",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "updated_at",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": "now()",
+     "nullable": false
+    }
+   ],
+   "comment": "Rendered by /admin, owned by the outbound lane. research/lib/lane.mjs is the authority: this table is how that verdict reaches a screen. reviewed=false means NOBODY HAS READ THAT STATE YET, which is a work queue, not a refusal."
   },
   {
    "rls": true,
@@ -5381,6 +5464,13 @@
      "comment": null,
      "default": null,
      "nullable": true
+    },
+    {
+     "name": "notified_at",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": null,
+     "nullable": true
     }
    ],
    "comment": null
@@ -5520,6 +5610,140 @@
     {
      "name": "signed_at",
      "type": "timestamp with time zone",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "stripe_account",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "payouts_ready",
+     "type": "boolean",
+     "comment": null,
+     "default": "false",
+     "nullable": false
+    }
+   ],
+   "comment": null
+  },
+  {
+   "rls": true,
+   "name": "truce_payouts",
+   "schema": "public",
+   "columns": [
+    {
+     "name": "id",
+     "type": "uuid",
+     "comment": null,
+     "default": "gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "deal_id",
+     "type": "uuid",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "payer_side",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "payee_side",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "amount_cents",
+     "type": "integer",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "fee_cents",
+     "type": "integer",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "type": "text",
+     "comment": null,
+     "default": "'usd'::text",
+     "nullable": false
+    },
+    {
+     "name": "stripe_payment_intent",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "stripe_checkout_session",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "stripe_connected_account",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "stripe_application_fee",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "type": "text",
+     "comment": null,
+     "default": "'created'::text",
+     "nullable": false
+    },
+    {
+     "name": "failure_reason",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "created_at",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": "now()",
+     "nullable": false
+    },
+    {
+     "name": "paid_at",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": null,
+     "nullable": true
+    },
+    {
+     "name": "evidence",
+     "type": "jsonb",
      "comment": null,
      "default": null,
      "nullable": true
@@ -6483,6 +6707,13 @@
      "comment": null,
      "default": null,
      "nullable": true
+    },
+    {
+     "name": "target",
+     "type": "numeric",
+     "comment": null,
+     "default": null,
+     "nullable": true
     }
    ],
    "comment": null
@@ -6914,6 +7145,12 @@
    "table": "compliance_policy",
    "schema": "public",
    "definition": "CREATE UNIQUE INDEX compliance_policy_pkey ON public.compliance_policy USING btree (id)"
+  },
+  {
+   "name": "compliance_states_pkey",
+   "table": "compliance_states",
+   "schema": "public",
+   "definition": "CREATE UNIQUE INDEX compliance_states_pkey ON public.compliance_states USING btree (state)"
   },
   {
    "name": "compliance_training_pkey",
@@ -7522,6 +7759,30 @@
    "definition": "CREATE UNIQUE INDEX truce_parties_token_key ON public.truce_parties USING btree (token)"
   },
   {
+   "name": "truce_payouts_deal",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CREATE INDEX truce_payouts_deal ON public.truce_payouts USING btree (deal_id)"
+  },
+  {
+   "name": "truce_payouts_pkey",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CREATE UNIQUE INDEX truce_payouts_pkey ON public.truce_payouts USING btree (id)"
+  },
+  {
+   "name": "truce_payouts_status",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CREATE INDEX truce_payouts_status ON public.truce_payouts USING btree (status)"
+  },
+  {
+   "name": "truce_payouts_stripe_payment_intent_key",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CREATE UNIQUE INDEX truce_payouts_stripe_payment_intent_key ON public.truce_payouts USING btree (stripe_payment_intent)"
+  },
+  {
    "name": "truce_signatures_deal_id_party_id_key",
    "table": "truce_signatures",
    "schema": "public",
@@ -7562,7 +7823,7 @@
  ],
  "policies": [],
  "postgres": "17.6",
- "taken_at": "2026-08-14T20:38:19.525152+00:00",
+ "taken_at": "2026-08-14T22:07:06.980868+00:00",
  "triggers": [
   {
    "name": "admin_audit_no_mutate",
@@ -8285,6 +8546,23 @@
     "postgres=X/postgres",
     "service_role=X/postgres"
    ],
+   "args": "p_secret text",
+   "name": "sv_admin_cockpit",
+   "config": [
+    "search_path=public"
+   ],
+   "schema": "public",
+   "comment": "Everything the cockpit paints, in one round trip, because David asked for no lengthy processes and a board that needs nine requests is out of date before it finishes painting. Every lamp returns its state AND the sentence explaining it, so the front end can never invent a reason.",
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_cockpit(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_dnc jsonb; v_dnc_ok boolean;\nbegin\n  perform private.require(p_secret);\n  begin v_dnc := public.sv_dnc_readiness(p_secret);\n  exception when others then\n    v_dnc := jsonb_build_object('scrub_ready', false, 'procedures_ready', false,\n                                'error', 'readiness could not be read, which is a refusal');\n  end;\n  v_dnc_ok := coalesce((v_dnc->>'scrub_ready')::boolean, false)\n          and coalesce((v_dnc->>'procedures_ready')::boolean, false);\n\n  return jsonb_build_object(\n    'at', now(),\n    'lines', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (\n        select l.id, l.phone, l.label, l.purpose, l.status, l.area_code,\n               l.daily_cap, l.calls_today, l.calls_total, l.answer_rate,\n               l.reputation, l.reputation_at, l.rest_until,\n               (l.rest_until is not null and l.rest_until > now())          as resting,\n               greatest(l.daily_cap - l.calls_today, 0)                     as remaining_today,\n               (select count(*) from public.calls c\n                 where c.line_id = l.id\n                   and c.status in ('queued','initiated','ringing','in-progress')\n                   and c.created_at > now() - interval '30 minutes')        as in_flight\n          from public.lines l order by l.label nulls last) x),\n    'line_capacity', (select jsonb_build_object(\n        'lines', count(*), 'active', count(*) filter (where status = 'active'),\n        'resting', count(*) filter (where rest_until is not null and rest_until > now()),\n        'flagged', count(*) filter (where reputation in ('at_risk','flagged')),\n        'calls_today', coalesce(sum(calls_today), 0),\n        'daily_ceiling', coalesce(sum(daily_cap), 0)) from public.lines),\n\n    'in_flight', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (\n        select c.id, c.call_sid, c.direction, c.status, c.from_number, c.to_number,\n               c.answered_by, c.created_at, c.started_at, c.answered_at,\n               c.call_class, c.ai_speaking, c.ai_listening, c.disclosure_verified,\n               ct.name as contact_name, ct.id as contact_id, ct.trade, ct.city, ct.state,\n               extract(epoch from (now() - coalesce(c.answered_at, c.started_at, c.created_at)))::int as elapsed_s,\n               (select count(*) from public.transcript_lines t where t.call_sid = c.call_sid) as lines_so_far\n          from public.calls c\n          left join public.contacts ct on ct.id = c.contact_id\n         where c.status in ('queued','initiated','ringing','in-progress')\n           and c.created_at > now() - interval '30 minutes'\n         order by c.created_at desc) x),\n\n    'recent', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (\n        select c.id, c.call_sid, c.direction, c.status, c.answered_by, c.duration_seconds,\n               c.from_number, c.to_number, c.created_at, c.placed, c.refused_reason,\n               c.call_class, c.disclosure_verified, c.recording_sid, c.summary,\n               ct.name as contact_name, ct.id as contact_id,\n               (select count(*) from public.transcript_lines t where t.call_sid = c.call_sid) as transcript_lines\n          from public.calls c\n          left join public.contacts ct on ct.id = c.contact_id\n         order by c.created_at desc limit 25) x),\n\n    'queue', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from (\n        select c.id, c.name, c.phone, c.email, c.trade, c.city, c.state, c.line_type,\n               c.disposition, c.lane, c.call_count, c.last_contacted_at, c.contact_name,\n               c.created_at,\n               coalesce(c.line_type in ('landline','fixedVoip'), false) as fixed_line,\n               (c.email is not null)                                    as has_email,\n               coalesce(s.human_dial_ok, false)                         as state_open,\n               coalesce(s.reviewed, false)                              as state_reviewed,\n               case\n                 when c.email is not null then 1\n                 when coalesce(s.human_dial_ok,false) and v_dnc_ok then 2\n                 when coalesce(s.reviewed,false) then 4\n                 else 3\n               end as rank,\n               case\n                 when c.email is not null then 'Email is open right now. No carrier, no registry, no state clearance needed.'\n                 when coalesce(s.human_dial_ok,false) and v_dnc_ok then 'State is clear and the registry is loaded.'\n                 when not coalesce(s.reviewed,false) then 'Waiting on state clearance. Nobody has read this state yet, so it is a queue rather than a refusal.'\n                 else coalesce(s.reason, 'Blocked by state law.')\n               end as why\n          from public.contacts c\n          left join public.compliance_states s on s.state = c.state\n         where not coalesce(c.suppressed, false)\n           and c.disposition in ('new','queued','callback')\n         order by\n           case when c.email is not null then 1\n                when coalesce(s.human_dial_ok,false) and v_dnc_ok then 2\n                when coalesce(s.reviewed,false) then 4 else 3 end,\n           c.created_at desc\n         limit 40) x),\n\n    'lamps', jsonb_build_object(\n      'registry', jsonb_build_object('ok', v_dnc_ok, 'detail', v_dnc,\n        'why', case when v_dnc_ok then 'Registry loaded and the written procedures are in place.'\n                    when not coalesce((v_dnc->>'scrub_ready')::boolean,false)\n                      then 'The national do-not-call registry has never been loaded, so no number can be proven absent from it. Nothing is cold-callable, whatever its line type.'\n                    else 'The written procedures required by 47 CFR 64.1200(d) are not all in place.' end),\n      'states', jsonb_build_object(\n        'reviewed', (select count(*) from public.compliance_states where reviewed),\n        'open',     (select count(*) from public.compliance_states where human_dial_ok),\n        'in_book',  (select count(distinct state) from public.contacts where state is not null),\n        'why', 'A state is only callable once its own statutory text has been read. Unreviewed is a queue, not a refusal.'),\n      'suppression', jsonb_build_object(\n        'entries', (select count(*) from public.suppression),\n        'contacts', (select count(*) from public.contacts where coalesce(suppressed,false)),\n        'why', 'Checked before every dial. Suppression covers every channel, not only the phone.')),\n\n    'book', jsonb_build_object(\n      'total',      (select count(*) from public.contacts),\n      'emailable',  (select count(*) from public.contacts\n                      where email is not null and not coalesce(suppressed,false)),\n      'fixed_line', (select count(*) from public.contacts where line_type in ('landline','fixedVoip')),\n      'mobile',     (select count(*) from public.contacts where line_type in ('mobile','nonFixedVoip')),\n      'worked',     (select count(*) from public.contacts where last_contacted_at is not null),\n      'calls_total',(select count(*) from public.calls),\n      'transcript_lines', (select count(*) from public.transcript_lines),\n      'recordings', (select count(*) from public.calls where recording_sid is not null),\n      'messages',   (select count(*) from public.crm_messages))\n  );\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
    "args": "p_secret text, p_id uuid",
    "name": "sv_admin_contact",
    "config": [
@@ -8308,9 +8586,9 @@
     "search_path=public"
    ],
    "schema": "public",
-   "comment": null,
+   "comment": "fixed_line is a PROPERTY of the phone number. callable_now is a PERMISSION and is computed from the same do-not-call gate the per-record preflight uses, so the list and the record cannot drift apart. They did: the list once claimed 1,212 callable while every record said none were.",
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_contact_facets(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  return jsonb_build_object(\n    'total',       (select count(*) from public.contacts),\n    'ai_dialable', (select count(*) from public.contacts where line_type in ('landline','fixedVoip')),\n    'suppressed',  (select count(*) from public.contacts where suppressed),\n    'enriched',    (select count(*) from public.contacts where enriched_at is not null),\n    'with_email',  (select count(*) from public.contacts where email is not null),\n    'with_website',(select count(*) from public.contacts where website is not null),\n    'lane',        (select coalesce(jsonb_agg(jsonb_build_object('k', coalesce(lane,'none'), 'n', n) order by n desc), '[]'::jsonb)\n                      from (select lane, count(*) n from public.contacts group by 1) s),\n    'disposition', (select coalesce(jsonb_agg(jsonb_build_object('k', disposition, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select disposition, count(*) n from public.contacts group by 1) s),\n    'line_type',   (select coalesce(jsonb_agg(jsonb_build_object('k', coalesce(line_type,'unknown'), 'n', n) order by n desc), '[]'::jsonb)\n                      from (select line_type, count(*) n from public.contacts group by 1) s),\n    'trade',       (select coalesce(jsonb_agg(jsonb_build_object('k', trade, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select trade, count(*) n from public.contacts where trade is not null group by 1 order by 2 desc limit 24) s),\n    'state',       (select coalesce(jsonb_agg(jsonb_build_object('k', state, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select state, count(*) n from public.contacts where state is not null group by 1 order by 2 desc limit 60) s),\n    'owner',       (select coalesce(jsonb_agg(jsonb_build_object('k', owner, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select owner, count(*) n from public.contacts where owner is not null group by 1) s)\n  );\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_contact_facets(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_dnc jsonb; v_gate_open boolean;\nbegin\n  perform private.require(p_secret);\n\n  begin\n    v_dnc := public.sv_dnc_readiness(p_secret);\n  exception when others then\n    v_dnc := jsonb_build_object('scrub_ready', false, 'procedures_ready', false);\n  end;\n  -- The same condition the per-record preflight applies. One authority, two surfaces.\n  v_gate_open := coalesce((v_dnc->>'scrub_ready')::boolean, false)\n             and coalesce((v_dnc->>'procedures_ready')::boolean, false);\n\n  return jsonb_build_object(\n    'total',        (select count(*) from public.contacts),\n    -- A PROPERTY of the number. Renamed from ai_dialable, which read as permission.\n    'fixed_line',   (select count(*) from public.contacts\n                      where line_type in ('landline','fixedVoip')),\n    -- The PERMISSION, right now. Zero while the registry is unloaded, and that is correct.\n    'callable_now', case when v_gate_open\n                      then (select count(*) from public.contacts\n                             where line_type in ('landline','fixedVoip')\n                               and not coalesce(suppressed, false))\n                      else 0 end,\n    'callable_blocked_because',\n      case when v_gate_open then null\n           when not coalesce((v_dnc->>'scrub_ready')::boolean, false)\n             then 'The national do-not-call registry has never been loaded, so no number can be proven absent from it. Until then nothing is cold-callable, whatever its line type.'\n           else 'The written do-not-call procedures required by 47 CFR 64.1200(d) are not all in place.' end,\n    'emailable_now',(select count(*) from public.contacts\n                      where email is not null and not coalesce(suppressed, false)),\n    'textable_line',(select count(*) from public.contacts\n                      where line_type in ('mobile','nonFixedVoip')),\n    'suppressed',   (select count(*) from public.contacts where coalesce(suppressed,false)),\n    'enriched',     (select count(*) from public.contacts where enriched_at is not null),\n    'with_email',   (select count(*) from public.contacts where email is not null),\n    'with_website', (select count(*) from public.contacts where website is not null),\n    'websites_unread', (select count(*) from public.contacts\n                         where website is not null and enriched_at is null),\n    'lane',        (select coalesce(jsonb_agg(jsonb_build_object('k', coalesce(lane,'none'), 'n', n) order by n desc), '[]'::jsonb)\n                      from (select lane, count(*) n from public.contacts group by 1) s),\n    'disposition', (select coalesce(jsonb_agg(jsonb_build_object('k', disposition, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select disposition, count(*) n from public.contacts group by 1) s),\n    'line_type',   (select coalesce(jsonb_agg(jsonb_build_object('k', coalesce(line_type,'unknown'), 'n', n) order by n desc), '[]'::jsonb)\n                      from (select line_type, count(*) n from public.contacts group by 1) s),\n    'trade',       (select coalesce(jsonb_agg(jsonb_build_object('k', trade, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select trade, count(*) n from public.contacts where trade is not null group by 1 order by 2 desc limit 24) s),\n    'state',       (select coalesce(jsonb_agg(jsonb_build_object('k', state, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select state, count(*) n from public.contacts where state is not null group by 1 order by 2 desc limit 60) s),\n    'owner',       (select coalesce(jsonb_agg(jsonb_build_object('k', owner, 'n', n) order by n desc), '[]'::jsonb)\n                      from (select owner, count(*) n from public.contacts where owner is not null group by 1) s)\n  );\nend $function$\n",
    "security_definer": true
   },
   {
@@ -8336,7 +8614,7 @@
     "postgres=X/postgres",
     "service_role=X/postgres"
    ],
-   "args": "p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_dialable boolean, p_sort text, p_limit integer, p_offset integer",
+   "args": "p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_reach text, p_enriched text, p_sort text, p_limit integer, p_offset integer",
    "name": "sv_admin_contacts",
    "config": [
     "search_path=public"
@@ -8344,24 +8622,7 @@
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_contacts(p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_dialable boolean, p_sort text, p_limit integer, p_offset integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v jsonb; n bigint; lim integer; off integer;\nbegin\n  perform private.require(p_secret);\n  lim := greatest(1, least(coalesce(p_limit, 50), 200));\n  off := greatest(0, coalesce(p_offset, 0));\n\n  create temp table if not exists _f on commit drop as select 1;\n\n  with base as (\n    select c.* from public.contacts c\n     where (p_lane        is null or c.lane = p_lane)\n       and (p_disposition is null or c.disposition = p_disposition)\n       and (p_state       is null or c.state = p_state)\n       and (p_trade       is null or c.trade = p_trade)\n       and (p_line_type   is null or c.line_type = p_line_type)\n       and (p_owner       is null or c.owner = p_owner)\n       and (p_tag         is null or c.tags @> array[p_tag])\n       and (p_suppressed  is null or c.suppressed = p_suppressed)\n       -- \"dialable\" is the lawful-to-AI-cold-call pool: a verified fixed business line.\n       and (p_dialable    is null or (c.line_type in ('landline','fixedVoip')) = p_dialable)\n       and (p_q is null or p_q = '' or (\n              c.name    ilike '%'||p_q||'%' or c.phone   ilike '%'||p_q||'%'\n           or c.city    ilike '%'||p_q||'%' or c.website ilike '%'||p_q||'%'\n           or c.street  ilike '%'||p_q||'%' or c.id::text = p_q))\n  )\n  select count(*) into n from base;\n\n  select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into v from (\n    select c.id, c.name, c.phone, c.trade, c.state, c.city, c.website, c.line_type, c.carrier,\n           c.lane, c.lane_reasons, c.disposition, c.owner, c.tags, c.score, c.suppressed,\n           c.suppressed_reason, c.call_count, c.first_contacted_at, c.last_contacted_at,\n           c.created_at, c.contact_name, c.contact_role, c.email, c.linkedin_url, c.enriched_at,\n           (c.line_type in ('landline','fixedVoip')) as ai_dialable,\n           (select count(*) from public.notes nt where nt.contact_id = c.id)      as note_count,\n           (select count(*) from public.crm_tasks t\n             where t.contact_id = c.id and t.status = 'open')                     as open_tasks,\n           (select max(cl.created_at) from public.calls cl where cl.contact_id = c.id) as last_call_at\n      from public.contacts c\n     where (p_lane        is null or c.lane = p_lane)\n       and (p_disposition is null or c.disposition = p_disposition)\n       and (p_state       is null or c.state = p_state)\n       and (p_trade       is null or c.trade = p_trade)\n       and (p_line_type   is null or c.line_type = p_line_type)\n       and (p_owner       is null or c.owner = p_owner)\n       and (p_tag         is null or c.tags @> array[p_tag])\n       and (p_suppressed  is null or c.suppressed = p_suppressed)\n       and (p_dialable    is null or (c.line_type in ('landline','fixedVoip')) = p_dialable)\n       and (p_q is null or p_q = '' or (\n              c.name    ilike '%'||p_q||'%' or c.phone   ilike '%'||p_q||'%'\n           or c.city    ilike '%'||p_q||'%' or c.website ilike '%'||p_q||'%'\n           or c.street  ilike '%'||p_q||'%' or c.id::text = p_q))\n     order by\n       case when coalesce(p_sort,'recent') = 'recent' then c.created_at end desc nulls last,\n       case when p_sort = 'name'   then lower(c.name) end asc  nulls last,\n       case when p_sort = 'score'  then c.score end desc nulls last,\n       case when p_sort = 'calls'  then c.call_count end desc nulls last,\n       case when p_sort = 'touched' then c.last_contacted_at end desc nulls last,\n       c.created_at desc\n     limit lim offset off\n  ) x;\n\n  return jsonb_build_object('total', n, 'limit', lim, 'offset', off, 'rows', v);\nend $function$\n",
-   "security_definer": true
-  },
-  {
-   "acl": [
-    "=X/postgres",
-    "postgres=X/postgres",
-    "service_role=X/postgres"
-   ],
-   "args": "p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_dialable boolean, p_sort text, p_limit integer, p_offset integer, p_has_email boolean",
-   "name": "sv_admin_contacts",
-   "config": [
-    "search_path=public"
-   ],
-   "schema": "public",
-   "comment": null,
-   "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_contacts(p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_dialable boolean, p_sort text, p_limit integer, p_offset integer, p_has_email boolean DEFAULT NULL::boolean)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v jsonb; n bigint; lim integer; off integer;\nbegin\n  perform private.require(p_secret);\n  lim := greatest(1, least(coalesce(p_limit, 50), 200));\n  off := greatest(0, coalesce(p_offset, 0));\n\n  select count(*) into n from public.contacts c\n   where (p_lane        is null or c.lane = p_lane)\n     and (p_disposition is null or c.disposition = p_disposition)\n     and (p_state       is null or c.state = p_state)\n     and (p_trade       is null or c.trade = p_trade)\n     and (p_line_type   is null or c.line_type = p_line_type)\n     and (p_owner       is null or c.owner = p_owner)\n     and (p_tag         is null or c.tags @> array[p_tag])\n     and (p_suppressed  is null or coalesce(c.suppressed,false) = p_suppressed)\n     and (p_has_email   is null or (c.email is not null) = p_has_email)\n     and (p_dialable    is null or coalesce(c.line_type in ('landline','fixedVoip'), false) = p_dialable)\n     and (p_q is null or p_q = '' or (\n            c.name ilike '%'||p_q||'%' or c.phone ilike '%'||p_q||'%' or c.city ilike '%'||p_q||'%'\n         or c.website ilike '%'||p_q||'%' or c.street ilike '%'||p_q||'%'\n         or coalesce(c.email,'') ilike '%'||p_q||'%'\n         or coalesce(c.contact_name,'') ilike '%'||p_q||'%' or c.id::text = p_q));\n\n  select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into v from (\n    select c.id, c.name, c.phone, c.trade, c.state, c.city, c.website, c.line_type, c.carrier,\n           c.lane, c.lane_reasons, c.disposition, c.owner, c.tags, c.score, c.suppressed,\n           c.suppressed_reason, c.call_count, c.first_contacted_at, c.last_contacted_at,\n           c.created_at, c.contact_name, c.contact_role, c.email, c.linkedin_url, c.enriched_at,\n           c.first_seen_via,\n           coalesce(c.line_type in ('landline','fixedVoip'), false) as ai_dialable,\n           (select count(*) from public.notes nt where nt.contact_id = c.id)  as note_count,\n           (select count(*) from public.crm_tasks t\n             where t.contact_id = c.id and t.status = 'open')                 as open_tasks,\n           (select max(cl.created_at) from public.calls cl where cl.contact_id = c.id) as last_call_at\n      from public.contacts c\n     where (p_lane        is null or c.lane = p_lane)\n       and (p_disposition is null or c.disposition = p_disposition)\n       and (p_state       is null or c.state = p_state)\n       and (p_trade       is null or c.trade = p_trade)\n       and (p_line_type   is null or c.line_type = p_line_type)\n       and (p_owner       is null or c.owner = p_owner)\n       and (p_tag         is null or c.tags @> array[p_tag])\n       and (p_suppressed  is null or coalesce(c.suppressed,false) = p_suppressed)\n       and (p_has_email   is null or (c.email is not null) = p_has_email)\n       and (p_dialable    is null or coalesce(c.line_type in ('landline','fixedVoip'), false) = p_dialable)\n       and (p_q is null or p_q = '' or (\n              c.name ilike '%'||p_q||'%' or c.phone ilike '%'||p_q||'%' or c.city ilike '%'||p_q||'%'\n           or c.website ilike '%'||p_q||'%' or c.street ilike '%'||p_q||'%'\n           or coalesce(c.email,'') ilike '%'||p_q||'%'\n           or coalesce(c.contact_name,'') ilike '%'||p_q||'%' or c.id::text = p_q))\n     order by\n       case when coalesce(p_sort,'recent') = 'recent'  then c.created_at end desc nulls last,\n       case when p_sort = 'name'    then lower(c.name) end asc  nulls last,\n       case when p_sort = 'score'   then c.score end desc nulls last,\n       case when p_sort = 'calls'   then c.call_count end desc nulls last,\n       case when p_sort = 'touched' then c.last_contacted_at end desc nulls last,\n       c.created_at desc\n     limit lim offset off\n  ) x;\n\n  return jsonb_build_object('total', n, 'limit', lim, 'offset', off, 'rows', v);\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_contacts(p_secret text, p_q text, p_lane text, p_disposition text, p_state text, p_trade text, p_line_type text, p_owner text, p_tag text, p_suppressed boolean, p_reach text, p_enriched text, p_sort text, p_limit integer, p_offset integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_rows jsonb; v_total bigint; v_lim integer; v_off integer;\nbegin\n  perform private.require(p_secret);\n  v_lim := greatest(1, least(coalesce(p_limit, 50), 200));\n  v_off := greatest(0, coalesce(p_offset, 0));\n\n  with filtered as (\n    select c.* from public.contacts c\n     where (p_lane        is null or c.lane = p_lane)\n       and (p_disposition is null or c.disposition = p_disposition)\n       and (p_state       is null or c.state = p_state)\n       and (p_trade       is null or c.trade = p_trade)\n       and (p_line_type   is null or c.line_type = p_line_type)\n       and (p_owner       is null or c.owner = p_owner)\n       and (p_tag         is null or c.tags @> array[p_tag])\n       and (p_suppressed  is null or coalesce(c.suppressed,false) = p_suppressed)\n       and (p_reach is null or p_reach = '' or\n            (p_reach = 'email'  and c.email is not null) or\n            (p_reach = 'fixed'  and c.line_type in ('landline','fixedVoip')) or\n            (p_reach = 'mobile' and c.line_type in ('mobile','nonFixedVoip')) or\n            (p_reach = 'none'   and c.email is null\n                                and (c.line_type is null or c.line_type = 'tollFree')))\n       and (p_enriched is null or p_enriched = '' or\n            (p_enriched = 'done' and c.enriched_at is not null) or\n            (p_enriched = 'todo' and c.enriched_at is null and c.website is not null))\n       and (p_q is null or p_q = '' or (\n              c.name ilike '%'||p_q||'%' or c.phone ilike '%'||p_q||'%' or c.city ilike '%'||p_q||'%'\n           or c.website ilike '%'||p_q||'%' or c.street ilike '%'||p_q||'%'\n           or coalesce(c.email,'') ilike '%'||p_q||'%'\n           or coalesce(c.contact_name,'') ilike '%'||p_q||'%'\n           or (p_q ~ '^[0-9a-f-]{36}$' and c.id::text = p_q)))\n  ),\n  page as (\n    select c.id, c.name, c.phone, c.trade, c.state, c.city, c.website, c.line_type, c.carrier,\n           c.lane, c.lane_reasons, c.disposition, c.owner, c.tags, c.score, c.suppressed,\n           c.suppressed_reason, c.call_count, c.first_contacted_at, c.last_contacted_at,\n           c.created_at, c.contact_name, c.contact_role, c.email, c.linkedin_url, c.enriched_at,\n           c.first_seen_via,\n           coalesce(c.line_type in ('landline','fixedVoip'), false) as ai_dialable,\n           (select count(*) from public.notes nt where nt.contact_id = c.id) as note_count,\n           (select count(*) from public.crm_tasks t\n             where t.contact_id = c.id and t.status = 'open')        as open_tasks\n      from filtered c\n     order by\n       case when coalesce(p_sort,'recent') = 'recent'  then c.created_at end desc nulls last,\n       case when p_sort = 'name'    then lower(c.name) end asc  nulls last,\n       case when p_sort = 'calls'   then c.call_count end desc nulls last,\n       case when p_sort = 'touched' then c.last_contacted_at end desc nulls last,\n       c.created_at desc\n     limit v_lim offset v_off\n  )\n  select (select count(*) from filtered),\n         coalesce((select jsonb_agg(to_jsonb(page)) from page), '[]'::jsonb)\n    into v_total, v_rows;\n\n  return jsonb_build_object('total', v_total, 'limit', v_lim, 'offset', v_off, 'rows', v_rows);\nend $function$\n",
    "security_definer": true
   },
   {
@@ -8766,6 +9027,23 @@
    "comment": null,
    "returns": "jsonb",
    "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_set_password(p_secret text, p_admin_id uuid, p_hash text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  update public.admin_users\n     set password_hash = p_hash, must_change = false, failed_count = 0,\n         locked_until = null, updated_at = now()\n   where id = p_admin_id;\n  if not found then return jsonb_build_object('ok', false); end if;\n  -- Every other session for this operator dies with the old password. A password change that\n  -- leaves the attacker's session alive has changed nothing.\n  update public.admin_sessions set revoked_at = now()\n   where admin_id = p_admin_id and revoked_at is null;\n  return jsonb_build_object('ok', true);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text",
+   "name": "sv_admin_state_pool",
+   "config": [
+    "search_path=public"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_state_pool(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v_dnc jsonb; v_dnc_ok boolean;\nbegin\n  perform private.require(p_secret);\n  begin v_dnc := public.sv_dnc_readiness(p_secret);\n  exception when others then v_dnc := jsonb_build_object('scrub_ready', false, 'procedures_ready', false); end;\n  v_dnc_ok := coalesce((v_dnc->>'scrub_ready')::boolean, false)\n          and coalesce((v_dnc->>'procedures_ready')::boolean, false);\n\n  return jsonb_build_object(\n    'dnc_ready', v_dnc_ok,\n    'by_state', (select coalesce(jsonb_agg(to_jsonb(x) order by x.contacts desc), '[]'::jsonb) from (\n        select c.state,\n               count(*)                                                        as contacts,\n               count(*) filter (where c.line_type in ('landline','fixedVoip')) as fixed_lines,\n               count(*) filter (where c.line_type in ('mobile'))               as mobiles,\n               coalesce(s.reviewed, false)      as reviewed,\n               coalesce(s.ai_voice_ok, false)   as ai_voice_ok,\n               coalesce(s.human_dial_ok, false) as human_dial_ok,\n               s.reason, s.statute,\n               case\n                 when s.state is null or not s.reviewed then 'waiting_on_state_clearance'\n                 when s.human_dial_ok and v_dnc_ok      then 'open'\n                 when s.human_dial_ok and not v_dnc_ok  then 'waiting_on_dnc_registry'\n                 else 'blocked_by_state_law'\n               end as status\n          from public.contacts c\n          left join public.compliance_states s on s.state = c.state\n         where c.state is not null\n         group by c.state, s.state, s.reviewed, s.ai_voice_ok, s.human_dial_ok, s.reason, s.statute\n    ) x),\n    'totals', (select jsonb_build_object(\n        'contacts',        count(*),\n        'mobiles',         count(*) filter (where c.line_type = 'mobile'),\n        'fixed_lines',     count(*) filter (where c.line_type in ('landline','fixedVoip')),\n        -- The number that matters, and it is not the one anyone expects.\n        'human_dialable_now', count(*) filter (\n            where coalesce(s.human_dial_ok,false) and v_dnc_ok\n              and not coalesce(c.suppressed,false)\n              and c.line_type in ('landline','fixedVoip','mobile')),\n        'human_dialable_when_dnc_lands', count(*) filter (\n            where coalesce(s.human_dial_ok,false)\n              and not coalesce(c.suppressed,false)\n              and c.line_type in ('landline','fixedVoip','mobile')),\n        'waiting_on_state_clearance', count(*) filter (where s.state is null or not s.reviewed),\n        'blocked_by_state_law', count(*) filter (where s.reviewed and not s.human_dial_ok))\n      from public.contacts c left join public.compliance_states s on s.state = c.state)\n  );\nend $function$\n",
    "security_definer": true
   },
   {
@@ -10211,6 +10489,23 @@
   },
   {
    "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_state text, p_reviewed boolean, p_ai boolean, p_human boolean, p_reason text, p_statute text, p_by text",
+   "name": "sv_state_clearance",
+   "config": [
+    "search_path=public"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_state_clearance(p_secret text, p_state text, p_reviewed boolean, p_ai boolean, p_human boolean, p_reason text, p_statute text, p_by text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare r public.compliance_states%rowtype;\nbegin\n  perform private.require(p_secret);\n  insert into public.compliance_states (state, reviewed, ai_voice_ok, human_dial_ok, reason,\n                                        statute, reviewed_at, reviewed_by)\n  values (upper(trim(p_state)), coalesce(p_reviewed,true), coalesce(p_ai,false),\n          coalesce(p_human,false), nullif(p_reason,''), nullif(p_statute,''), now(), nullif(p_by,''))\n  on conflict (state) do update set\n    reviewed = excluded.reviewed, ai_voice_ok = excluded.ai_voice_ok,\n    human_dial_ok = excluded.human_dial_ok, reason = excluded.reason,\n    statute = excluded.statute, reviewed_at = excluded.reviewed_at,\n    reviewed_by = excluded.reviewed_by, updated_at = now()\n  returning * into r;\n  return jsonb_build_object('ok', true, 'state', to_jsonb(r));\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
     "postgres=X/postgres",
     "anon=X/postgres",
     "authenticated=X/postgres",
@@ -10390,6 +10685,57 @@
   },
   {
    "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_token text",
+   "name": "tr_agent_brief",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_agent_brief(p_secret text, p_token text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare sender public.truce_parties; rep public.truce_parties; d public.truce_deals;\nbegin\n  perform private.require(p_secret);\n  select * into sender from public.truce_parties where token = p_token;\n  if not found then return jsonb_build_object('ok', false, 'reason', 'unknown link'); end if;\n  select * into d from public.truce_deals where id = sender.deal_id;\n  -- the agent that answers represents the OTHER side: you haggle with their agent, not your own\n  select * into rep from public.truce_parties where deal_id = sender.deal_id and side <> sender.side;\n  return jsonb_build_object(\n    'ok', true,\n    'deal', jsonb_build_object('id', d.id, 'subject', d.subject, 'kind', d.kind, 'status', d.status,\n              'settled_value', d.settled_value, 'expires_at', d.expires_at),\n    'sender', jsonb_build_object('side', sender.side, 'name', sender.display_name, 'role', sender.role),\n    'represents', jsonb_build_object('side', rep.side, 'name', rep.display_name, 'role', rep.role,\n                    'limit_set', rep.limit_set_at is not null)\n                  || coalesce(sealed.my_limit(rep.id), '{}'::jsonb),\n    'thread', coalesce((select jsonb_agg(jsonb_build_object('seq', m.seq, 'speaker', m.speaker,\n                 'body', m.body, 'amount', m.amount, 'move', m.move) order by m.seq)\n               from public.truce_messages m where m.deal_id = d.id), '[]'::jsonb)\n  );\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_deal uuid, p_side text, p_body text, p_amount numeric, p_move text",
+   "name": "tr_agent_say",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_agent_say(p_secret text, p_deal uuid, p_side text, p_body text, p_amount numeric, p_move text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare n int;\nbegin\n  perform private.require(p_secret);\n  select coalesce(max(seq),0)+1 into n from public.truce_messages where deal_id = p_deal;\n  insert into public.truce_messages (deal_id, seq, speaker, body, amount, move)\n  values (p_deal, n, p_side, left(btrim(coalesce(p_body,'')),1200), p_amount, coalesce(p_move,'agent'));\n  return jsonb_build_object('ok', true, 'seq', n);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_deal uuid, p_side text, p_amount numeric",
+   "name": "tr_agent_settle",
+   "config": [
+    "search_path=public, private, extensions, sealed"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_agent_settle(p_secret text, p_deal uuid, p_side text, p_amount numeric)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions', 'sealed'\nAS $function$\ndeclare d public.truce_deals; me public.truce_parties; lim record; other record;\nbegin\n  perform private.require(p_secret);\n  select * into d from public.truce_deals where id = p_deal;\n  if d.id is null then return jsonb_build_object('ok', false, 'reason', 'unknown deal'); end if;\n  if d.status = 'settled' then\n    return jsonb_build_object('ok', true, 'already', true, 'settled_value', d.settled_value);\n  end if;\n  if d.status in ('withdrawn','no_overlap') or d.expires_at < now() then\n    return jsonb_build_object('ok', false, 'reason', 'this deal is not open');\n  end if;\n  if p_amount is null or p_amount <= 0 then\n    return jsonb_build_object('ok', false, 'reason', 'a settlement needs a positive number');\n  end if;\n\n  select * into me from public.truce_parties where deal_id = p_deal and side = p_side;\n  select l.amount, l.direction into lim from sealed.limits l where l.party_id = me.id;\n  if lim.amount is null then\n    return jsonb_build_object('ok', false, 'reason', 'that side has no limit set, so nothing can be agreed for them');\n  end if;\n\n  -- THE HARD CHECK. min = the least they will take; max = the most they will pay.\n  if lim.direction = 'min' and p_amount < lim.amount then\n    return jsonb_build_object('ok', false, 'reason', 'below the floor', 'refused', true);\n  end if;\n  if lim.direction = 'max' and p_amount > lim.amount then\n    return jsonb_build_object('ok', false, 'reason', 'above the ceiling', 'refused', true);\n  end if;\n\n  -- If the OTHER side has also set a limit, the number must work for them too.\n  select l.amount as amount, l.direction as direction into other\n    from sealed.limits l join public.truce_parties p on p.id = l.party_id\n   where p.deal_id = p_deal and p.side <> p_side;\n  if other.amount is not null then\n    if other.direction = 'min' and p_amount < other.amount then\n      return jsonb_build_object('ok', false, 'reason', 'below the other floor', 'refused', true);\n    end if;\n    if other.direction = 'max' and p_amount > other.amount then\n      return jsonb_build_object('ok', false, 'reason', 'above the other ceiling', 'refused', true);\n    end if;\n  end if;\n\n  update public.truce_deals\n     set status = 'settled', settled_at = now(), settled_value = p_amount,\n         settlement = jsonb_build_object(\n           'value', p_amount,\n           'method', 'agreed in conversation between a party and the other side''s agent, then re-checked against both sealed limits',\n           'agreed_by_side', p_side,\n           'computed_at', now())\n   where id = p_deal;\n  return jsonb_build_object('ok', true, 'settled_value', p_amount);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
     "postgres=X/postgres",
     "service_role=X/postgres",
     "anon=X/postgres"
@@ -10407,36 +10753,191 @@
   },
   {
    "acl": [
+    "=X/postgres",
     "postgres=X/postgres",
-    "service_role=X/postgres",
-    "anon=X/postgres"
+    "service_role=X/postgres"
    ],
-   "args": "p_token text, p_direction text, p_amount numeric, p_must_haves text[]",
-   "name": "tr_set_limit",
+   "args": "p_secret text, p_token text, p_account text",
+   "name": "tr_payee_account",
    "config": [
-    "search_path=public, sealed"
+    "search_path=public, private"
    ],
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.tr_set_limit(p_token text, p_direction text, p_amount numeric, p_must_haves text[] DEFAULT '{}'::text[])\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'sealed'\nAS $function$\ndeclare me public.truce_parties;\nbegin\n  select * into me from public.truce_parties where token = p_token;\n  if not found then return jsonb_build_object('error','unknown link'); end if;\n  if p_direction not in ('max','min') then return jsonb_build_object('error','direction must be max or min'); end if;\n  if p_amount is null or p_amount < 0 then return jsonb_build_object('error','a limit needs a number'); end if;\n\n  insert into sealed.limits (party_id, deal_id, direction, amount, must_haves)\n  values (me.id, me.deal_id, p_direction, p_amount, coalesce(p_must_haves,'{}'))\n  on conflict (party_id) do update set direction = excluded.direction, amount = excluded.amount,\n                                       must_haves = excluded.must_haves, set_at = now();\n\n  update public.truce_parties set limit_set_at = now(), joined_at = coalesce(joined_at, now()) where id = me.id;\n  update public.truce_deals set status = 'negotiating' where id = me.deal_id and status = 'open';\n\n  -- Run only when BOTH sides are in. One side's number alone reveals nothing and does nothing.\n  if (select count(*) from sealed.limits where deal_id = me.deal_id) = 2 then\n    perform sealed.negotiate(me.deal_id);\n  end if;\n  return public.tr_view(p_token);\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payee_account(p_secret text, p_token text, p_account text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  update public.truce_parties set stripe_account = p_account where token = p_token;\n  if not found then return jsonb_build_object('ok', false, 'reason', 'unknown link'); end if;\n  return jsonb_build_object('ok', true);\nend $function$\n",
    "security_definer": true
   },
   {
    "acl": [
+    "=X/postgres",
     "postgres=X/postgres",
-    "service_role=X/postgres",
-    "anon=X/postgres"
+    "service_role=X/postgres"
    ],
-   "args": "p_secret text, p_token text, p_direction text, p_amount numeric, p_must_haves text[], p_opening numeric",
-   "name": "tr_set_limit",
+   "args": "p_secret text, p_token text, p_ready boolean",
+   "name": "tr_payee_ready",
    "config": [
-    "search_path=public, private, sealed"
+    "search_path=public, private"
    ],
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.tr_set_limit(p_secret text, p_token text, p_direction text, p_amount numeric, p_must_haves text[] DEFAULT '{}'::text[], p_opening numeric DEFAULT NULL::numeric)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'sealed'\nAS $function$\ndeclare me public.truce_parties; d public.truce_deals; other_dir text;\nbegin\n  perform private.require(p_secret);\n  select * into me from public.truce_parties where token = p_token;\n  if not found then return jsonb_build_object('error','unknown link'); end if;\n  select * into d from public.truce_deals where id = me.deal_id;\n  if d.expires_at < now() then return jsonb_build_object('error','this link has expired'); end if;\n  if p_direction not in ('max','min') then return jsonb_build_object('error','direction must be max or min'); end if;\n  if p_amount is null or p_amount < 0 then return jsonb_build_object('error','a limit needs a number'); end if;\n  if p_opening is not null then\n    if p_direction = 'min' and p_opening < p_amount then\n      return jsonb_build_object('error','your asking price is below the least you said you would take');\n    end if;\n    if p_direction = 'max' and p_opening > p_amount then\n      return jsonb_build_object('error','your offer is above the most you said you would pay');\n    end if;\n  end if;\n\n  -- ★ REFUSE THE MALFORMED PAIR AT THE DOOR, rather than letting it become a fake no_overlap.\n  -- Nothing is written, so the party can simply pick again and the deal survives.\n  select l.direction into other_dir\n    from sealed.limits l\n    join public.truce_parties p on p.id = l.party_id\n   where p.deal_id = me.deal_id and p.side <> me.side;\n  if other_dir is not null and other_dir = p_direction then\n    return jsonb_build_object('error',\n      case when p_direction = 'min'\n        then 'You have both said this is the least you will TAKE. One of you is paying and one is being paid, so one side needs the most they will PAY.'\n        else 'You have both said this is the most you will PAY. One of you is paying and one is being paid, so one side needs the least they will TAKE.' end,\n      'code','same_direction');\n  end if;\n\n  insert into sealed.limits (party_id, deal_id, direction, amount, must_haves, opening)\n  values (me.id, me.deal_id, p_direction, p_amount, coalesce(p_must_haves,'{}'), p_opening)\n  on conflict (party_id) do update set direction = excluded.direction, amount = excluded.amount,\n                                       must_haves = excluded.must_haves, opening = excluded.opening,\n                                       set_at = now();\n\n  update public.truce_parties set limit_set_at = now(), joined_at = coalesce(joined_at, now()) where id = me.id;\n  -- a deal that previously died can come back when a number changes; only a settled one is final\n  update public.truce_deals set status = 'negotiating'\n   where id = me.deal_id and status in ('open','no_overlap','malformed');\n  if (select count(*) from sealed.limits where deal_id = me.deal_id) = 2 then\n    perform sealed.negotiate(me.deal_id);\n  end if;\n  return public.tr_view(p_secret, p_token);\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payee_ready(p_secret text, p_token text, p_ready boolean)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  update public.truce_parties set payouts_ready = coalesce(p_ready,false) where token = p_token;\n  return jsonb_build_object('ok', found);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_token text, p_other boolean",
+   "name": "tr_payee_state",
+   "config": [
+    "search_path=public, private"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payee_state(p_secret text, p_token text, p_other boolean DEFAULT false)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare me public.truce_parties; target public.truce_parties;\nbegin\n  perform private.require(p_secret);\n  select * into me from public.truce_parties where token = p_token;\n  if me.id is null then return jsonb_build_object('ok', false, 'reason', 'unknown link'); end if;\n  if p_other then\n    select * into target from public.truce_parties where deal_id = me.deal_id and side <> me.side;\n  else\n    target := me;\n  end if;\n  return jsonb_build_object('ok', true, 'account', target.stripe_account, 'ready', target.payouts_ready);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_payout uuid, p_session text, p_intent text, p_account text",
+   "name": "tr_payout_intent",
+   "config": [
+    "search_path=public, private"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payout_intent(p_secret text, p_payout uuid, p_session text, p_intent text, p_account text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  update public.truce_payouts\n     set stripe_checkout_session = p_session,\n         stripe_payment_intent = coalesce(p_intent, stripe_payment_intent),\n         stripe_connected_account = p_account,\n         status = 'awaiting_payment'\n   where id = p_payout;\n  return jsonb_build_object('ok', found);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_deal uuid, p_payer_side text, p_fee_cents integer",
+   "name": "tr_payout_open",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payout_open(p_secret text, p_deal uuid, p_payer_side text, p_fee_cents integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare d public.truce_deals; existing public.truce_payouts; amt integer; payee text;\nbegin\n  perform private.require(p_secret);\n  select * into d from public.truce_deals where id = p_deal;\n  if d.id is null then return jsonb_build_object('ok', false, 'reason', 'unknown deal'); end if;\n  if d.status <> 'settled' or d.settled_value is null then\n    return jsonb_build_object('ok', false, 'reason', 'nothing to pay: this deal has not settled');\n  end if;\n  if p_payer_side not in ('a','b') then return jsonb_build_object('ok', false, 'reason', 'payer must be a or b'); end if;\n\n  select * into existing from public.truce_payouts where deal_id = p_deal and status <> 'cancelled' limit 1;\n  if existing.id is not null then\n    return jsonb_build_object('ok', true, 'already', true, 'payout_id', existing.id,\n      'status', existing.status, 'amount_cents', existing.amount_cents, 'fee_cents', existing.fee_cents);\n  end if;\n\n  amt := round(d.settled_value * 100)::integer;\n  payee := case when p_payer_side = 'a' then 'b' else 'a' end;\n  if p_fee_cents < 0 or p_fee_cents >= amt then\n    return jsonb_build_object('ok', false, 'reason', 'the fee must be smaller than the amount');\n  end if;\n\n  insert into public.truce_payouts (deal_id, payer_side, payee_side, amount_cents, fee_cents, status)\n  values (p_deal, p_payer_side, payee, amt, p_fee_cents, 'created')\n  returning * into existing;\n  return jsonb_build_object('ok', true, 'payout_id', existing.id, 'amount_cents', amt,\n    'fee_cents', p_fee_cents, 'status', 'created');\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_intent text, p_status text, p_evidence jsonb, p_fee_id text",
+   "name": "tr_payout_settle",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_payout_settle(p_secret text, p_intent text, p_status text, p_evidence jsonb, p_fee_id text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare row public.truce_payouts;\nbegin\n  perform private.require(p_secret);\n  select * into row from public.truce_payouts where stripe_payment_intent = p_intent;\n  if row.id is null then return jsonb_build_object('ok', false, 'reason', 'no payout for that intent'); end if;\n  if row.status = 'succeeded' then\n    return jsonb_build_object('ok', true, 'already', true, 'payout_id', row.id);\n  end if;\n  update public.truce_payouts\n     set status = p_status,\n         paid_at = case when p_status = 'succeeded' then now() else paid_at end,\n         stripe_application_fee = coalesce(p_fee_id, stripe_application_fee),\n         evidence = p_evidence,\n         failure_reason = case when p_status = 'succeeded' then null else p_evidence->>'reason' end\n   where id = row.id;\n  return jsonb_build_object('ok', true, 'payout_id', row.id, 'status', p_status);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_days integer",
+   "name": "tr_revenue",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_revenue(p_secret text, p_days integer DEFAULT 30)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare out jsonb;\nbegin\n  perform private.require(p_secret);\n  select jsonb_build_object(\n    'window_days', p_days,\n    'deals_settled', (select count(*) from public.truce_deals where status='settled' and settled_at > now() - (p_days||' days')::interval),\n    'payouts_succeeded', (select count(*) from public.truce_payouts where status='succeeded' and paid_at > now() - (p_days||' days')::interval),\n    'gross_settled_cents', (select coalesce(sum(amount_cents),0) from public.truce_payouts where status='succeeded' and paid_at > now() - (p_days||' days')::interval),\n    'fees_earned_cents', (select coalesce(sum(fee_cents),0) from public.truce_payouts where status='succeeded' and paid_at > now() - (p_days||' days')::interval),\n    'awaiting', (select count(*) from public.truce_payouts where status in ('created','awaiting_payee','awaiting_payment')),\n    'failed', (select count(*) from public.truce_payouts where status in ('failed','cancelled'))\n  ) into out;\n  return out;\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres",
+    "anon=X/postgres"
+   ],
+   "args": "p_secret text, p_token text, p_body text",
+   "name": "tr_say",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_say(p_secret text, p_token text, p_body text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare me public.truce_parties; d public.truce_deals; n int; b text;\nbegin\n  perform private.require(p_secret);\n  select * into me from public.truce_parties where token = p_token;\n  if not found then return jsonb_build_object('ok', false, 'reason', 'unknown link'); end if;\n  select * into d from public.truce_deals where id = me.deal_id;\n  if d.expires_at < now() then return jsonb_build_object('ok', false, 'reason', 'this link has expired'); end if;\n  if d.status in ('settled','no_overlap','withdrawn') then\n    return jsonb_build_object('ok', false, 'reason', 'this deal is finished');\n  end if;\n  b := btrim(coalesce(p_body,''));\n  if b = '' then return jsonb_build_object('ok', false, 'reason', 'say something'); end if;\n  b := left(b, 1200);\n  select coalesce(max(seq),0)+1 into n from public.truce_messages where deal_id = d.id;\n  insert into public.truce_messages (deal_id, seq, speaker, body, move)\n  values (d.id, n, me.side, b, 'human');\n  update public.truce_deals set status='negotiating' where id=d.id and status='open';\n  return jsonb_build_object('ok', true, 'seq', n, 'side', me.side);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres",
+    "anon=X/postgres"
+   ],
+   "args": "p_secret text, p_token text, p_contact text",
+   "name": "tr_set_contact",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_set_contact(p_secret text, p_token text, p_contact text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare pid uuid; did uuid; c text;\nbegin\n  perform private.require(p_secret);\n  select id, deal_id into pid, did from public.truce_parties where token = p_token;\n  if pid is null then return jsonb_build_object('ok', false, 'reason', 'unknown token'); end if;\n  c := nullif(btrim(coalesce(p_contact,'')), '');\n  -- Only an email. A phone number would imply we can text, and texting is not switched on.\n  if c is not null and c !~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$' then\n    return jsonb_build_object('ok', false, 'reason', 'that does not look like an email address');\n  end if;\n  -- ★ A PARTY MAY ONLY EVER WRITE THEIR OWN CONTACT, because the token identifies exactly one\n  -- row. There is deliberately no path anywhere that lets one side supply the other side's\n  -- address: the whole invitation model is that the sender passes the link on themselves.\n  update public.truce_parties set contact = c where id = pid;\n  return jsonb_build_object('ok', true, 'saved', c is not null);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_token text, p_direction text, p_amount numeric, p_must_haves text[], p_opening numeric, p_target numeric",
+   "name": "tr_set_limit",
+   "config": [
+    "search_path=public, private, sealed, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_set_limit(p_secret text, p_token text, p_direction text, p_amount numeric, p_must_haves text[] DEFAULT '{}'::text[], p_opening numeric DEFAULT NULL::numeric, p_target numeric DEFAULT NULL::numeric)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'sealed', 'extensions'\nAS $function$\ndeclare me public.truce_parties; d public.truce_deals; other public.truce_parties;\n        o_amt numeric; o_dir text; lo numeric; hi numeric; mid numeric; val numeric; n int;\nbegin\n  perform private.require(p_secret);\n  select * into me from public.truce_parties where token = p_token;\n  if me.id is null then return jsonb_build_object('error','unknown link'); end if;\n  select * into d from public.truce_deals where id = me.deal_id;\n  if d.status = 'settled' then return public.tr_view(p_secret, p_token); end if;\n\n  if p_target is not null then\n    if p_direction = 'min' and p_target < p_amount then\n      return jsonb_build_object('error','your goal is below your floor. The goal is what you push for; the floor is where you stop.');\n    end if;\n    if p_direction = 'max' and p_target > p_amount then\n      return jsonb_build_object('error','your goal is above your ceiling. The goal is what you push for; the ceiling is where you stop.');\n    end if;\n  end if;\n\n  -- deal_id is NOT NULL here and the first draft of this function omitted it, which threw and\n  -- surfaced as a generic 500 on the one path that mattered.\n  insert into sealed.limits (party_id, deal_id, amount, direction, must_haves, opening, target)\n  values (me.id, me.deal_id, p_amount, p_direction, coalesce(p_must_haves,'{}'), p_opening, p_target)\n  on conflict (party_id) do update\n    set amount = excluded.amount, direction = excluded.direction,\n        must_haves = excluded.must_haves, opening = excluded.opening, target = excluded.target;\n  update public.truce_parties set limit_set_at = now() where id = me.id;\n  update public.truce_deals set status='negotiating' where id=d.id and status='open';\n\n  select * into other from public.truce_parties where deal_id = d.id and side <> me.side;\n  select l.amount, l.direction into o_amt, o_dir from sealed.limits l where l.party_id = other.id;\n  if o_amt is not null then\n    if p_direction = o_dir then\n      return jsonb_build_object('error','you both picked the same direction, so there is nothing to settle');\n    end if;\n    lo := least(p_amount, o_amt); hi := greatest(p_amount, o_amt);\n    if (p_direction='min' and p_amount > o_amt) or (p_direction='max' and p_amount < o_amt) then\n      update public.truce_deals set status='no_overlap' where id=d.id;\n      return public.tr_view(p_secret, p_token);\n    end if;\n    mid := (lo + hi) / 2.0;\n    val := round(mid + ((coalesce(d.seed, 0.5) - 0.5) * (hi - lo) * 0.18));\n    if val < lo then val := lo; end if;\n    if val > hi then val := hi; end if;\n    select coalesce(max(seq),0) into n from public.truce_messages where deal_id = d.id;\n    update public.truce_deals\n       set status='settled', settled_at=now(), settled_value=val,\n           settlement = jsonb_build_object('value', val, 'method',\n             'a point inside the overlap between two sealed limits, offset so the figure cannot be inverted to reveal either one',\n             'messages', n, 'computed_at', now())\n     where id = d.id;\n  end if;\n  return public.tr_view(p_secret, p_token);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_deal uuid",
+   "name": "tr_settlement_notice",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.tr_settlement_notice(p_secret text, p_deal uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare d record; out jsonb;\nbegin\n  perform private.require(p_secret);\n  -- ★ CLAIM-ONCE, ATOMICALLY. Both sides can race here, and a retry must never send a second\n  -- \"you settled\" email. The UPDATE ... where notified_at is null RETURNING is the claim: exactly\n  -- one caller wins it, everyone else gets claimed:false and sends nothing.\n  update public.truce_deals\n     set notified_at = now()\n   where id = p_deal and status = 'settled' and notified_at is null\n  returning id, subject, settled_value into d;\n\n  if d.id is null then\n    return jsonb_build_object('ok', true, 'claimed', false);\n  end if;\n\n  select jsonb_build_object(\n    'ok', true, 'claimed', true, 'subject', d.subject, 'settled_value', d.settled_value,\n    'parties', coalesce(jsonb_agg(jsonb_build_object(\n        'side', p.side, 'name', p.display_name, 'contact', p.contact, 'token', p.token\n      ) order by p.side) filter (where p.contact is not null), '[]'::jsonb)\n  ) into out\n  from public.truce_parties p where p.deal_id = d.id;\n  return out;\nend $function$\n",
    "security_definer": true
   },
   {
@@ -10517,7 +11018,7 @@
    "schema": "sealed",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION sealed.my_limit(p_party uuid)\n RETURNS jsonb\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'sealed', 'public'\nAS $function$\n  select jsonb_build_object(\n           'limit',  l.amount,        -- canonical, matches the published contract\n           'amount', l.amount,        -- transitional alias, same value, same audience\n           'opening', l.opening,\n           'direction', l.direction,\n           'must_haves', l.must_haves)\n    from sealed.limits l where l.party_id = p_party;\n$function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION sealed.my_limit(p_party uuid)\n RETURNS jsonb\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'sealed', 'public'\nAS $function$\n  select jsonb_build_object('limit', l.amount, 'amount', l.amount, 'target', l.target,\n           'opening', l.opening, 'direction', l.direction, 'must_haves', l.must_haves)\n    from sealed.limits l where l.party_id = p_party;\n$function$\n",
    "security_definer": true
   },
   {
@@ -11195,6 +11696,13 @@
    "table": "compliance_policy",
    "schema": "public",
    "definition": "PRIMARY KEY (id)"
+  },
+  {
+   "name": "compliance_states_pkey",
+   "type": "p",
+   "table": "compliance_states",
+   "schema": "public",
+   "definition": "PRIMARY KEY (state)"
   },
   {
    "name": "compliance_training_pkey",
@@ -11923,6 +12431,62 @@
    "table": "truce_parties",
    "schema": "public",
    "definition": "UNIQUE (token)"
+  },
+  {
+   "name": "truce_payouts_amount_cents_check",
+   "type": "c",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CHECK ((amount_cents > 0))"
+  },
+  {
+   "name": "truce_payouts_deal_id_fkey",
+   "type": "f",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "FOREIGN KEY (deal_id) REFERENCES truce_deals(id) ON DELETE CASCADE"
+  },
+  {
+   "name": "truce_payouts_fee_cents_check",
+   "type": "c",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CHECK ((fee_cents >= 0))"
+  },
+  {
+   "name": "truce_payouts_payee_side_check",
+   "type": "c",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CHECK ((payee_side = ANY (ARRAY['a'::text, 'b'::text])))"
+  },
+  {
+   "name": "truce_payouts_payer_side_check",
+   "type": "c",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CHECK ((payer_side = ANY (ARRAY['a'::text, 'b'::text])))"
+  },
+  {
+   "name": "truce_payouts_pkey",
+   "type": "p",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "PRIMARY KEY (id)"
+  },
+  {
+   "name": "truce_payouts_status_check",
+   "type": "c",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "CHECK ((status = ANY (ARRAY['created'::text, 'awaiting_payee'::text, 'awaiting_payment'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text, 'cancelled'::text])))"
+  },
+  {
+   "name": "truce_payouts_stripe_payment_intent_key",
+   "type": "u",
+   "table": "truce_payouts",
+   "schema": "public",
+   "definition": "UNIQUE (stripe_payment_intent)"
   },
   {
    "name": "truce_signatures_deal_id_fkey",
