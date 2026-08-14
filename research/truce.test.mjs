@@ -16,6 +16,14 @@
 // print on the signed page. A test that only greps the transcript would have passed it.
 
 const SITE = process.env.TRUCE_SITE || 'https://answered.reddenda.com';
+
+// ★ EVERY DEAL THIS SUITE CREATES IS TAGGED AND TORN DOWN.
+// A previous run of this file left 14 fabricated negotiations sitting in the production table that
+// the operator console reads, and a teammate found them and reasoned about them as real. A test
+// that writes to production and does not clean up is manufacturing evidence, which is the estate's
+// first law inverted. The tag makes the residue findable even if the teardown itself fails.
+const RUN = `truce-test-${Date.now().toString(36)}`;
+const created = [];
 const API = `${SITE}/api/truce`;
 
 let pass = 0; let fail = 0;
@@ -43,6 +51,7 @@ async function runDeal({ sellerFloor, buyerCeiling, sellerAsk, buyerOffer, subje
   const b = d.them.split('/').pop();
   await api({ op: 'set_limit', token: a, direction: 'min', amount: sellerFloor, opening: sellerAsk });
   const view = await api({ op: 'set_limit', token: b, direction: 'max', amount: buyerCeiling, opening: buyerOffer });
+  created.push(d.deal_id);
   return { a, b, view, dealId: d.deal_id };
 }
 
@@ -56,7 +65,7 @@ const CEILING = 1700;    // Ryan will not pay more
 {
   const { a, b, view } = await runDeal({
     sellerFloor: FLOOR, buyerCeiling: CEILING, sellerAsk: 1750, buyerOffer: 1450,
-    subject: 'truce-test property-1',
+    subject: `${RUN} property-1`,
   });
 
   const ryanSees = JSON.stringify(view);
@@ -113,7 +122,7 @@ const CEILING = 1700;    // Ryan will not pay more
   for (let i = 0; i < 5; i += 1) {
     const { view } = await runDeal({
       sellerFloor: FLOOR, buyerCeiling: CEILING, sellerAsk: 1750, buyerOffer: 1450,
-      subject: `truce-test property-2 run ${i}`,
+      subject: `${RUN} property-2 run ${i}`,
     });
     settled.push(Number(view.deal.settled_value));
   }
@@ -136,7 +145,7 @@ const CEILING = 1700;    // Ryan will not pay more
 {
   const { view, b: noOverlapTokenB } = await runDeal({
     sellerFloor: 1950, buyerCeiling: 1900, sellerAsk: 2100, buyerOffer: 1800,
-    subject: 'truce-test no-overlap',
+    subject: `${RUN} no-overlap`,
   });
   test('no overlap settles nothing and says so plainly', () => {
     assert(view.deal.status === 'no_overlap', `status was ${view.deal.status}`);
@@ -161,7 +170,20 @@ const CEILING = 1700;    // Ryan will not pay more
   test('a malformed link is rejected without touching the database', () => assert(rejected));
 }
 
+// ── TEARDOWN. Runs whatever happened above. ──────────────────────────────────────────────────
+let removed = 0; let stranded = 0;
+for (const id of created) {
+  try {
+    const r = await api({ op: 'purge_test_deal', deal_id: id, run: RUN });
+    if (r && r.deleted) removed += 1; else stranded += 1;
+  } catch { stranded += 1; }
+}
+console.log(`\nteardown: ${removed}/${created.length} test deals removed${stranded ? `, ${stranded} STRANDED` : ''}`);
+if (stranded) {
+  console.log(`  clean them with:  delete from public.truce_deals where subject like '${RUN}%';`);
+  fail += 1;
+  console.log('  FAILING THE RUN: a suite that leaves fabricated rows in production has not passed.');
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
-console.log('Test deals remain in the database with subjects beginning "truce-test". Clean them with:');
-console.log("  delete from public.truce_deals where subject like 'truce-test%';\n");
 process.exit(fail ? 1 : 0);

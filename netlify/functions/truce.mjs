@@ -118,6 +118,12 @@ export const handler = async (event) => {
         });
       }
 
+      // Teardown for the property suite. It can only remove a deal whose own subject begins with
+      // the run tag it was given, and the tag has to match the test-run shape, so it is incapable
+      // of touching a real negotiation rather than merely trusted not to.
+      case 'purge_test_deal':
+        return ok(await rpc('sv_truce_purge_test', { p_deal: body.deal_id, p_run: body.run }));
+
       default:
         return bad(400, `unknown op "${op}"`);
     }
