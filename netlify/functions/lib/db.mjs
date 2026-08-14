@@ -47,6 +47,8 @@ export const exec           = (table, row) => rpc('sv_exec', { p_table: table, p
 
 // ── reads ────────────────────────────────────────────────────────────────────────────────────
 export const board      = () => rpc('sv_board');
+/** Everything the gate needs about one number, in one round trip. Never dial without it. */
+export const dialContext = (phone) => rpc('sv_dial_context', { p_phone: phone });
 export const contacts   = (f = {}) => rpc('sv_contacts', {
   p_q: f.q || null, p_lane: f.lane || null, p_disposition: f.disposition || null,
   p_state: f.state || null, p_trade: f.trade || null, p_line_type: f.lineType || null,

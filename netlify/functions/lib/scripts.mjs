@@ -56,6 +56,24 @@ export const SCRIPTS = {
     listenSeconds: 12,
   },
 
+  // A human operator on the line, joined through a conference.
+  //
+  // NOTE ON A DISTINCTION WE ARE DELIBERATELY NOT TAKING ADVANTAGE OF: a call dialled by a
+  // person, with a person speaking, is neither an autodialled call nor an artificial voice, so
+  // 47 CFR 64.1200(a)(1) does not reach it and the mobile restriction that blocks everything
+  // else here would not apply. That is very probably correct in law. It is still gated exactly
+  // like an AI call in this system, because the moment "a human is on it" unlocks a wider pool,
+  // autopilot has a loophole to drive through, and the difference between a supervised manual
+  // dial and an automated one is a code path nobody will re-read in six months. If we ever want
+  // the wider pool for genuinely manual dialling, it gets its own explicit lane with its own
+  // audit trail, not a quiet exemption inside this object.
+  conference: {
+    id: 'conference.v1',
+    obligations: ['identify_caller_at_open', 'state_callback_number', 'disclose_ai_at_open', 'announce_recording_if_recorded'],
+    open: () => opening(),
+    listenSeconds: 0,
+  },
+
   // Voicemail. Short, honest, and it never calls back.
   voicemail: {
     id: 'voicemail.v1',

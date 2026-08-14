@@ -12,3 +12,4 @@ node_modules/
 
 # research corpus: real business contact data, never deployed, never committed
 research/data/
+research/data-pull.log

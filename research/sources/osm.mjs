@@ -10,6 +10,10 @@
 // Overpass is a shared free service. Be a good citizen: one state at a time, a real timeout, and
 // a pause between requests. If you need volume, run it overnight, not in a loop.
 
+// OSM's usage policy requires a descriptive User-Agent with a contact route. Sending none
+// gets you a 406 from Apache, not a helpful error.
+const UA = 'Answered-Research/1.0 (contact: info@reddenda.com) node-fetch';
+
 const ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
@@ -95,10 +99,21 @@ async function post(query, { attempts = 4 } = {}) {
     const endpoint = ENDPOINTS[attempt % ENDPOINTS.length];
     try {
       await waitForSlot(endpoint);
+      // MEASURED 2026-08-13: Overpass wants the query form-encoded as `data=`. Posting it as a
+      // raw text/plain body returns 504 and 429 rather than a parse error, which reads exactly
+      // like rate limiting and sent this lane chasing a throttle that was not there.
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: query,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          // MEASURED 2026-08-13: without these two headers the endpoint returns 406 Not
+          // Acceptable from Apache, and the retry loop reads it as throttling. Node's fetch
+          // sends no descriptive User-Agent, and the OSM usage policy requires one. Every
+          // "429" chased for an hour was this.
+          'User-Agent': UA,
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams({ data: query }).toString(),
         signal: AbortSignal.timeout(180000),
       });
       if (res.status === 429 || res.status === 504) throw new Error(`overpass ${res.status}`);
@@ -123,12 +138,25 @@ export async function pullState({ state, trades = Object.keys(TRADES), limit = 4
   const batches = chunk(selectors, SELECTORS_PER_QUERY);
 
   for (let i = 0; i < batches.length; i += 1) {
-    let data;
+    let data = null;
     try {
       data = await post(buildQuery(state, batches[i], limit));
     } catch (e) {
-      onProgress?.({ state, batch: i + 1, of: batches.length, error: e.message });
-      continue;                                    // one dead batch never kills the state
+      // A big state (TX, FL, CA) can blow the server-side budget with several selectors in one
+      // union and come back 504 or 429, which reads like throttling but is really query cost.
+      // Fall back to one selector at a time before giving up on the batch.
+      onProgress?.({ state, batch: i + 1, of: batches.length, error: `${e.message}; retrying one selector at a time` });
+      const merged = { elements: [] };
+      for (const sel of batches[i]) {
+        try {
+          const one = await post(buildQuery(state, [sel], limit));
+          merged.elements.push(...(one.elements || []));
+        } catch (e2) {
+          onProgress?.({ state, batch: i + 1, of: batches.length, error: `${sel}: ${e2.message}` });
+        }
+        await sleep(2000);
+      }
+      data = merged;
     }
 
     let added = 0;

@@ -12,8 +12,8 @@
 
 import * as db from './lib/db.mjs';
 import * as tw from './lib/twilio-rest.mjs';
-import { SCRIPTS, scriptSatisfies } from './lib/scripts.mjs';
-import { classify, DEFAULT_POLICY, LANES } from '../../research/lib/lane.mjs';
+import { SCRIPTS } from './lib/scripts.mjs';
+import { gateFor, placeCall, site } from './lib/dial.mjs';
 import { BASE_HEADERS, mintCookie, cookieValid, pinValid, configured, readCookie, setCookieHeader, slow } from './lib/gate-auth.mjs';
 import { PAGE, LOGIN } from './cockpit-ui.mjs';
 
@@ -22,83 +22,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Cache
 const ok = (data) => ({ statusCode: 200, headers: JSON_HEADERS, body: JSON.stringify(data) });
 const bad = (code, message) => ({ statusCode: code, headers: JSON_HEADERS, body: JSON.stringify({ error: message }) });
 
-const site = () => process.env.URL || 'https://answered.reddenda.com';
 const OPERATOR_NUMBER = () => (process.env.ANSWERED_OPERATOR_NUMBER || '').trim();
-
-// ── the gate, applied identically everywhere ─────────────────────────────────────────────────
-async function gateFor(phone, { state, lineType, lookupOk, consent, callCount30d } = {}) {
-  let lt = lineType;
-  let lo = lookupOk;
-  if (lt == null) {
-    const res = await tw.lineType(phone);
-    lt = res.lineType; lo = res.lookupOk;
-  }
-  const verdict = classify(
-    { phone, state, lineType: lt, lookupOk: lo, consent, callCount30d: callCount30d || 0 },
-    DEFAULT_POLICY, new Set(), new Date(),
-  );
-  return { verdict, lineType: lt, lookupOk: lo };
-}
-
-async function placeCall({ phone, contact, mode, operator, campaignId, lineId, fromNumber }) {
-  const script = SCRIPTS[mode] ? mode : 'measure';
-  const { verdict, lineType, lookupOk } = await gateFor(phone, {
-    state: contact?.state, lineType: contact?.line_type, lookupOk: contact?.lookup_ok,
-    callCount30d: contact?.call_count,
-  });
-
-  // The script must carry every obligation the gate attached, or the call does not happen.
-  const sat = verdict.dialable ? scriptSatisfies(script, verdict.obligations || []) : { ok: true, missing: [] };
-  if (!sat.ok) {
-    verdict.lane = LANES.RED;
-    verdict.dialable = false;
-    verdict.reasons = [...(verdict.reasons || []), `script "${script}" does not carry: ${sat.missing.join(', ')}`];
-  }
-
-  const gateRecord = {
-    lane: verdict.lane, dialable: verdict.dialable, reasons: verdict.reasons,
-    line_type: lineType, lookup_ok: lookupOk, obligations: verdict.obligations || [],
-    script, policy: DEFAULT_POLICY, decided_at: new Date().toISOString(),
-  };
-
-  if (!verdict.dialable) {
-    await db.recordCall({
-      contact_id: contact?.id || null, campaign_id: campaignId || null, to_number: phone,
-      from_number: fromNumber || null, status: 'refused', gate: gateRecord, operator,
-      placed: false, refused_reason: (verdict.reasons || []).join('; '),
-    });
-    return { placed: false, gate: gateRecord, retryAt: verdict.retryAt || null };
-  }
-
-  const from = fromNumber || process.env.CANARY_FROM_NUMBER || process.env.ANSWERED_DEMO_NUMBER;
-  if (!from) return { placed: false, error: 'no outbound number configured' };
-
-  const call = await tw.createCall({
-    To: phone,
-    From: from,
-    Url: `${site()}/api/call-voice?mode=${encodeURIComponent(script)}`,
-    Method: 'POST',
-    StatusCallback: `${site()}/api/call-status`,
-    StatusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-    StatusCallbackMethod: 'POST',
-    MachineDetection: 'DetectMessageEnd',
-    MachineDetectionTimeout: 15,
-    AsyncAmd: 'false',
-    Timeout: 30,
-    Record: 'true',
-    RecordingStatusCallback: `${site()}/api/call-recording`,
-    RecordingStatusCallbackMethod: 'POST',
-    RecordingChannels: 'dual',
-  });
-
-  await db.recordCall({
-    call_sid: call.sid, contact_id: contact?.id || null, campaign_id: campaignId || null,
-    line_id: lineId || null, to_number: phone, from_number: from, status: call.status,
-    gate: gateRecord, operator, placed: true,
-  });
-
-  return { placed: true, call_sid: call.sid, status: call.status, gate: gateRecord };
-}
 
 // ── operations ───────────────────────────────────────────────────────────────────────────────
 async function run(op, body, operator) {
@@ -114,8 +38,13 @@ async function run(op, body, operator) {
     case 'calls':      return { rows: await db.calls(body) };
 
     case 'gatecheck': {
-      const { verdict, lineType, lookupOk } = await gateFor(body.phone, { state: body.state });
-      return { verdict, line_type: lineType, lookup_ok: lookupOk };
+      const g = await gateFor(body.phone, { state: body.state });
+      return {
+        verdict: g.verdict, line_type: g.lineType, lookup_ok: g.lookupOk,
+        suppressed: Boolean(g.context && g.context.suppressed),
+        calls_30d: Number((g.context && g.context.calls_30d) || 0),
+        known_contact: g.contact ? { id: g.contact.id, name: g.contact.name, state: g.contact.state, disposition: g.contact.disposition } : null,
+      };
     }
 
     case 'dial': {
