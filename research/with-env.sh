@@ -15,7 +15,7 @@ if ! command -v netlify >/dev/null 2>&1; then
   echo "netlify CLI not found. npm i -g netlify-cli" >&2; exit 1
 fi
 
-NEEDED="TWILIO_ACCOUNT_SID TWILIO_API_SID TWILIO_API_SECRET CANARY_FROM_NUMBER ANSWERED_DEMO_NUMBER ELEVENLABS_API_KEY ANTHROPIC_API_KEY_LIVE ANSWERED_EL_AGENT_ID"
+NEEDED="TWILIO_ACCOUNT_SID TWILIO_API_SID TWILIO_API_SECRET CANARY_FROM_NUMBER ANSWERED_DEMO_NUMBER ELEVENLABS_API_KEY ANTHROPIC_API_KEY_LIVE ANSWERED_EL_AGENT_ID ANSWERED_DB_URL ANSWERED_DB_ANON ANSWERED_DB_SECRET"
 
 # One API call, then pick out what we need. env:get per-variable would be N round trips.
 ENV_JSON="$(netlify env:list --json 2>/dev/null)" || { echo "netlify env:list failed. Is this directory linked? (netlify link)" >&2; exit 1; }
