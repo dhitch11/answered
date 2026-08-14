@@ -94,14 +94,25 @@ for (const [reason, n] of gated.reasons.slice(0, 6)) console.log(`    ${String(n
 const byState = new Map();
 for (const r of gated.records) {
   const k = r.state;
-  const v = byState.get(k) || { total: 0, dialable: 0 };
-  v.total += 1; if (r.verdict.lane === 'amber' || r.verdict.lane === 'green' || r.verdict.lane === 'hold') {
+  const v = byState.get(k) || { total: 0, dialable: 0, unmeasured: 0 };
+  v.total += 1;
+  // ★ A NUMBER WE NEVER MANAGED TO ASK ABOUT IS COUNTED SEPARATELY, NOT AS A ZERO.
+  // Oregon's first 175 numbers all came back `Twilio 401: The authorization with Key failed`, and
+  // this table printed "OR 0/175 0% fixed-line" — which reads as "Oregon has no business landlines"
+  // when the truth was "we never asked". The gate was fine (a failed lookup is RED, correctly), but
+  // the REPORT turned a broken credential into a fact about a state, and Oregon is the one state
+  // we are legally clear to call. A failure must never render as a measurement.
+  if (r.lookupOk === false) v.unmeasured += 1;
+  else if (r.verdict.lane === 'amber' || r.verdict.lane === 'green' || r.verdict.lane === 'hold') {
     if (r.lineType === 'landline' || r.lineType === 'fixedVoip') v.dialable += 1;
   }
   byState.set(k, v);
 }
 console.log('\n  By state:');
 for (const [st, v] of [...byState.entries()].sort((a, b) => b[1].total - a[1].total)) {
-  console.log(`    ${st}  ${String(v.dialable).padStart(4)}/${String(v.total).padEnd(4)}  ${((v.dialable / v.total) * 100).toFixed(0)}% fixed-line`);
+  const measured = v.total - v.unmeasured;
+  const pct = measured > 0 ? `${((v.dialable / measured) * 100).toFixed(0)}% fixed-line` : 'NOT MEASURED';
+  const note = v.unmeasured ? `  (${v.unmeasured} lookup failed, excluded from the rate)` : '';
+  console.log(`    ${st}  ${String(v.dialable).padStart(4)}/${String(measured).padEnd(4)}  ${pct}${note}`);
 }
 console.log(`${'='.repeat(74)}\n`);

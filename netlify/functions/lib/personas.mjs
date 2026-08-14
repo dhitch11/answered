@@ -51,6 +51,22 @@ const PAYMENT_OUT_RE = /\b(?:card number|credit card|debit card|social security|
 // Wednesday. Any other weekday out of her mouth is an invented appointment.
 const DAY_RE = /\b(?:monday|thursday|friday|saturday|sunday)\b/i;
 
+// ★ MEASURED, NOT IMAGINED (2026-08-14). A full conversation was run through the real agent with
+// the booking tool MOCKED by the vendor's simulator, which answers every tool with the two words
+// "Tool Called." The model read that, and said: "You're all set, Marcus. I have you booked for
+// Tuesday at eight in the morning." Nothing had been booked. Nothing had even been attempted.
+//
+// That is the single most damaging sentence this product can produce, and no floor stood under it,
+// because every floor here reads only the WORDS and this one is about a FACT: has a booking
+// actually been confirmed in this conversation. So this floor takes the fact as an argument. It is
+// off only when a tool answer has said the visit is on the schedule; the default, and the value on
+// any code path that forgets to pass it, is ON.
+//
+// It deliberately does NOT catch the HOLD language the frozen spec requires ("I have you penciled
+// in for Tuesday at eight"), because holding a window out loud before booking it is exactly what
+// Riley is told to do. The line between them is the claim of completion, not the mention of a time.
+const BOOKED_CLAIM_RE = /\b(?:you(?:'re| are)? all set\b|you(?:'re| are) (?:booked|scheduled|confirmed|locked in)\b|i(?:'ve| have) (?:got )?(?:you )?(?:booked|scheduled)\b|we(?:'ve| have) (?:got )?(?:you )?(?:booked|scheduled)\b|(?:it|that|the visit|the appointment)(?:'s| is| has been) (?:booked|scheduled|confirmed)\b|you(?:'re| are) on the (?:books|schedule)\b|(?:it|that)(?:'s| is) on the (?:books|schedule)\b)/i;
+
 const CRISIS_RE = /\b(?:gas leak|smell(?:s|ing)? (?:like )?gas|carbon monoxide|co (?:alarm|detector)|on fire|house fire|fire in (?:the|my)|smoke (?:coming|pouring|filling|everywhere)|spark(?:s|ing)? (?:from|out of|in the)|flooding (?:right now|bad|fast)|actively flooding|water (?:pouring|gushing|shooting))\b/i;
 
 const PAYMENT_IN_RE = /\b(?:card number|credit card|debit card|social security|ssn|cvv|routing number)\b|\b\d{13,16}\b/i;
@@ -380,6 +396,9 @@ export const PERSONAS = {
       "Well, that's embarrassing, my side of the demo just tripped over itself. Give me another ring in a minute and I'll be right here.",
     closeLine: 'Alright, we should wrap up here. Thanks for calling Cedar Ridge Plumbing and Air, you take care now.',
     outFloors: [
+      // FIRST, because a false booking is the worst thing this voice can say. The five frozen
+      // floors keep their order relative to each other underneath it.
+      { by: 'unbooked-claim', re: BOOKED_CLAIM_RE, unlessBooked: true, pivot: 'Hold on, I do not have that written down yet, so nothing is booked. Let me sort that out for you.' },
       { by: 'price', re: PRICE_RE, pivot: 'The office quotes prices, I only book the visit. Want me to grab you a window?' },
       { by: 'contact-promise', re: CONTACT_RE, pivot: "I handle the whole thing right here on the call, so let's just knock it out now." },
       { by: 'ai-denial', re: AI_DENY_RE, pivot: "To be straight with you, I'm an AI receptionist on the Answered demo line. Now, where were we with that visit?" },
@@ -592,9 +611,18 @@ export function personaFor(pathname, body) {
 
 // ── the guard engine ────────────────────────────────────────────────────────
 
-/** One clause, one verdict. Deterministic, and it runs before a word streams. */
-export function guardClause(persona, text, ctxDigits) {
+/**
+ * One clause, one verdict. Deterministic, and it runs before a word streams.
+ *
+ * `state` carries facts the guard cannot read out of the text: today the only one is whether a
+ * booking has actually been confirmed on this call. A floor marked `unlessBooked` is skipped only
+ * when that is TRUE, so a caller that forgets to pass state gets the floor at full strength. The
+ * failure direction is a pivot, never a claim.
+ */
+export function guardClause(persona, text, ctxDigits, state) {
+  const booked = Boolean(state && state.booked);
   for (const f of persona.outFloors) {
+    if (f.unlessBooked && booked) continue;
     if (f.numeral) {
       if (badNumeral(text, ctxDigits, persona.numAllow)) return { ok: false, by: f.by, pivot: f.pivot };
       continue;
@@ -609,7 +637,7 @@ export function guardClause(persona, text, ctxDigits) {
 }
 
 /** The buffered path: guard a whole reply, clause by clause, and cap cadence. */
-export function guardWhole(persona, text, ctxDigits) {
+export function guardWhole(persona, text, ctxDigits, state) {
   let rest = String(text || '').trim();
   if (!rest) return '';
   let out = '';
@@ -625,7 +653,7 @@ export function guardWhole(persona, text, ctxDigits) {
       rest = rest.slice(end);
     }
     if (clause) {
-      const g = guardClause(persona, clause, ctxDigits);
+      const g = guardClause(persona, clause, ctxDigits, state);
       if (!g.ok) return (out ? out + ' ' : '') + g.pivot;
       out += (out ? ' ' : '') + clause;
       sentences += 1;

@@ -243,19 +243,31 @@ export async function settle(session, { operator = 'hold-runtime' } = {}) {
     rating = rate({ kind, evidence }, {});
   }
 
+  // ★ THE NUMBER AND THE SENTENCE HAVE TO COME FROM THE SAME PLACE, AND THEY DID NOT.
+  // The amount was taken from the ledger, which is authoritative, while the explanation was taken
+  // from the local preview. On a replay those two disagree by construction: the ledger returns the
+  // ORIGINAL free event while a fresh preview, run after the free first hold has been spent, says
+  // ten dollars. Measured on a re-run, the receipt printed "$0.00" directly above "A live person
+  // was reached on a commercial line. One price, the whole errand.", which reads like a bill. A
+  // recorded reason always wins over a previewed one.
   const cents = recorded ? recorded.cents : (rating && typeof rating.cents === 'number' ? rating.cents : 0);
+  const reason = (recorded && recorded.reason) || (rating ? rating.reason : REASON[outcome]);
   const patched = await patch(s.id, {
     ...base,
     charge_kind: kind,
     charge_cents: cents,
     charge_gross_cents: rating ? rating.gross_cents || 0 : 0,
-    charge_reason: rating ? rating.reason : REASON[outcome],
+    charge_reason: reason,
     bill_event_id: recorded && recorded.id ? recorded.id : null,
   });
   await event(s.id, 'settled', {
     outcome, kind, charged_cents: cents,
     gross_cents: rating ? rating.gross_cents : null,
-    reason: rating ? rating.reason : null,
+    reason,
+    replay: Boolean(recorded && recorded.replay),
+    // Kept, not hidden. A preview taken after the free hold was spent SHOULD disagree with a
+    // replayed original, and that disagreement is the ledger doing its job.
+    preview_disagreed: Boolean(recorded && rating && recorded.cents !== rating.cents),
     recorded_in_ledger: Boolean(recorded), operator,
   });
   return { session: patched, rating, recorded, outcome };

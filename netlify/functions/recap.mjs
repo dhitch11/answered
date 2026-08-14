@@ -272,10 +272,19 @@ export async function deliverRecap(input, { site = 'https://answered.reddenda.co
       // so settling a row that was never claimed writes nothing at all and the skip becomes
       // invisible: the operator sees no delivery and no record of why there was none, which is
       // indistinguishable from the bug this whole file exists to fix.
+      //
+      // ★ AND ONLY SETTLE IF THE CLAIM WAS WON. Settling unconditionally would let a number added
+      // to the skip list later rewrite an older row that already recorded a real delivery, turning
+      // "we sent this shop their transcript, here is the provider id" into "we skipped it". A
+      // ledger you can overwrite is not a ledger.
       if (key) {
-        await store.claimDelivery(key, ch, input.conversation_id).catch(() => {});
-        await store.settleDelivery(key, ch, { status: 'skipped', reason, lines: lines.length })
-          .catch(() => { /* the ledger note is not worth failing the request over */ });
+        const claim = await store.claimDelivery(key, ch, input.conversation_id).catch(() => ({ claimed: false }));
+        if (claim.claimed) {
+          await store.settleDelivery(key, ch, { status: 'skipped', reason, lines: lines.length })
+            .catch(() => { /* the ledger note is not worth failing the request over */ });
+        } else {
+          result.delivery[ch] = { ok: true, duplicate: true, reason: `${reason} A delivery record for this call already exists and was left untouched.` };
+        }
       }
     }
     result.ok = true;

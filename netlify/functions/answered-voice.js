@@ -163,6 +163,40 @@ exports.handler = async (event) => {
     return { statusCode: 403, body: 'wrong account' };
   }
 
+  // ── SPEND CEILING ──────────────────────────────────────────────────────────
+  // @LANE-SEARCHLIGHT measured (2026-08-14) that this webhook cannot verify a
+  // Twilio signature: this account authenticates by API key pair, so the auth
+  // token needed for the HMAC is not readable, and validTwilioSignature()
+  // degrades to the AccountSid check. An AccountSid is not a secret, so a
+  // forged POST reaches register-call and burns ElevenLabs quota. That is
+  // denial of wallet, not a breach: no outbound capability and no data.
+  //
+  // The real fix is TWILIO_AUTH_TOKEN from the Twilio Console, and it is
+  // David's to fetch. Until then this caps the damage rather than pretending
+  // there is none. Real inbound volume on this line is a handful of calls a
+  // day, so a ceiling well above that never touches a caller and stops a
+  // script cold. It fails OPEN on a store error, deliberately: a real customer
+  // call must not be refused because a counter could not be read, and the
+  // ceiling exists for money, not for security.
+  try {
+    const blobs = await import('@netlify/blobs');
+    if (typeof blobs.connectLambda === 'function') {
+      try { blobs.connectLambda(event); } catch (e) { /* the read below is the verdict */ }
+    }
+    const store = blobs.getStore('voice-ceiling');
+    const hourKey = 'h/' + new Date().toISOString().slice(0, 13);
+    const cur = await store.get(hourKey, { type: 'json' });
+    const n = Number(cur && cur.n) || 0;
+    const CAP = Number(process.env.ANSWERED_VOICE_HOURLY_CAP || 40);
+    if (n >= CAP) {
+      console.error(`ANSWERED-VOICE: hourly bridge ceiling reached (${n} of ${CAP}); serving the honest fallback instead of burning quota.`);
+      return XML(FALLBACK_TWIML);
+    }
+    await store.setJSON(hourKey, { n: n + 1, at: new Date().toISOString() });
+  } catch (e) {
+    console.error('ANSWERED-VOICE: spend ceiling unreadable, allowing the call:', String(e && e.message).slice(0, 120));
+  }
+
   // never bridge into an account that cannot speak
   if (!(await elAccountHealthy())) {
     console.error('ANSWERED-VOICE fallback: ElevenLabs account unhealthy or unreachable.');

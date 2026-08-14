@@ -87,6 +87,9 @@ export const ROUTES = [
   // because the method check runs before the bearer check. Owner: tighten or relabel freely.
   { path: '/api/answered-tool',    kind: 'api', expect: [405, 401], what: 'The tool endpoint the voice calls to book a job.' },
   { path: '/api/answered-tool/book_job', kind: 'api', expect: [405, 401], what: 'The booking tool, addressed by path the way ElevenLabs sends it.' },
+  // Hold's test line (@LANE-HOLD). Also not mine: added so the drift check stops failing the
+  // staging run for every lane. It is a Twilio webhook, so a GET is 405 or 403. Owner: relabel freely.
+  { path: '/api/hold/testline',    kind: 'api', expect: [405, 403], what: 'The Hold test line webhook.' },
   // HOLD's two Twilio webhooks (@LANE-HOLD). NOT my routes, and I have not read a line of their
   // logic. They are here because _stage.sh's drift check refuses to stage ANY lane's work while a
   // declared path is unmonitored, so an unlisted route from one lane blocks the whole estate. Both

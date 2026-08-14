@@ -478,6 +478,10 @@ export default async (req) => {
   if (assistantTurns >= persona.softCloseAt) system += '\n\n' + persona.softCloseNote;
 
   const offered = offeredTools(persona, body, inMsgs);
+  // The one fact the output guard cannot read out of the model's own words. See the note above
+  // BOOKED_CLAIM_RE in lib/personas.mjs: this is what stops "you are all set" from being said on a
+  // call where nothing was ever written down.
+  const guardState = { booked: bookedAlready(inMsgs) };
 
   const messages = toAnthropicMessages(inMsgs);
 
@@ -530,10 +534,10 @@ export default async (req) => {
         console.error('answered-brain: ' + persona.id + ' produced ' + tool.name + ' arguments this bridge could not parse; nothing was sent');
         return jsonCompletion(id, outModel, persona.toolFail, null);
       }
-      const spokenNow = guardWhole(persona, text, ctxDigits) || persona.toolHold;
+      const spokenNow = guardWhole(persona, text, ctxDigits, guardState) || persona.toolHold;
       return jsonCompletion(id, outModel, spokenNow, [toOpenAiToolCall(tool, conversationId, T0)]);
     }
-    const finalText = guardWhole(persona, text, ctxDigits) || persona.breaker;
+    const finalText = guardWhole(persona, text, ctxDigits, guardState) || persona.breaker;
     return jsonCompletion(id, outModel, finalText, null);
   }
 
@@ -611,7 +615,7 @@ export default async (req) => {
             if (!out) continue;
             out = out.charAt(0).toUpperCase() + out.slice(1);
           }
-          const g = guardClause(persona, out, ctxDigits);
+          const g = guardClause(persona, out, ctxDigits, guardState);
           if (!g.ok) {
             // a blocked clause ends the turn: pivot spoken, nothing after it
             dead = true;

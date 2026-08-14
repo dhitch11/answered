@@ -102,8 +102,10 @@ export default async (req) => {
 
   // A malformed token is told it is malformed rather than 404ing, so somebody who mangled a
   // pasted link knows which half of the problem is theirs.
-  if (/^\/hold\/(s|receipt)\//.test(path)) return html(shell('That link is not valid', notice('That link is not a Hold link. Check you copied the whole thing.')), 404);
-  return new Response('not found', { status: 404 });
+  // Same reason as the 410 above: a 404 here is eaten by the static fallthrough, so a malformed
+  // link would answer with a platform page rather than telling somebody what went wrong.
+  if (/^\/hold\/(s|receipt)\//.test(path)) return html(shell('That link is not valid', notice('That is not a Hold link. Check you copied the whole thing, all forty eight characters of it.')), 400);
+  return new Response('hold: no such route', { status: 404 });
 };
 
 // ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -577,7 +579,11 @@ tick();
 async function receiptPage(token) {
   let v = null;
   try { v = await store.view(token); } catch (e) { return html(shell('Hold receipt', notice('We could not reach the record just now. Try again in a moment.')), 503); }
-  if (!v || v.error) return html(shell('Hold receipt', notice('That link does not match a hold we have.')), 404);
+  // ★ 410, NOT 404, AND IT IS NOT PEDANTRY. Netlify treats a 404 from a matched function as
+  // "carry on looking", falls through to the static handler, and serves ITS generic 404 page
+  // instead. Measured: the honest sentence below was replaced by a blank platform 404, and the
+  // person holding a mistyped link learned nothing. Any status that is not 404 is delivered.
+  if (!v || v.error) return html(shell('Hold receipt', notice('That link does not match a hold we have. Check you pasted the whole thing.')), 410);
 
   const s = v.session;
   const r = store.receipt(s, v.events || []);

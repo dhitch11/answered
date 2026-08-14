@@ -79,7 +79,7 @@ import { callingWindow, zonesFor } from './lib/hours.mjs';
 import {
   opening, identityAsk, debtStatement, WRONG_PARTY, STOP_ACKNOWLEDGED, DISPUTE_ACKNOWLEDGED,
   NO_DATE_YET, PROMISE_CLOSE, CLOSE_UNRESOLVED, VOICEMAIL, BROKEN,
-  isStop, isDispute, askedIfAI, AI_ANSWER, saidYes, saidNo,
+  isStop, isDispute, isWrongNumber, WRONG_NUMBER_ACKNOWLEDGED, askedIfAI, AI_ANSWER, saidYes, saidNo,
   extractPromise, parseDate, parseAmountCents, floorCheck, spokenMoney,
 } from './lib/recover-script.mjs';
 
@@ -516,7 +516,19 @@ async function handleTurn(event) {
   const cb = inv.business_phone || callbackNumber();
   const say = (text) => XML(`<Response>${SAY(text)}<Hangup/></Response>`);
 
-  // ── 1. STOP OUTRANKS EVERYTHING, ON EVERY TURN, BEFORE ANYTHING ELSE RUNS ──────────────────
+  // ── 0. THE WRONG NUMBER, CHECKED FIRST OF ALL ─────────────────────────────────────────────
+  // Before stop and before dispute, because this person is not our debtor and the whole rest of
+  // this function is written for somebody who is. Measured on a live call: without this branch,
+  // "no, wrong number" matched the dispute list and froze a valid invoice as disputed while the
+  // number that does not reach anybody stayed on it, ready to be dialled again tomorrow.
+  if (isWrongNumber(heard)) {
+    await R.stop(inv.id, `wrong number reported on call ${p.CallSid}: "${heard.slice(0, 200)}"`, p.CallSid, 'stop')
+      .catch((e) => console.error('RECOVER: wrong-number stop write failed:', String(e.message).slice(0, 140)));
+    await note(row.id, { disposition: 'wrong_number', identity_confirmed: false, call_sid: p.CallSid || null, outcome: { wrong_number: true, heard } });
+    return say(WRONG_NUMBER_ACKNOWLEDGED);
+  }
+
+  // ── 1. STOP OUTRANKS EVERYTHING ELSE, ON EVERY TURN, BEFORE ANYTHING ELSE RUNS ─────────────
   // 1692c(c) is immediate and unconditional. It is checked before identity, because somebody who
   // says "stop calling me" has said it whether or not they ever confirmed their name.
   if (isStop(heard)) {

@@ -30,7 +30,14 @@ import * as rt from './lib/hold-runtime.mjs';
 import { classifyUtterance, fuse, FAR } from './lib/hold-detect.mjs';
 
 const PUBLIC_PATH = '/api/hold/hear';
-const OK = new Response('', { status: 204 });
+// ★ MEASURED, NOT ASSUMED: `new Response('', { status: 204 })` THROWS.
+// 204 is a null-body status and undici refuses to construct one with a body at all, including the
+// empty string, so this line used to raise "Invalid response status code 204" and the platform
+// turned it into a 500. Every transcription callback and every call-status callback failed that
+// way: the detector never received one word, no status event ever landed, and the product would
+// have looked completely wired while being completely deaf. Nothing about it was visible from the
+// code, the routes, or a green deploy. Only a real HTTP request found it.
+const OK = () => new Response(null, { status: 204 });
 
 const MODELS = ['claude-haiku-4-5-20251001', 'claude-sonnet-5'];
 
@@ -73,7 +80,7 @@ export default async (req) => {
 
   const p = gate.params;
   const id = String((event.queryStringParameters || {}).s || '');
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return OK;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return OK();
 
   const kind = String(p.TranscriptionEvent || '');
   if (kind === 'transcription-error') {
@@ -87,14 +94,14 @@ export default async (req) => {
         await store.patch(id, { detector: { ...(cur.session.detector || {}), deaf: true, deaf_since: new Date().toISOString() } });
       }
     } catch (e) { /* the event above is already the record */ }
-    return OK;
+    return OK();
   }
-  if (kind !== 'transcription-content') return OK;
+  if (kind !== 'transcription-content') return OK();
 
   let data = {};
   try { data = JSON.parse(p.TranscriptionData || '{}'); } catch { /* an unreadable payload is an empty one */ }
   const text = String(data.transcript || '').trim();
-  if (!text) return OK;
+  if (!text) return OK();
 
   // ── 1. write it down, first, always ────────────────────────────────────────────────────────
   const graded = classifyUtterance(text);
@@ -109,12 +116,12 @@ export default async (req) => {
   });
 
   const loaded = await store.get(id, 120);
-  if (!loaded || loaded.error || !loaded.session) return OK;
+  if (!loaded || loaded.error || !loaded.session) return OK();
   const s = loaded.session;
   const events = loaded.events || [];
 
   // Nothing else matters once the errand is over.
-  if (s.status === 'ended' || s.outcome) return OK;
+  if (s.status === 'ended' || s.outcome) return OK();
 
   // ── 2. a stop is obeyed before anything else is decided ────────────────────────────────────
   // The person on the far end never asked to be part of this. If they say take us off the list,
@@ -134,7 +141,7 @@ export default async (req) => {
     await store.patch(id, { outcome_reason: 'the line we called asked not to be called again' });
     await store.settle(s, { operator: 'hold-hear' });
     if (s.call_sid) await rt.endLeg(s.call_sid);
-    return OK;
+    return OK();
   }
 
   // ── 3. decide ──────────────────────────────────────────────────────────────────────────────
@@ -168,36 +175,52 @@ export default async (req) => {
 
   await store.event(id, 'detector', { by: 'hear', act: verdict.act, state: verdict.state, confidence: verdict.confidence, why: verdict.why });
 
-  if (!s.call_sid) return OK;
+  if (!s.call_sid) return OK();
 
-  if (verdict.act === 'bridge') {
-    const rung = await rt.ringUser(s);
-    if (!rung.ok && !rung.already) await store.event(id, 'user_ring_failed', { reason: rung.reason });
-    await rt.moveLeg(s.call_sid, '/api/hold/announce', id, '&ring=1&by=hear-confirm');
-    return OK;
-  }
-  if (verdict.act === 'announce' && !s.announced_at) {
+  // ★ THE FINDING IS WRITTEN DOWN BEFORE THE ACTION IS TAKEN, and that ordering was a defect
+  // until a test caught it. `human_at` used to be set inside the /announce document, which is only
+  // reached if the live-call redirect below succeeds. When the redirect failed, and the telephony
+  // API failing is exactly the case where it does, the session sat in its old state with no record
+  // that a person had ever been detected: the operator console showed a quiet hold while somebody
+  // was on the line. The knowledge belongs to the ear that heard it, not to the mouth that acts on
+  // it.
+  //
+  // It is only written on a CONFIDENT read. A weak candidate has not earned `human_at`, because
+  // that field decides which outcome sentence the receipt prints, and "we reached a person and
+  // could not connect you" is a promise about what happened, not a guess.
+  const confident = verdict.act === 'bridge' || (verdict.act === 'announce' && verdict.ringUserNow);
+
+  if (verdict.act === 'bridge' || (verdict.act === 'announce' && !s.announced_at)) {
+    const ring = verdict.act === 'bridge' || Boolean(verdict.ringUserNow);
+    if (confident && !s.human_at) {
+      await store.patch(id, { human_at: new Date().toISOString(), status: 'announcing' });
+    }
     // A strong read rings the customer at the same moment we start talking, so the four seconds
     // the page promises are real. A weak read talks first and only rings once something answers.
-    if (verdict.ringUserNow) {
+    if (ring) {
       const rung = await rt.ringUser(s);
       if (!rung.ok && !rung.already) await store.event(id, 'user_ring_failed', { reason: rung.reason });
     }
-    await rt.moveLeg(s.call_sid, '/api/hold/announce', id, `&ring=${verdict.ringUserNow ? '1' : '0'}&by=hear`);
-    return OK;
+    const moved = await rt.moveLeg(s.call_sid, '/api/hold/announce', id, `&ring=${ring ? '1' : '0'}&by=hear`);
+    if (!moved.ok) {
+      // The waiting loop is the backstop: it re-runs the same detector on its next tick and
+      // reaches the same document without needing the telephony API to steer anything.
+      await store.event(id, 'steer_failed', { to: 'announce', reason: moved.reason, falling_back_to: 'the waiting loop' });
+    }
+    return OK();
   }
   if (verdict.act === 'menu') {
     await rt.moveLeg(s.call_sid, '/api/hold/menu', id, '&by=hear');
-    return OK;
+    return OK();
   }
   if (verdict.act === 'give_up') {
     await store.patch(id, { outcome_reason: verdict.why });
     await store.settle(s, { operator: 'hold-hear' });
     await rt.endLeg(s.call_sid);
-    return OK;
+    return OK();
   }
 
-  return OK;
+  return OK();
 };
 
 export const config = { path: ['/api/hold/hear'] };

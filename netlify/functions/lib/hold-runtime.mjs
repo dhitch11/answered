@@ -76,7 +76,7 @@ export const goTo = (path, id, extra = '') =>
  */
 export function waiting(id, tick, sinceAnswerMs) {
   const seconds = sinceAnswerMs < 90000 ? 8 : 20;
-  return XML(`<Response><Pause length="${seconds}"/>${goTo('/api/hold/tick', id, `&amp;t=${tick + 1}`)}</Response>`);
+  return XML(`<Response><Pause length="${seconds}"/>${goTo('/api/hold/tick', id, `&t=${tick + 1}`)}</Response>`);
 }
 
 export const conference = (id, name, { record = false } = {}) =>

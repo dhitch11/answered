@@ -236,9 +236,17 @@ export function normalizeBooking(raw, now = new Date()) {
  *
  * Built from the FACTS OF THE JOB, not from a request id, because the two duplicate-shaped events
  * we actually face produce different request ids and identical facts: ElevenLabs retrying a webhook
- * that timed out, and a model deciding to call the tool a second time to be helpful. The
- * conversation id is mixed in when the vendor gives us one, so two different callers who somehow
- * book character-identical jobs at the same instant still get their own rows.
+ * that timed out, and a model deciding to call the tool a second time to be helpful.
+ *
+ * ★ AND THE FACTS ARE THE AUTHORITY HERE, NOT THE CONVERSATION ID, WHICH IS MEASURED AND NOT HOPED.
+ * Two real ElevenLabs conversations were driven through the live runtime on 2026-08-14 and the
+ * webhook body arrived with NO conversation_id both times, even though the field is declared on the
+ * tool and the bridge injects it. Three documented shapes for binding it as a platform dynamic
+ * variable were tried against the vendor API and all three were refused 422. So the id is mixed in
+ * WHEN it turns up and the key is complete without it. That is the right way round: a key that
+ * depended on the vendor supplying an id would have silently degraded to no protection at all on
+ * exactly the path that matters, and the second of those two conversations is the proof it does
+ * not, because it replayed instead of booking a second van.
  */
 export function idemKey(clean, conversationId) {
   const canon = [
@@ -265,7 +273,7 @@ const PARAMS = {
   service:         { type: 'string', description: 'What the visit is for, in the caller\'s own words, for example "water heater is leaking".' },
   window:          { type: 'string', enum: WINDOW_KEYS, description: 'Which of the three visit windows the caller agreed to. tuesday_8am is Tuesday at eight in the morning, tuesday_130pm is Tuesday at one thirty in the afternoon, wednesday_9am is Wednesday at nine in the morning. There are no other windows.' },
   notes:           { type: 'string', description: 'Anything else the caller said that the tech should know. Optional. Leave it out rather than filling it.' },
-  conversation_id: { type: 'string', description: 'Set by the phone system. Leave it out. Never ask the caller about it.' },
+  conversation_id: { type: 'string', description: 'Set by the phone system when it has one. Leave it out. Never ask the caller about it.' },
 };
 const REQUIRED = ['customer_name', 'address', 'callback_number', 'service', 'window'];
 

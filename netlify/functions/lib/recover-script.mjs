@@ -201,12 +201,45 @@ const DISPUTE_PATTERNS = [
   // pattern reads as thorough and misses half of every real transcript.
   /\bthat('?s| is| was)? ?(not|isn'?t|ain'?t) (right|correct|mine|my bill|my invoice)\b/i,
   /\b(i )?(don'?t|do not|never) owe\b/i, /\bnever (hired|used|ordered)\b/i,
-  /\bwrong (person|number|account|amount|invoice)\b/i,
+  // ★ "wrong number" AND "wrong person" ARE DELIBERATELY NOT HERE ANY MORE, and taking them out
+  // fixed a real misclassification found by driving a live call: "no, wrong number" was being filed
+  // as a DISPUTE OF THE DEBT. Nothing leaked, because the wrong-party branch never speaks an
+  // amount either, so the failure was invisible from the outside. It was still wrong in three ways
+  // that matter: a perfectly valid invoice was frozen as "disputed", it landed in the operator's
+  // dispute queue where a human would go looking for an argument nobody made, and the ONE action
+  // the call should have triggered (this number does not reach our debtor, stop dialling it) never
+  // happened. A wrong number is a fact about the NUMBER. A dispute is a fact about the DEBT.
+  /\bwrong (account|amount|invoice|bill)\b/i,
   /\bwork (was )?(never|not) (done|finished|completed)\b/i,
   /\b(my|an?) (lawyer|attorney)\b/i,
   /\bbankrupt/i,
 ];
 export const isDispute = (t) => DISPUTE_PATTERNS.some((re) => re.test(String(t || '')));
+
+/**
+ * "You have the wrong number." Its own verdict, checked BEFORE both stop and dispute.
+ *
+ * This is the one branch where the person on the line is, on their own account, NOT our debtor, and
+ * that changes what the right action is. It is not a dispute: no debt is being contested. It is not
+ * quite an ordinary stop either: nobody is opting out of anything, they are telling us we have a
+ * fact wrong. But the ACTION is the same as a stop and for a stronger reason, because the harm of
+ * getting this wrong is an uninvolved stranger receiving an artificial voice about somebody else's
+ * bill, over and over. So it stops the calls and suppresses the number, and it tells the operator
+ * the invoice needs a better number rather than a lawyer.
+ */
+const WRONG_NUMBER_PATTERNS = [
+  /\bwrong (number|person|guy|lady)\b/i,
+  /\b(no ?one|nobody) (here )?(by|with) that name\b/i,
+  /\bnever heard of (him|her|them|that (guy|person|name))\b/i,
+  // "there is no" and "there's no" again: the third time in this file a contraction-only pattern
+  // has silently covered half the sentences people say. Both spellings, every time.
+  /\bthere('s| is|s)? no \w+ here\b/i,
+  /\byou('| ha)?ve got the wrong\b/i,
+];
+export const isWrongNumber = (t) => WRONG_NUMBER_PATTERNS.some((re) => re.test(String(t || '')));
+
+export const WRONG_NUMBER_ACKNOWLEDGED =
+  'Sorry about that, I had the wrong number. I have taken it off the list and we will not call it again. Have a good one.';
 
 const ASKED_AI = [
   /\b(are|is) (you|this) (a |an )?(robot|bot|recording|machine|computer|a ?i|artificial)/i,

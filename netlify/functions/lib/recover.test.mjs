@@ -17,7 +17,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  opening, debtStatement, VOICEMAIL, floorCheck, isStop, isDispute, saidYes, saidNo,
+  opening, debtStatement, VOICEMAIL, floorCheck, isStop, isDispute, isWrongNumber, saidYes, saidNo,
   parseAmountCents, parseDate, extractPromise, spokenMoney, spokenNumber,
 } from './recover-script.mjs';
 import { callingWindow, zonesFor, insideWindow, STATE_ZONES } from './hours.mjs';
@@ -104,6 +104,25 @@ test('a dispute is not a stop and never writes a suppression', () => {
     assert.equal(isDispute(t), true, `MISSED DISPUTE: ${t}`);
   }
   assert.equal(isStop('I already paid that'), false);
+});
+
+test('a wrong number is its own verdict, not a dispute of the debt', () => {
+  // ★ THE DEFECT THIS TEST EXISTS FOR, found by driving a live call rather than by reading code:
+  // "no, wrong number" matched the dispute list, so a perfectly valid invoice was frozen as
+  // "disputed" and the number that reaches nobody stayed on it. No debt detail leaked, which is
+  // exactly why nothing downstream would ever have flagged it.
+  for (const t of ['no, wrong number', 'you have the wrong number', 'wrong person',
+    'there is no Sam here', 'never heard of him', 'nobody here by that name']) {
+    assert.equal(isWrongNumber(t), true, `MISSED WRONG NUMBER: ${t}`);
+    assert.equal(isDispute(t), false, `STILL FILED AS A DISPUTE: ${t}`);
+  }
+});
+
+test('a real dispute is still a dispute, and is not a wrong number', () => {
+  for (const t of ['I already paid that', 'that is the wrong amount', 'the work was never finished']) {
+    assert.equal(isDispute(t), true, t);
+    assert.equal(isWrongNumber(t), false, t);
+  }
 });
 
 test('identity is only confirmed on a real yes', () => {

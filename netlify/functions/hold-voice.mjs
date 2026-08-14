@@ -56,14 +56,31 @@ async function load(id) {
   }
 }
 
+/**
+ * ★ MEASURED: A 404 FROM ONE OF THESE ROUTES MAKES THE PLATFORM KEEP LOOKING, AND IT FINDS US
+ * AGAIN. A refused webhook (wrong Twilio account) returned 403, the platform treated the non-2xx
+ * as "not handled", retried the same request as /api/hold/voice.html, .htm and /index.html, and
+ * every one of those reached this function again on a path the table below does not contain. The
+ * LAST answer is the one the caller sees, so a working 403 was displayed as a 404 and the gate
+ * looked broken while it was working perfectly.
+ *
+ * Two changes, and both matter. The pretty-URL suffixes are stripped so a retry resolves to the
+ * SAME document and gets the SAME verdict, and an unmatched path answers 403 rather than 404, so
+ * nothing about an authenticated telephony endpoint ever tells the platform to go on searching.
+ */
+const normalise = (pathname) => String(pathname || '/')
+  .replace(/\/index\.html?$/i, '')
+  .replace(/\.html?$/i, '')
+  .replace(/\/+$/, '') || '/';
+
 export default async (req) => {
   const url = new URL(req.url);
-  const role = PATHS[url.pathname.replace(/\/+$/, '') || '/'];
-  if (!role) return new Response('not found', { status: 404 });
+  const role = PATHS[normalise(url.pathname)];
+  if (!role) return new Response('hold-voice: not a document on this line', { status: 403 });
 
   const event = await rt.asLambda(req);
-  const gate = authenticate(event, url.pathname);
-  if (!gate.ok) return new Response(gate.reject.body || 'refused', { status: gate.reject.statusCode });
+  const gate = authenticate(event, normalise(url.pathname));
+  if (!gate.ok) return new Response(`hold-voice gate: ${gate.reject.body || 'refused'}`, { status: gate.reject.statusCode });
 
   const p = gate.params;
   const q = event.queryStringParameters || {};
@@ -95,7 +112,7 @@ async function onAnswer(s, p) {
     hold_started_at: s.hold_started_at || new Date().toISOString(),
   });
   await store.event(s.id, 'answered', { call_sid: p.CallSid, from: p.From ? String(p.From).slice(-4) : null });
-  return XML(`<Response>${transcriptionOn(s.id)}<Pause length="4"/>${goTo('/api/hold/tick', s.id, '&amp;t=1')}</Response>`);
+  return XML(`<Response>${transcriptionOn(s.id)}<Pause length="4"/>${goTo('/api/hold/tick', s.id, '&t=1')}</Response>`);
 }
 
 // ── the waiting loop, and every deadline in the product ──────────────────────────────────────
@@ -220,7 +237,7 @@ async function onMenu(s, events, q, now) {
   // top of it, and half of them need a beat after the prompt before they will accept input.
   return XML(
     `<Response><Pause length="1"/><Play digits="ww${esc(choice.digit)}"/><Pause length="3"/>`
-    + goTo('/api/hold/tick', s.id, `&amp;t=${(Number(q.t) || 1) + 1}`)
+    + goTo('/api/hold/tick', s.id, `&t=${(Number(q.t) || 1) + 1}`)
     + `</Response>`,
   );
 }
@@ -239,9 +256,13 @@ async function onAnnounce(s, events, q, now) {
     if (!rung.ok && !rung.already) await store.event(s.id, 'user_ring_failed', { reason: rung.reason });
   }
 
+  // human_at is a claim that a person was on the line, and the receipt prints an outcome sentence
+  // off it. A weak probe has not established that yet, so it writes announced_at and nothing else;
+  // human_at lands only when we are confident enough to ring the customer, or when the probe comes
+  // back answered.
   await store.patch(s.id, {
     status: ring ? 'bridging' : 'announcing',
-    human_at: s.human_at || new Date().toISOString(),
+    ...(ring ? { human_at: s.human_at || new Date().toISOString() } : {}),
     announced_at: new Date().toISOString(),
   });
   await store.event(s.id, 'announced', { ringing_customer: ring, by: q.by || 'detector', repeat: already });
@@ -253,7 +274,7 @@ async function onAnnounce(s, events, q, now) {
     + (store.theCase(s) ? SAY(store.theCase(s)) : '')
     + SAY(tail)
     + `<Pause length="${ring ? 6 : 5}"/>`
-    + goTo(ring ? '/api/hold/join' : '/api/hold/tick', s.id, ring ? '' : `&amp;t=${(Number(q.t) || 1) + 1}&amp;after=announce`)
+    + goTo(ring ? '/api/hold/join' : '/api/hold/tick', s.id, ring ? '' : `&t=${(Number(q.t) || 1) + 1}&after=announce`)
     + `</Response>`,
   );
 }
@@ -269,7 +290,7 @@ async function onJoin(s) {
   // record-from-start records from the start of the CONFERENCE, and the conference starts here,
   // which is after /announce. A call recorded from the moment of dialling would have captured a
   // stranger before they were told anything.
-  return XML(`<Response>${conference(s.id, name, { record: true })}${goTo('/api/hold/tick', s.id, '&amp;t=1&amp;after=conference')}</Response>`);
+  return XML(`<Response>${conference(s.id, name, { record: true })}${goTo('/api/hold/tick', s.id, '&t=1&after=conference')}</Response>`);
 }
 
 // ── our own customer's leg ───────────────────────────────────────────────────────────────────

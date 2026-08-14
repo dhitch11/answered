@@ -29,7 +29,14 @@ import * as store from './lib/hold-store.mjs';
 import * as rt from './lib/hold-runtime.mjs';
 
 const PUBLIC_PATH = '/api/hold/status';
-const OK = new Response('', { status: 204 });
+// ★ MEASURED, NOT ASSUMED: `new Response('', { status: 204 })` THROWS.
+// 204 is a null-body status and undici refuses to construct one with a body at all, including the
+// empty string, so this line used to raise "Invalid response status code 204" and the platform
+// turned it into a 500. Every transcription callback and every call-status callback failed that
+// way: the detector never received one word, no status event ever landed, and the product would
+// have looked completely wired while being completely deaf. Nothing about it was visible from the
+// code, the routes, or a green deploy. Only a real HTTP request found it.
+const OK = () => new Response(null, { status: 204 });
 
 const DEAD = new Set(['completed', 'busy', 'no-answer', 'failed', 'canceled']);
 
@@ -42,10 +49,10 @@ export default async (req) => {
   const q = event.queryStringParameters || {};
   const id = String(q.s || '');
   const kind = String(q.kind || 'target');
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return OK;
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return OK();
 
   const loaded = await store.get(id, 60).catch(() => null);
-  if (!loaded || loaded.error || !loaded.session) return OK;
+  if (!loaded || loaded.error || !loaded.session) return OK();
   const s = loaded.session;
 
   if (kind === 'conference') return onConference(s, p);
@@ -61,18 +68,18 @@ async function onTargetLeg(s, p) {
 
   if (status === 'ringing' || status === 'initiated') {
     if (!s.dialed_at) await store.patch(s.id, { status: 'ringing', dialed_at: new Date().toISOString() });
-    return OK;
+    return OK();
   }
-  if (!DEAD.has(status)) return OK;
+  if (!DEAD.has(status)) return OK();
 
   // The line hung up, or never answered. Everything below decides between trying again and
   // closing the errand.
-  if (s.status === 'ended' || s.outcome) return OK;
+  if (s.status === 'ended' || s.outcome) return OK();
 
   // If the two of them were connected, this is just the end of a finished conversation.
   if (s.bridged_at) {
     await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
-    return OK;
+    return OK();
   }
 
   // If we had reached a person but never delivered our customer, that is its own outcome and it
@@ -81,7 +88,7 @@ async function onTargetLeg(s, p) {
     await store.patch(s.id, { outcome_reason: 'we reached a person and could not get you onto the call' });
     await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
     if (s.bridge_call_sid) await rt.endLeg(s.bridge_call_sid);
-    return OK;
+    return OK();
   }
 
   const attempts = Number(s.attempts || 0);
@@ -94,7 +101,7 @@ async function onTargetLeg(s, p) {
       outcome_reason: status === 'no-answer' ? 'nobody picked up' : `the line ended the call (${status})`,
     });
     await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
-    return OK;
+    return OK();
   }
 
   // ★ THE REDIAL, AND WHY IT IS NOT A NEW SESSION. One errand, one row, one possible charge.
@@ -122,7 +129,7 @@ async function onTargetLeg(s, p) {
     await store.event(s.id, 'redial_failed', { error: String(e.message).slice(0, 200) });
     await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
   }
-  return OK;
+  return OK();
 }
 
 // ── the leg we placed to our own customer ────────────────────────────────────────────────────
@@ -130,9 +137,9 @@ async function onUserLeg(s, p) {
   const status = String(p.CallStatus || '').toLowerCase();
   await store.event(s.id, 'user_leg', { status, sid: p.CallSid || null });
 
-  if (!DEAD.has(status)) return OK;
-  if (s.bridged_at) return OK;          // they were connected; this is the normal end
-  if (s.status === 'ended' || s.outcome) return OK;
+  if (!DEAD.has(status)) return OK();
+  if (s.bridged_at) return OK();          // they were connected; this is the normal end
+  if (s.status === 'ended' || s.outcome) return OK();
 
   // ★ NOBODY IS LEFT TALKING TO AN EMPTY ROOM. We reached a person, promised them our customer,
   // and could not deliver. Their leg is moved to a spoken apology rather than simply hung up on,
@@ -148,7 +155,7 @@ async function onUserLeg(s, p) {
       : `we reached a person and could not connect you (${status})`,
   });
   await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
-  return OK;
+  return OK();
 }
 
 // ── the room ─────────────────────────────────────────────────────────────────────────────────
@@ -169,7 +176,7 @@ async function onConference(s, p) {
       });
     }
     await store.patch(s.id, patch);
-    return OK;
+    return OK();
   }
 
   if (ev === 'conference-end' || ev === 'participant-leave') {
@@ -177,12 +184,12 @@ async function onConference(s, p) {
       await store.settle({ ...s, ended_at: new Date().toISOString() }, { operator: 'hold-status' });
     }
   }
-  return OK;
+  return OK();
 }
 
 async function onRecording(s, p) {
   const sid = String(p.RecordingSid || '');
-  if (!sid) return OK;
+  if (!sid) return OK();
   await store.patch(s.id, {
     recording_sid: sid,
     recording_seconds: Number(p.RecordingDuration || 0) || null,
@@ -191,7 +198,7 @@ async function onRecording(s, p) {
     recording_url: `Recordings/${sid}`,
   });
   await store.event(s.id, 'recording_ready', { sid, seconds: Number(p.RecordingDuration || 0) || null });
-  return OK;
+  return OK();
 }
 
 export const config = { path: ['/api/hold/status'] };

@@ -120,7 +120,12 @@ t('riley caps are unchanged', () => {
 });
 
 t('riley floor ORDER is unchanged, because order is behaviour', () => {
+  // 'unbooked-claim' was added on 2026-08-14 when the voice grew hands, and it is FIRST because a
+  // false booking is the worst sentence this line can produce. The five frozen floors keep their
+  // order relative to each other underneath it, which is the part that was never allowed to move.
   assert.deepEqual(riley.outFloors.map((f) => f.by),
+    ['unbooked-claim', 'price', 'contact-promise', 'ai-denial', 'payment', 'slot-invention', 'numeral']);
+  assert.deepEqual(riley.outFloors.map((f) => f.by).filter((b) => b !== 'unbooked-claim'),
     ['price', 'contact-promise', 'ai-denial', 'payment', 'slot-invention', 'numeral']);
   assert.deepEqual(riley.inBranches.map((b) => b.by),
     ['crisis', 'payment-offered', 'ai-asked', 'demo-asked', 'abuse']);
@@ -956,6 +961,99 @@ await at('every existing floor still runs on a turn that has tools on it', async
     stream: true, tools: EL_DECLARES, messages: [{ role: 'user', content: 'how much' }],
   })).text();
   assert.ok(spoken(sse).includes('The office quotes prices'), spoken(sse));
+});
+
+// ── 9. THE FLOOR THE SIMULATOR FOUND ────────────────────────────────────────
+// A full conversation was run through the real agent with the tool mocked. The
+// model read "Tool Called." and said "You're all set, Marcus. I have you booked
+// for Tuesday at eight in the morning." Nothing had been booked. These are the
+// assertions that make that sentence impossible.
+
+const ctx = contextDigits(riley, [], '');
+const guard = (line, booked) => guardClause(riley, line, ctx, { booked });
+
+t('an unbacked booking claim is blocked, in all the ways a model says it', () => {
+  const claims = [
+    "You're all set, Marcus.",
+    'You are all set.',
+    'I have you booked for Tuesday.',
+    "I've got you booked.",
+    "You're booked.",
+    'You are scheduled.',
+    "We've got you scheduled.",
+    "That's booked.",
+    'The visit is confirmed.',
+    "You're on the schedule.",
+    "It's on the books.",
+    "You're locked in.",
+  ];
+  for (const c of claims) {
+    const g = guard(c, false);
+    assert.equal(g.ok, false, 'went through unblocked: ' + c);
+    assert.equal(g.by, 'unbooked-claim', c + ' -> ' + g.by);
+    assert.ok(/nothing is booked/i.test(g.pivot), g.pivot);
+  }
+});
+
+t('the same sentences are fine once a booking really happened', () => {
+  for (const c of ["You're all set, Marcus.", 'I have you booked for Tuesday.', "You're on the schedule."]) {
+    assert.equal(guard(c, true).ok, true, 'blocked a TRUE statement: ' + c);
+  }
+});
+
+t('the floor does NOT block the hold language the frozen spec requires', () => {
+  // "hold the window out loud, like 'I have you penciled in for Tuesday at eight'"
+  const holds = [
+    'I have you penciled in for Tuesday at eight.',
+    'I have you down for Tuesday at eight.',
+    'Let me get that written down for you.',
+    'Which one works for you?',
+    'Let me get you on the schedule, what is the address?',
+    'I can book you in once I have the address.',
+  ];
+  for (const h of holds) {
+    const g = guard(h, false);
+    assert.ok(g.ok || g.by !== 'unbooked-claim', 'the hold language must survive: ' + h + ' -> ' + (g.by || 'ok'));
+  }
+});
+
+t('a caller forgetting to pass the state gets the floor at FULL strength', () => {
+  // The failure direction of a missing argument is a pivot, never a claim.
+  assert.equal(guardClause(riley, "You're all set.", ctx).ok, false);
+  assert.equal(guardClause(riley, "You're all set.", ctx, {}).ok, false);
+  assert.equal(guardClause(riley, "You're all set.", ctx, { booked: undefined }).ok, false);
+});
+
+t('no other voice grew this floor by accident', () => {
+  for (const p of [scout, onboard, customer]) {
+    assert.ok(!p.outFloors.some((f) => f.by === 'unbooked-claim'), p.id);
+  }
+});
+
+await at('the bridge blocks the claim on a call where nothing was booked', async () => {
+  MODEL_REPLY = "Yeah. You're all set, Marcus. I have you booked for Tuesday at eight in the morning.";
+  const sse = await (await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES,
+    messages: [
+      { role: 'user', content: 'so are we good?' },
+      { role: 'tool', tool_call_id: 'call_1', content: 'Tool Called.' },
+    ],
+  })).text();
+  const said = spoken(sse);
+  assert.ok(/nothing is booked/i.test(said), 'the exact sentence the simulator produced got through: ' + said);
+  assert.ok(!/all set/i.test(said), said);
+});
+
+await at('and lets it through on a call where something was', async () => {
+  MODEL_REPLY = "You're all set, Marcus. I have you booked for Tuesday at eight in the morning.";
+  const sse = await (await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES,
+    messages: [
+      { role: 'user', content: 'so are we good?' },
+      { role: 'tool', tool_call_id: 'call_1', content: 'BOOKED. It is written down and the shop has it, for Tuesday at eight in the morning.' },
+    ],
+  })).text();
+  assert.ok(/all set/i.test(spoken(sse)), 'a true sentence must not be pivoted: ' + spoken(sse));
 });
 
 // ── report ──────────────────────────────────────────────────────────────────
