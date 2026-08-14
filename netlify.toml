@@ -52,3 +52,49 @@
   to = "/.netlify/functions/site-directory"
   status = 200
   force = true
+
+# ── the cockpit and the outbound call runtime (@ANSWERED-RESEARCH) ────────────
+# /internal/cockpit is gated server-side inside the function, same posture as
+# /internal: nothing is serialized until the PIN check passes.
+
+[[redirects]]
+  from = "/internal/cockpit"
+  to = "/.netlify/functions/cockpit"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-voice"
+  to = "/.netlify/functions/call-voice"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-turn"
+  to = "/.netlify/functions/call-turn"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-status"
+  to = "/.netlify/functions/call-status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-transcription"
+  to = "/.netlify/functions/call-transcription"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-recording"
+  to = "/.netlify/functions/call-recording"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/recording"
+  to = "/.netlify/functions/recording"
+  status = 200
+  force = true

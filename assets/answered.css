@@ -2810,3 +2810,271 @@ html.js .rung:not(.done):not(.hit) { opacity: .72; }
 @media (prefers-reduced-motion: reduce) {
   .scta { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM THROUGH SPACE. THE COMPOSITION PASS, 2026-08-13. CSS LANE.
+   David: "The site is too wordy. MORE PREMIUM and easier to grasp. It needs
+   to be obvious, especially the sections below the hero."
+
+   Two lanes are cutting the words. This lane does not touch a word: it makes
+   what is left FEEL expensive, by fixing the three things that were making a
+   well-written page read as an endless one. All three were measured through
+   the serving path at 1440 and 390 before anything below was written.
+
+   ── FINDING 1 · THE PAGE HAD NO SPACING SCALE, SO IT HAD NO TEMPO. ─────────
+   Measured gap between every rendered block at 1440:
+     eyebrow -> headline   18px          (consistent, and correct)
+     headline -> its lede  15, 16, 16, 22px
+     headline -> its rack  44, 48px
+     lede -> its rack      28, 34, 44, 46, 52px
+     rack -> its footnote  14, 20, 26, 30, 34px
+     section -> section    184px baseline, 208-268 at a ground change
+   Everything INSIDE a section sat between 14 and 52px, then the page paid a
+   184px void, then repeated. That is one flat interval and one cliff, which
+   is exactly what "endless" feels like: nothing in the middle tells the eye
+   that a new movement has started, so the reader has no unit larger than a
+   paragraph and smaller than a screen. A 16px gap under a 62px headline is
+   also optically negative -- the lede sits inside the headline's descenders.
+
+   The ladder below is four measured steps, each roughly twice the last, so
+   the hierarchy is carried by the SPACE and not only by the type:
+     1440   18 tie  /  32 say  /  86 move  /  184 seam
+      390   14 tie  /  22 say  /  46 move  /  ~100 seam
+   TIE  = an eyebrow and its headline are one object.
+   SAY  = the headline and the one sentence that supports it.
+   MOVE = the statement ends and the mechanism begins. This is the step the
+          page did not have, and it is the whole fix.
+   SEAM = unchanged. The seam budget was measured and tuned on 08-13 and the
+          300px voids it retired are not coming back.
+
+   ── FINDING 2 · THE MEASURE RAN TO 82ch. ──────────────────────────────────
+   Measured at 1440, every running-prose block on the page:
+     p.src   #setup           82.6ch   720px    the carrier-codes note
+     p.src   /setup 2nd       78.6ch   686px
+     p.src   #early form-note 74.8ch   652px
+     p.src   ledger caption   72.5ch   632px
+     p.setup-flash #price     72.0ch   664px    the first-hold-free promise
+     .disc-body #honesty      70.7ch   652px
+     p.lede  x4               60 - 66ch
+   A 12.25px mono caption at 82 characters is a paragraph wearing a footnote's
+   clothes, and a 21px lede at 66ch takes two eye movements per line. Nothing
+   above 58ch survives below.
+
+   THE MECHANISM MATTERS: the markup lane authors max-width INLINE, in ch
+   (46, 47, 48, 50, 52, 54, 62, 64, 66, 72, 84ch across index.html), and an
+   inline declaration beats any stylesheet selector. `!important` would win,
+   but it would also WIDEN every block already authored narrower than the cap,
+   which is the opposite of the fix. So the ceiling is set with `width`
+   instead: the used width of a block is min(width, max-width), so an inline
+   max-width NARROWER than the cap still wins and a WIDER one is clipped to
+   it. One property, no !important, and the other lane keeps its authority in
+   the only direction it should have it.
+
+   ── FINDING 3 · THE RACK OUT-WEIGHED THE HEADLINE. ────────────────────────
+   Measured type mass per section (characters set at each size):
+     #what      49px(66ch)  ->  26px(198ch)  ->  16px(883ch)
+     #honesty   62px(21ch)  ->  21px(211ch)  ->  16px(1122ch)
+     the band   40px(4ch)   ->  14px(115ch)  ->  13px(245ch)
+   The stat band is the one section on this page that reads at a glance, and
+   the reason is its ratio: the number is 2.9x the next thing on the tile and
+   nothing else competes. Everywhere else the section headline was 1.88x its
+   card titles -- and there are four to six of those titles, so their combined
+   mass beat the single headline and the eye had nowhere to land first. Linear
+   and Stripe run about 2.4x. The card title steps back to 22px to get there,
+   and the lede steps UP, because a lede only 1.35x its own body copy is not a
+   lede, it is the first paragraph.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --r-tie:  18px;
+  --r-say:  clamp(22px, 2.2vw, 32px);
+  --r-move: clamp(46px, 6vw, 86px);
+  --r-tail: clamp(22px, 2.4vw, 34px);
+}
+
+/* ── THE MEASURE CEILING. `width`, never `max-width`: see FINDING 2. ─────────
+   Scoped to section-level running prose only. A .src is ALSO used as a 10px
+   counter chip inside a card ("01 / 04") and as a label inside the band, so
+   the selector takes p.src at section level and never a descendant .src.
+
+   THE HOST LIST IS BY NESTING DEPTH, not by one named wrapper. The first
+   version of this rule named `.wrap` and `.two > div`, which is how the
+   homepage happens to be built, and it left the sibling pages untouched:
+   re-measured at 1440 after it shipped, /pricing still ran a 12.2px mono
+   source note at 128 CHARACTERS per line out of `.wrap > div > p.src`, one
+   level deeper than the selector reached, and /recover ran 74ch body copy out
+   of `.wrap > div.mn > p`. A law that only holds for one page's DOM shape is
+   not a law. Three levels of plain layout div covers every band on the site.
+
+   `p.eyebrow` is excluded on purpose and is NOT a miss: it is a flex row
+   holding a 22px rule and a short uppercase label, so its BOX is wide while
+   its line is six words. Measuring it reports 112ch and means nothing.
+   Prose inside a PLANE is excluded too -- a .card / .pcard / .mode column is
+   already narrow on a desktop, and it gets its own ceiling below for the one
+   case that actually breaks, which is the rack collapsing to one track. ── */
+:where(section > .wrap,
+       section > .wrap > div,
+       section > .wrap > div > div,
+       .hero .hero-grid > div) > p.lede { width: min(52ch, 100%); }
+
+:where(section > .wrap,
+       section > .wrap > div,
+       section > .wrap > div > div) > p.src { width: min(62ch, 100%); }
+
+:where(section > .wrap,
+       section > .wrap > div,
+       section > .wrap > div > div) > p:not(.eyebrow):not(.lede):not(.src):not(.price-law) {
+  width: min(58ch, 100%);
+}
+/* the disclosure stack is the honesty section, which carried 1122 characters
+   at one size. The answer stays whole; it just stops running the full band.
+   `.disc .disc-body` above is (0,2,0) and carries max-width:74ch, so this has
+   to match it on weight: measured after the first attempt at (0,1,0), the
+   inner p obeyed at 62ch and the body it sits in still ran 70.7ch. */
+.disc .disc-body, .disc .disc-body p { max-width: 62ch; }
+
+/* ── AND THE MEASURE INSIDE A PLANE, WHICH ONLY BREAKS WHEN THE RACK DOES. ──
+   Card copy needs no ceiling on a desktop: a card in a two or three track
+   grid is 440px wide and its body sets about 45ch on its own. But every rack
+   on this site collapses to a single column (.cards and .modes at 940px,
+   .steps at 860px), and from there down to about 620px the card is the full
+   band. Measured at 768 through the serving path: eleven card and mode
+   paragraphs at 71.8 - 72.3ch, 645px of 15.5px copy per line, on the exact
+   viewport a tablet reader holds. The ceiling costs nothing above 940 and is
+   the whole fix below it. These take max-width, not the `width` trick above,
+   because no inline max-width is authored on them. ── */
+.card > p, .step > p, .mode > p, .gc > .gc-d, .pcard > p { max-width: 58ch; }
+
+/* ── THE LADDER. The markup lane authors margin-top inline on nearly every
+   block (16, 18, 20, 22, 26, 28, 34px), so unlike the measure ceiling above
+   there is no way to express "at least this much" as a second property:
+   margin has no min-max pair. These four relationships are structural, not
+   content, so they take the weight and are scoped to the exact adjacency. ── */
+.h2 + .lede,
+.h2 + p,
+.display + .lede,
+.hero h1 + .lede { margin-top: var(--r-say) !important; }
+/* `.h2 + p` and not `.h2 + .lede` alone, because a lane cutting copy deletes
+   ledes: measured after the first attempt, #price had lost its lede and the
+   first-hold-free promise plate had slid to 18px under a 49px headline. The
+   rule has to describe the RELATIONSHIP (a headline and the sentence under
+   it), not the class the sentence happens to be wearing this hour. */
+
+/* MOVE: the statement ends, the mechanism begins. The racks are the only
+   things on this page that are a mechanism, so they are the only things that
+   get the step. */
+section > .wrap > .cards,
+section > .wrap > .steps,
+section > .wrap > .pcards,
+section > .wrap > .modes,
+section > .wrap > .gate-grid,
+section > .wrap > .convey,
+section > .wrap > .dollars,
+section > .wrap > .chain,
+section > .wrap > .iform { margin-top: var(--r-move) !important; }
+
+/* TAIL: a caption hangs off the object it cites, closer than a new movement
+   but further than a paragraph. Only when it closes the section. */
+section > .wrap > p.src:last-child,
+section > .wrap > .two > div > p.src:last-child { margin-top: var(--r-tail) !important; }
+
+/* ── THE RATIO. See FINDING 3. ──────────────────────────────────────────────
+   .h3 is one class used by 18 headings, so the step down is scoped to the
+   two racks whose titles were out-massing their section headline. The gate
+   cards, the price cards and the disclosure summaries are untouched: those
+   ARE the thing being read, not a support layer. */
+.card > .h3, .step > .h3, .mode > .h3 { font-size: clamp(19px, 1.5vw, 22px); line-height: 1.24; }
+
+/* and the lede stops being the first paragraph. 23px against 15.5px card copy
+   is 1.48x, against a 49px utility headline is 2.13x, and it now runs 52ch. */
+.lede { font-size: clamp(17px, 1.55vw, 23px); }
+
+/* ── A REGISTER IS ONLY A REGISTER IF ITS COLUMN CAN HOLD IT. ───────────────
+   Measured across 1100 / 1440 / 1920, every display heading on the page, with
+   the widest single word in each:
+     #setup    62px in a  906px box  ->  2 lines   "You install nothing..."
+     #missed   62px in a  520px box  ->  4 LINES   "You were driving. Mom
+                                                    called anyway."
+   Same register, same word count, double the lines. The variable is the
+   column, and nobody owned it: #missed is the one EDITORIAL heading on the
+   page mounted in a 1fr/1fr two-column band, and its two longest words set
+   292px each, so 520px cannot hold any two of them on one line and the
+   heading shatters into a four-line stack of three-word fragments. It does
+   not improve at 1920 either, because .two lives inside the 1240px wrap.
+   This is the same fix, by the same mechanism, that the TYPE SCALE MODULATION
+   block above already applied to #ledger (1.21fr) and to the receipt band
+   (1.55fr) -- the ratio is measured against the artifact beside it, which
+   here is the handset. At 1.36fr the copy column takes 601px and the phone
+   keeps 442px, which is still wider than the 430px the receipt is capped at
+   and holds the SMS transcript at its 84% bubble measure without reflow.
+   Inline grid-template-columns on the element, so this wins on weight, and
+   the 900px collapse below still outranks it on order. ── */
+@media (min-width: 901px) {
+  #missed .two {
+    grid-template-columns: minmax(0, 1.36fr) minmax(0, 1fr) !important;
+  }
+}
+
+/* ── THE SEAM, EVENED. ──────────────────────────────────────────────────────
+   The DEAD-ZONE RHYTHM block above recognises three quiet tails: a mono
+   footnote, a lone ghost link, and a disclosure stack. It missed a fourth,
+   and it is the most common one on the page: a RACK OF PLANES. A card, a step
+   and a price card all carry 24-34px of their own bottom padding, so a section
+   closing on one is already paying most of a seam out of the object's own
+   inside. Measured at 1440: #what closes on .cards.four, pays 124px of
+   section padding on top of the card's own 34px, and opens a 208px void into
+   a section that then pays 84 more. Bringing it onto the 184px baseline is
+   what pays for the MOVE step above.
+   Same structural style, same :where() zero-specificity, so the .paper.pad
+   crescendo exception above still wins and a ground change still gets its
+   full breath. ── */
+:where(section:has(> .wrap > .cards:last-child),
+       section:has(> .wrap > .steps:last-child),
+       section:has(> .wrap > .pcards:last-child),
+       section:has(> .wrap > .gate-grid:last-child)).pad {
+  padding-bottom: clamp(52px, 6.4vw, 94px);
+}
+:where(section:has(> .wrap > .cards:last-child),
+       section:has(> .wrap > .steps:last-child),
+       section:has(> .wrap > .pcards:last-child),
+       section:has(> .wrap > .gate-grid:last-child)).pad-s {
+  padding-bottom: clamp(42px, 4.8vw, 70px);
+}
+
+/* ── 390 FIRST. On a phone the tie tightens so the first interval of the
+   ladder still reads as an interval: 14 / 22 / 46 is 1.6x, 2.1x. At the 18px
+   desktop tie it would have been 1.2x, which is not a step. ── */
+@media (max-width: 640px) {
+  :root { --r-tie: 14px; }
+  .eyebrow + .h2, .eyebrow + .display, .eyebrow + h1 { margin-top: var(--r-tie) !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HERO LANE APPEND (@HERO). Scoped to hero selectors only. Appended last so
+   it wins on cascade order without touching any rule above it.
+
+   THE CONSUMER H1 SHIPPED A FIVE-LINE HEADLINE WITH TWO ORPHANS.
+   Measured, not eyeballed, at 1280 / 1440 / 1920 by grouping every word rect
+   into line boxes: "You never / have to / be on the / phone / again." — the
+   last two lines carried ONE word each, at every desktop width. The business
+   H1 was already fine at four lines ("Every call / answered. / Every job /
+   booked."), because each of those lines is a whole clause of its own
+   sentence, so it is deliberately left alone here.
+
+   THE FIX IS MEASURE, NOT SIZE. Five candidates were measured. Shrinking the
+   type to 4.6-5.2vw also resolves the rag, but it throws away the 88px
+   signature scale that is the strongest thing on the screen and it drags the
+   business H1 around with it. Widening the copy column instead fixes the
+   consumer H1 to four lines with "phone again." intact at 1280, 1440 AND
+   1920, keeps the display face at its full 88px, and leaves the business H1
+   byte-identical. The ring keeps 0.72fr, which is still a square well over
+   350px at 1440.
+
+   Scoped at min-width:941px on purpose: the base sheet already collapses
+   .hero-grid to a single column at max-width:940px, and the phone breaks the
+   H1 to a clean four lines on its own. This must never fight that rule.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 941px) {
+  .hero .hero-grid { grid-template-columns: minmax(0, 1.28fr) minmax(0, 0.72fr); }
+}

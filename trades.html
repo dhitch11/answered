@@ -17,7 +17,18 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/trades.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=f0602cf5">
+<link rel="stylesheet" href="/assets/answered.css?v=2b03293f">
+<style>
+/* MEASURED DEFECT, both product pages, present before this edit and fixed here.
+   The gated hero button ships [hidden], but `.btn{display:inline-flex}` is an
+   AUTHOR rule and beats the UA `[hidden]{display:none}`, so the attribute did
+   nothing and a RED line painted TWO buttons reading "Get on the list", one
+   above the other. This file's own comment promises the opposite: "a red line
+   shows exactly one button and never two that say the same words."
+   Keyed on [hidden] on purpose: the gate un-hides by REMOVING the attribute,
+   so this rule stops matching the moment the line goes green. */
+.btn[data-callgate][hidden] { display: none !important; }
+</style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -41,7 +52,7 @@
       <div>
         <p class="eyebrow rv">For plumbers, HVAC, electrical, roofing, landscaping</p>
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You were on a roof.<br> <span class="lit">It answered anyway.</span></h1>
-        <p class="lede hero-sub rv d2">A 24/7 voice on the number already painted on your truck. It answers, works out what they need, books it into your calendar, and puts a real emergency straight through to your cell.</p>
+        <p class="lede hero-sub rv d2">A 24/7 voice on the number already painted on your truck. It books the job, or puts a real emergency through to your cell.</p>
         <!-- THE DEMO IS THE ARGUMENT ON THIS PAGE, so it leads on this page.
              It used to sit 8,600px down, at the very bottom, which meant the
              one contractor-proof thing we own ("call it, it answers as a
@@ -61,7 +72,7 @@
         <!-- THE DECISION MOMENT, on the first screen of the page a contractor
              lands on. The offer and the way out of it, adjacent to the button,
              at 16px instead of in a footnote. Ground-portable tokens. -->
-        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)"><b style="color:var(--ink)">$0</b> to start. <b style="color:var(--ink)">$19</b> when it books a job, <b style="color:var(--ink)">$49</b> after hours, and <b style="color:var(--ink)">$0</b> for every call that books nothing. If a booking is not real, reply <b style="color:var(--ink)">VOID</b> and the charge comes off.</p>
+        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)"><b style="color:var(--ink)">$0</b> to start. <b style="color:var(--ink)">$19</b> a booked job, <b style="color:var(--ink)">$49</b> after hours, <b style="color:var(--ink)">$0</b> when nothing books. Not a real booking? Reply <b style="color:var(--ink)">VOID</b> and it comes off.</p>
         <p class="price-law rv d3" style="margin-top:14px">NO SUBSCRIPTION. NO PER-MINUTE CHARGE.</p>
       </div>
       <div class="rv d2">
@@ -87,9 +98,9 @@
          it stops being an 11.5px whisper at 66% alpha. -->
     <div class="band-grid">
       <div class="band-cell rv"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">01 / 04</div><div class="band-v num">48%</div><div class="band-k">of callers never reach a person at a home services business.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca Home Services Lead Conversion Benchmarks, 70M calls, July 2026.</div></div>
-      <div class="band-cell rv d1"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">02 / 04</div><div class="band-v num">45%</div><div class="band-k">of the ones who do reach a person book on that call.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca, July 2026. The same 70M call benchmark.</div></div>
+      <div class="band-cell rv d1"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">02 / 04</div><div class="band-v num">45%</div><div class="band-k">who reach a person book on that call.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>Invoca, July 2026. The same 70M call benchmark.</div></div>
       <div class="band-cell rv d2"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">03 / 04</div><div class="band-v num">$4,277</div><div class="band-k">is one missed roof lead, at a $9,504 average ticket.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>45% of a $9,504 average ticket (Thumbtack, 2026), at Invoca's 2026 close rate. Arithmetic, labeled as arithmetic.</div></div>
-      <div class="band-cell rv d3"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">04 / 04</div><div class="band-v num">93.7%</div><div class="band-k">of the 696,690 firms in these trades have under 20 people. Nobody is free to answer.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>US Census, Statistics of US Businesses, 2022.</div></div>
+      <div class="band-cell rv d3"><div class="src" style="font-size:10px;letter-spacing:.2em;color:var(--static);margin-bottom:12px">04 / 04</div><div class="band-v num">93.7%</div><div class="band-k">of the 696,690 firms in these trades have under 20 people.</div><div class="band-s src" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.5;color:var(--t2)"><b style="display:block;font-weight:500;color:var(--bronze);font-size:10px;letter-spacing:.2em;margin-bottom:6px">HOW WE KNOW</b>US Census, Statistics of US Businesses, 2022.</div></div>
     </div>
   </div>
 </section>
@@ -98,11 +109,11 @@
   <div class="wrap">
     <div style="display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:clamp(28px,5vw,68px);align-items:center" class="two">
       <div>
-        <p class="eyebrow rv">The 2 AM call, handled</p>
-        <h2 class="h2 rv d1" style="margin-top:16px;max-width:18ch">It knows your trade before the caller finishes the sentence.</h2>
-        <p class="lede rv d2" style="margin-top:20px">It answers as your business, works out what is actually wrong, checks your real availability, books the slot, and texts the confirmation. If it is a genuine emergency it puts them straight through to your cell instead.</p>
-        <p class="src rv d3" style="margin-top:18px">Read the first line of that call again. It said it was an AI before it did anything else. That is not the fine print, that is the feature.</p>
-        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:50ch;color:var(--ink-2);border-color:var(--accent-ink)">The <b style="color:var(--ink)">$49</b> in the corner of that card is the only moment money moves. The ringing, the questions and the texting are all <b style="color:var(--ink)">$0</b>.</p>
+        <p class="eyebrow rv">The 2 AM call</p>
+        <h2 class="h2 rv d1" style="margin-top:16px;max-width:18ch">It knows the trade before the caller finishes.</h2>
+        <p class="lede rv d2" style="margin-top:20px">It qualifies, checks availability, books the slot. A real emergency goes straight to your cell.</p>
+        <p class="src rv d3" style="margin-top:18px">It says it is an AI first. That is the feature, not the fine print.</p>
+        <p class="setup-flash rv d3" style="text-wrap:pretty;max-width:50ch;color:var(--ink-2);border-color:var(--accent-ink)">That <b style="color:var(--ink)">$49</b> is the only moment money moves. Ringing, questions, texting: <b style="color:var(--ink)">$0</b>.</p>
       </div>
       <div class="rv d2"><div class="showcase" data-show="call">
   <div class="sc-bar"><span class="sc-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span class="sc-num" style="white-space:nowrap">2:14 AM</span></div>
@@ -134,9 +145,7 @@
       <div>
         <p class="eyebrow rv">The arithmetic nobody does</p>
         <h2 class="h2 rv d1" style="margin-top:18px">One missed call is not one missed call.</h2>
-        <p class="lede rv d2" style="margin-top:22px">It is a lead that had already decided to buy, that had already found you, and that is now dialing the next number on the list. Nearly half of them never get a person. That is not a service problem. That is your revenue leaving through a phone.</p>
-        <p class="lede rv d2" style="margin-top:16px">Put a voice on the line and the leak closes. Not perfectly. Not every caller wants something. But the ones who do get booked, at two in the afternoon and at two in the morning.</p>
-        <p class="src rv d3" style="margin-top:20px">$537 is 45% of a $1,193 water heater. $4,277 is 45% of a $9,504 roof. Close rate from Invoca's July 2026 benchmark, tickets from Thumbtack's 2026 averages.</p>
+        <p class="lede rv d2" style="margin-top:22px">A lead that already decided to buy, already found you, and is now dialing the next number down the list.</p>
       </div>
       <div class="rv d2">
         <div class="ledger">
@@ -147,8 +156,8 @@
           <div class="ledger-row"><span class="lbl">Booked, after hours</span><span class="amt num">3</span><span class="bill num">$147</span></div>
           <div class="ledger-row total"><span class="lbl">You pay</span><span class="amt num">17 jobs</span><span class="bill num">$413</span></div>
         </div>
-        <p class="setup-flash" style="text-wrap:pretty;margin-top:20px;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)">Seventeen real jobs for <b style="color:var(--ink)">$413</b>, and <b style="color:var(--ink)">$0</b> for the other 83 calls. If one of those bookings is not real, reply <b style="color:var(--ink)">VOID</b> and it comes off the bill.</p>
-        <p class="src" style="margin-top:16px">Example arithmetic on the published rates, not a customer record. The 48% miss rate is Invoca's measured figure. The share of answered calls that turn into a booking is our own planning assumption and is not yet measured in production.</p>
+        <p class="setup-flash" style="text-wrap:pretty;margin-top:20px;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)"><b style="color:var(--ink)">$0</b> for the other 83 calls. Not real? Reply <b style="color:var(--ink)">VOID</b>.</p>
+        <p class="src" style="margin-top:16px">Example arithmetic on published rates, not a customer record. The 48% is Invoca's measured figure; the booking share is our planning assumption, not yet measured.</p>
       </div>
     </div>
     <!-- THE ACT, IMMEDIATELY AFTER THE PROOF. This ledger is the strongest
@@ -157,94 +166,21 @@
          phone. -->
     <div class="rv d3" style="margin-top:clamp(34px,4vw,52px);padding-top:clamp(26px,3vw,34px);border-top:1px solid var(--line2);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 22px">
       <a class="btn btn-primary" href="#start">Put my line on it</a>
-      <span style="font-size:16px;line-height:1.5;color:var(--ink-2);max-width:38ch">Free until it books you work. One code switches it on, one code switches it off, and nothing gets reprinted on the truck.</span>
+      <span style="font-size:16px;line-height:1.5;color:var(--ink-2);max-width:38ch">Free until it books you work. One code on, one code off.</span>
     </div>
-  </div>
-</section>
-
-<section class="pad-s seam">
-  <div class="wrap">
-    <p class="eyebrow rv">The whole system</p>
-    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Five parts, and only one of them is something you do.</h2>
-    <div class="rv d2" style="margin-top:34px"><div class="bp run">
-  <svg viewBox="0 0 900 300" role="img" aria-labelledby="bpt bpd">
-    <title id="bpt">How a call reaches Answered</title>
-    <desc id="bpd">A caller dials the business number. The carrier forwards the call to a line Answered owns. Answered answers, qualifies the caller, and either books the job into the calendar or transfers a real emergency to the owner's cell.</desc>
-
-    <defs>
-      <pattern id="bpgrid" width="24" height="24" patternUnits="userSpaceOnUse">
-        <path d="M24 0V24M0 24H24" class="bp-grid"/>
-      </pattern>
-    </defs>
-    <rect x="0" y="0" width="900" height="300" fill="url(#bpgrid)" opacity=".55"/>
-
-    <!-- datum line -->
-    <path d="M40 150 H860" class="bp-wire dash"/>
-    <g class="bp-tick">
-      <path d="M40 142v16M250 142v16M470 142v16M690 142v16M860 142v16"/>
-    </g>
-
-    <!-- the live path -->
-    <path id="bppath" d="M70 150 H220 M280 150 H440 M500 150 H660 M720 150 H830" class="bp-wire"/>
-    <path d="M70 150 H830" class="bp-flow"/>
-
-    <!-- nodes -->
-    <g>
-      <circle cx="70" cy="150" r="26" class="bp-node hot"/>
-      <text x="70" y="155" text-anchor="middle" class="bp-lab">01</text>
-      <text x="70" y="200" text-anchor="middle" class="bp-t">Caller</text>
-      <text x="70" y="218" text-anchor="middle" class="bp-sub">dials your number</text>
-    </g>
-    <g>
-      <rect x="222" y="124" width="56" height="52" rx="10" class="bp-node"/>
-      <text x="250" y="155" text-anchor="middle" class="bp-lab">02</text>
-      <text x="250" y="200" text-anchor="middle" class="bp-t">Carrier</text>
-      <text x="250" y="218" text-anchor="middle" class="bp-sub">one code, forwards</text>
-    </g>
-    <g>
-      <rect x="442" y="120" width="56" height="60" rx="10" class="bp-node"/>
-      <text x="470" y="155" text-anchor="middle" class="bp-lab">03</text>
-      <text x="470" y="200" text-anchor="middle" class="bp-t">Answered</text>
-      <text x="470" y="218" text-anchor="middle" class="bp-sub">picks up, qualifies</text>
-      <text x="470" y="98" text-anchor="middle" class="bp-sub">says it is an AI, first sentence</text>
-      <path d="M470 106 V118" class="bp-wire"/>
-    </g>
-    <g>
-      <rect x="662" y="124" width="56" height="52" rx="10" class="bp-node"/>
-      <text x="690" y="155" text-anchor="middle" class="bp-lab">04</text>
-      <text x="690" y="200" text-anchor="middle" class="bp-t">Booked</text>
-      <text x="690" y="218" text-anchor="middle" class="bp-sub">into your calendar</text>
-    </g>
-    <g>
-      <circle cx="830" cy="150" r="22" class="bp-node"/>
-      <text x="830" y="155" text-anchor="middle" class="bp-lab">05</text>
-      <text x="830" y="200" text-anchor="middle" class="bp-t">You</text>
-      <text x="830" y="218" text-anchor="middle" class="bp-sub">text and transcript</text>
-    </g>
-
-    <!-- the emergency branch -->
-    <path d="M470 120 C470 70 620 70 690 70 H800 C820 70 830 80 830 100 V128" class="bp-wire dash"/>
-    <text x="640" y="58" text-anchor="middle" class="bp-sub">a real emergency transfers straight to your cell</text>
-
-    <!-- the reversal -->
-    <path d="M250 176 C250 240 250 250 300 250 H430" class="bp-wire dash"/>
-    <text x="470" y="254" text-anchor="middle" class="bp-sub">one code turns it off again, ten seconds</text>
-  </svg>
-  <span class="bp-cap">Fig 1 &middot; call path</span>
-</div></div>
   </div>
 </section>
 
 <section class="paper seam pad">
   <div class="wrap">
     <p class="eyebrow rv">Setup</p>
-    <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">Nothing gets reprinted. Nothing gets ported. You dial one code.</h2>
+    <h2 class="h2 rv d1" style="margin-top:18px;max-width:20ch">Nothing gets reprinted. You dial one code.</h2>
     <div class="steps">
-      <div class="step rv" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Your number stays your number</h3><p style="color:rgba(30,27,23,.76)">The one on the truck, the van, the yard sign, the Google listing, the magnet on the fridge of every customer you have had for fifteen years. It does not change.</p></div>
-      <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Forwarding, not replacement</h3><p style="color:rgba(30,27,23,.76)">One carrier code sends calls here first. Another one sends them back. You can turn it off in the truck in ten seconds if you hate it.</p></div>
-      <div class="step rv d2" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Or catch only what you miss</h3><p style="color:rgba(30,27,23,.76)">Forward only the busy line, the dead zone, and the calls that ring out. You keep answering when your hands are free. It catches the rest, which is most of them.</p></div>
+      <div class="step rv" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Your number stays your number</h3><p style="color:rgba(30,27,23,.76)">The truck, the yard sign, the Google listing. None of it changes.</p></div>
+      <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Forwarding, not replacement</h3><p style="color:rgba(30,27,23,.76)">One code sends calls here. Another sends them back, in ten seconds.</p></div>
+      <div class="step rv d2" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Or catch only what you miss</h3><p style="color:rgba(30,27,23,.76)">Forward only the busy line, the dead zone, the calls that ring out.</p></div>
     </div>
-    <p class="src rv d3" style="margin-top:30px;max-width:82ch">Carrier codes come from Verizon and T-Mobile primary documentation, accessed 2026-08-10. Conditional forwarding behavior varies by carrier and handset and we are bench testing all three major US carriers before we publish a compatibility claim.</p>
+    <p class="src rv d3" style="margin-top:30px;max-width:82ch">Carrier codes: Verizon and T-Mobile primary documentation, accessed 2026-08-10. Conditional forwarding varies by carrier and handset; we are bench testing all three before claiming compatibility.</p>
   </div>
 </section>
 
@@ -252,7 +188,7 @@
   <div class="wrap narrow">
     <p class="eyebrow rv">Two in the morning</p>
     <p class="pull rv d1" style="margin-top:22px">A burst pipe does not leave a voicemail. It calls the next plumber.</p>
-    <p class="lede rv d2" style="margin-top:26px">After hours is where the category earns its keep, and it is the shift nobody wants. Water and freezing claims run about 1.61 per 100 insured homes a year at roughly $13,954 of average severity. Somebody is going to answer that call. It costs $49 for it to be you.</p>
+    <p class="lede rv d2" style="margin-top:26px">Water and freezing claims run about 1.61 per 100 insured homes a year, at $13,954 average severity. $49 for it to be you.</p>
     <p class="src rv d3" style="margin-top:18px">Claim frequency and severity from the Insurance Information Institute, 2018 to 2022 data.</p>
   </div>
 </section>
@@ -260,13 +196,12 @@
 <section class="pad seam" style="background:linear-gradient(180deg,var(--ink-950),var(--ink-900))">
   <div class="wrap">
     <p class="eyebrow rv">Then it goes and gets the rest</p>
-    <h2 class="h2 rv d1" style="margin-top:18px;max-width:22ch">The invoice that went quiet on day 31 is not a lost cause. It is an unmade phone call.</h2>
+    <h2 class="h2 rv d1" style="margin-top:18px;max-width:22ch">An unpaid invoice is an unmade phone call.</h2>
     <div class="cards">
-      <article class="card rv"><div class="card-tag">Autopilot</div><h3 class="h3">In your name, on your caller ID</h3><p>A polite, persistent follow up on the invoice that has aged past thirty days. Not a collections agency. You, with an assistant who never forgets and never gets embarrassed.</p><div class="price">$19 per invoice paid. Any size. Nothing paid, nothing owed.</div></article>
-      <article class="card rv d1"><div class="card-tag">Contingency</div><h3 class="h3">Only on what actually lands</h3><p>For the ones that have genuinely defaulted, a share of the money that arrives. Nothing arrives, nothing is owed. You pay nothing unless the money lands.</p><div class="price">A share of <b>recovered dollars</b>. Never a fee on nothing.</div></article>
-      <article class="card rv d2"><div class="card-tag">Every call</div><h3 class="h3">Written down as it happens</h3><p>Who promised what, and when. Every promise to pay logged, every call recorded where consent permits. It is your record, and it is the reason the second call works.</p><div class="price">Included.</div></article>
+      <article class="card rv"><div class="card-tag">Autopilot</div><h3 class="h3">In your name, on your caller ID</h3><p>Past day thirty, it follows up. Not a collections agency. You, with an assistant who never gets embarrassed.</p><div class="price">$19 per invoice paid. Any size. Nothing paid, nothing owed.</div></article>
+      <article class="card rv d1"><div class="card-tag">Contingency</div><h3 class="h3">Only on what actually lands</h3><p>For the ones that genuinely defaulted, a share of what arrives. Nothing arrives, nothing owed.</p><div class="price">A share of <b>recovered dollars</b>. Never a fee on nothing.</div></article>
+      <article class="card rv d2"><div class="card-tag">Every call</div><h3 class="h3">Written down as it happens</h3><p>Who promised what, and when. Every call recorded where consent permits.</p><div class="price">Included.</div></article>
     </div>
-    <p class="src rv d3" style="margin-top:26px;max-width:86ch">We call in your name, so your customer hears your company, not a collections agency. That is why it works: a friendly call from the business that did the work gets paid, and a letter from a stranger gets ignored.</p>
   </div>
 </section>
 
@@ -276,8 +211,7 @@
       <div>
         <p class="eyebrow rv">What it costs</p>
         <h2 class="h2 rv d1" style="margin-top:16px;max-width:17ch">Free until it books you work.</h2>
-        <p class="lede rv d2" style="margin-top:20px">No subscription and no per minute charge. The line can ring all day, and the meter does not move until a real job is on your calendar with a name, an address, a callback number and a confirmed window against it.</p>
-        <p class="setup-flash rv d2" style="text-wrap:pretty;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)">Your bill stops at <b style="color:var(--ink)">$549</b> no matter how good the month gets, and the cap never moves without you.</p>
+        <p class="lede rv d2" style="margin-top:20px">No subscription. No per minute charge. The meter moves only on a booked job.</p>
         <div class="rv d3" style="margin-top:26px;display:flex;flex-wrap:wrap;align-items:center;gap:14px 18px"><a class="btn btn-ghost" href="/pricing">See all three meters and the economics</a><span class="src" style="font-size:12.5px;line-height:1.5;color:var(--t2);max-width:30ch">Off again in ten seconds, with one code.</span></div>
       </div>
       <div class="rv d2" style="max-width:420px;width:100%;justify-self:end"><article class="pcard lead rv" data-aud="business both">
@@ -286,15 +220,14 @@
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 subscription &middot; $0 per minute &middot; $0 per call &middot; $0 for a wrong number</div>
-        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
-        <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>We would rather lose the <b>$19</b> than have you spend a Tuesday arguing about it.</span><span>Your bill stops at <b>$549</b>. The cap is yours to move, and it never moves without you.</span><span>After 90 days, a line that books almost nothing settles at <b>$39</b> a month, credited back against bookings.</span></div>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket.</p>
+        <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>Your bill stops at <b>$549</b>. You set the cap.</span><span>After 90 days, a quiet line settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
-          <li>Answers your existing number, 24 hours a day, in a voice built around your trade</li>
-          <li>Qualifies the caller, checks your real availability, books straight into your calendar</li>
-          <li>Warm transfers a genuine emergency to your cell in five seconds</li>
-          <li>Texts you the transcript and the recording inside a minute of the call ending</li>
-          <li>Never quotes a price, enforced in three independent layers</li>
-          <li>Live in about 60 seconds on one carrier code, off again in ten</li>
+          <li>Answers your existing number, 24 hours a day</li>
+          <li>Qualifies the caller and books into your calendar</li>
+          <li>Warm transfers a real emergency to your cell in five seconds</li>
+          <li>Texts you the transcript inside a minute</li>
+          <li>Never quotes a price, enforced in three layers</li>
         </ul>
         <div class="pc-foot">
         </div>
@@ -318,8 +251,8 @@
 <section class="paper seam pad" id="start">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
-    <h2 class="h2 rv d1" style="margin-top:18px">Free until it books you work.</h2>
-    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:50ch">Put it on the line for a week. If it does not book a job, you have paid nothing, and you turn it off with one code.</p>
+    <h2 class="h2 rv d1" style="margin-top:18px">Put your line on it.</h2>
+    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:50ch">A week on your line. If it books nothing, you pay nothing.</p>
     <!-- THE FORM. Its own element, never a gated slot. Same endpoint as the
          home page close; the product field is what tells us a plumber signed
          up on the trades page rather than a consumer on the home page. -->
@@ -340,14 +273,14 @@
     <!-- the reversal, adjacent to the last button on the page. paper ground, so
          every colour comes from --ink / --ink-2, never from a dark token. -->
     <p class="rv d3" style="margin-top:20px;margin-inline:auto;max-width:42ch;font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> base. <b style="color:var(--ink);font-weight:600">$19</b> when it books a job. Reply <b style="color:var(--ink);font-weight:600">VOID</b> and the charge comes off.</p>
-    <p class="src form-note rv d3">No card. No account. No salesperson calling you. Nothing to reprint on the truck.</p>
+    <p class="src form-note rv d3">No card. No account. No salesperson calling you.</p>
 
     <!-- THE DEMO, BESIDE THE FORM INSTEAD OF INSTEAD OF IT. Gated, ships
          [hidden], the number is never in this file. -->
     <div class="rv d3" data-callgate hidden style="margin-top:36px;padding-top:28px;border-top:1px solid rgba(11,12,14,.14)">
-      <p class="lede" style="margin:0 auto;max-width:44ch">Want to hear it before you hand over anything? Call it. It answers as a plumbing shop.</p>
+      <p class="lede" style="margin:0 auto;max-width:44ch">Hear it first. It answers as a plumbing shop.</p>
       <p style="margin-top:20px"><span class="cta-slot" data-callslot="Hear it answer"></span></p>
-      <p class="src" style="margin-top:14px;margin-inline:auto;max-width:52ch">Free. No account. Nobody calls you back. It is the engine this page describes, answering live.</p>
+      <p class="src" style="margin-top:14px;margin-inline:auto;max-width:52ch">Free. No account. Nobody calls you back.</p>
     </div>
   </div>
 </section>

@@ -9,3 +9,6 @@ _shots/
 
 # function deps, bundled at deploy, never committed or published
 node_modules/
+
+# research corpus: real business contact data, never deployed, never committed
+research/data/
