@@ -90,11 +90,13 @@ FOOT = f'''<footer class="foot">
           <li><a href="/trades.html">Answered, for your line</a></li>
           <li><a href="/hold.html">Hold, for everyone</a></li>
           <li><a href="/recover.html">Recover, for your invoices</a></li>
+          <li><a href="/parley.html">Parley, for settling a price</a></li>
         </ul>
       </div>
       <div>
         <h4>Company</h4>
         <ul>
+          <li><a href="/setup.html">How you set it up</a></li>
           <li><a href="/pricing.html">Pricing</a></li>
           <li><a href="/trust.html">Trust and guardrails</a></li>
           <li><a href="/#honesty">What we will not say</a></li>
@@ -174,10 +176,10 @@ def reversal(kind, top=22, center=False, delay='d2'):
     """The price law and the way out of it, side by side, next to the number."""
     body = {
         'answered': ('$0 base. <b class="num" style="%s">$19</b> when it books. '
-                     'Reply <b class="num" style="%s;letter-spacing:.04em">VOID</b> and it comes off.'),
+                     'One word, <b class="num" style="%s;letter-spacing:.04em">VOID</b>, and it comes off.'),
         'hold':     ('$0 if nobody ever picks up. <b class="num" style="%s">$20</b> when a human is '
-                     'on the line. Your first hold is free, and you can reply '
-                     '<b class="num" style="%s;letter-spacing:.04em">VOID</b> to any charge.'),
+                     'on the line. Your first hold is free, and one word, '
+                     '<b class="num" style="%s;letter-spacing:.04em">VOID</b>, takes off any charge.'),
         'recover':  ('$0 to start, $0 a month, <b class="num" style="%s">15%%</b> of what actually '
                      'lands. Nothing lands, nothing owed, and '
                      '<b class="num" style="%s;letter-spacing:.04em">VOID</b> takes off any charge.'),
@@ -244,6 +246,155 @@ H2_UTIL = 'font-size:clamp(30px,3.4vw,52px);line-height:1.12;letter-spacing:-.01
 H2_MID = 'font-size:clamp(34px,3.9vw,58px);line-height:1.06;letter-spacing:-.018em;text-wrap:balance'
 
 
+# ══ THE SWITCHBOARD ═══════════════════════════════════════════════════════════
+# WHY THIS EXISTS, MEASURED 2026-08-14 AGAINST THE REPO, NOT ASSUMED.
+#   · There is no billing code of any kind in this repository. No Stripe, no
+#     checkout, no card field, no payment intent, nothing that can move a dollar.
+#     Every price on every page is therefore an OFFER, and not one of them has
+#     ever been charged to anybody.
+#   · There is no customer account system. netlify/functions/interest.js upserts
+#     a HubSpot contact and sends email through Resend. That is the whole funnel.
+#     A contractor who says yes today gets a person, by hand, not a login.
+#   · No function in this repo sends an SMS to a customer, and the A2P campaign
+#     has been rejected three times, so nothing this company sends arrives as a
+#     text. Nine sentences across these pages said or implied one would.
+#
+# DELETING THOSE PROMISES WAS NEVER THE OPTION. The founder's standing order is
+# that a feature is never removed from this site. So every promise stays exactly
+# where it was, and the pages gain the one thing they were missing: the line
+# between what runs today and what does not.
+#
+# IT IS ONE SOURCE ON PURPOSE. The same four facts were being told four
+# different ways in four places, which is how a disclosure quietly rots: one
+# page gets updated, three do not, and the three that did not are now lying.
+# STATES below is the only place any of it is written. /pricing, /trust, /terms,
+# /privacy and /recording all render from here, and _texting_guard() at the
+# bottom of this file fails the build if a page starts promising a text again.
+#
+# A STATE ROW IS NOT AN APOLOGY. "Every price here was published before we could
+# take a single dollar" is a stronger sentence than anything we could have
+# written to cover it up, and it is only available to a company telling the
+# truth about where it is.
+STATE_DATE = '2026-08-14'
+
+# live=True gets the lit dot and reads LIVE. The demo-line row is the only one
+# that moves, so it is the only one carrying the [data-callgate] pair: the
+# branch that ships VISIBLE is the one that is true when the line is down, which
+# is the correct fail direction and the same rule every other gated block on
+# this site follows.
+STATES = [
+    dict(key='line', name='The demo line', live=True,
+         short='the demo line answers, and a real call checks it every two hours',
+         body='<span data-callgate hidden>It is answering this minute. It says it is an AI in its '
+              'first sentence, it announces the recording, and it will not say a dollar amount.</span>'
+              '<span data-callgate-off>A real call is placed to it every two hours, and every call '
+              'button on this site reads that check before it hands you a number. That is why you '
+              'sometimes get a list button here instead of a phone number.</span>'),
+    dict(key='lines', name='Business lines', live=False,
+         short='no business line is on the system yet',
+         body='No customer line is on this system yet. The first ones go on one at a time, by hand, '
+              'with a person on the phone with you. There is nothing to sign up for and no account '
+              'to make, because neither one exists.'),
+    dict(key='billing', name='Billing', live=False,
+         short='nothing on this site can charge you',
+         body='Nothing on this site can charge you. There is no card field anywhere in it and no '
+              'meter is running. Every price here was published before we could take a single '
+              'dollar, which is the order we wanted it in.'),
+    dict(key='texting', name='Texting', live=False,
+         short='texting is not switched on, so what you ask for arrives by email',
+         body='Our messaging program is not approved by the carriers yet, so we are not sending '
+              'texts to anybody. Until it clears, anything we would text you arrives by email '
+              'instead. We would rather send you the wrong kind of message than leave you waiting '
+              'on one that cannot arrive.'),
+]
+
+_SB_HEAD = 'What is on, and what is not'
+
+
+def state_table(dark=False, delay='d2', top=26):
+    """The four rows, as a receipt. .ptable rebinds the ink contract itself, so
+    the same call paints correctly on obsidian (.dark) and on bone paper.
+
+    THE CHIP IS NOT A FLEX CONTAINER, DELIBERATELY. .prow aligns its two grid
+    items on the BASELINE. A flex chip's baseline is its first flex item, which
+    here is a 7px dot carrying no text, so the state word would have hung below
+    the row's name. The dot is inline-block instead and the word keeps the
+    baseline. Measured, not assumed: this is the same class of defect as an
+    inline <b> blown out into its own flex item, which passes every geometry
+    assertion and is only visible in a screenshot.
+    """
+    rows = []
+    for d in STATES:
+        lit = d['live']
+        ink = 'var(--accent-ink)' if lit else 'var(--ink-2)'
+        dot = ('background:var(--accent-ink)' if lit
+               else 'border:1.5px solid var(--ink-3)')
+        rows.append(
+            '<div class="prow" id="state-' + d['key'] + '">'
+            '<div><b style="display:block;font-weight:600;font-size:17px;letter-spacing:-.005em">'
+            + d['name'] + '</b>'
+            '<span style="display:block;margin-top:7px;font-size:15px;line-height:1.56;'
+            'color:var(--ink-2)">' + d['body'] + '</span></div>'
+            '<div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;'
+            'white-space:nowrap;color:' + ink + '">'
+            '<span aria-hidden="true" style="display:inline-block;width:7px;height:7px;'
+            'border-radius:999px;margin-right:9px;vertical-align:1px;' + dot + '"></span>'
+            + ('LIVE' if lit else 'NOT YET') + '</div>'
+            '</div>')
+    return ('<div class="ptable' + (' dark' if dark else '') + ' rv ' + delay + '" '
+            'style="margin-top:' + str(top) + 'px">'
+            '<div class="prow head"><span>' + _SB_HEAD + '</span>'
+            '<span>As of ' + STATE_DATE + '</span></div>'
+            + ''.join(rows) + '</div>')
+
+
+SB_EYEBROW = 'Where this actually is'
+SB_HEADING = 'What is on, and what is not.'
+SB_LEDE = ('This site describes a phone company we are still building. Rather than leave you to '
+           'work out which parts exist, here is the line, in one place, dated.')
+SB_TAIL = ('Stated ' + STATE_DATE + '. These four rows are written in exactly one place, so no page '
+           'can quietly fall out of date on its own. When a row changes it changes here, and every '
+           'page carrying it changes in the same build.')
+
+
+def switchboard(dark=False, attrs='', eyebrow=None, heading=None, lede=None, tail=None):
+    """The whole section. id="state" is the anchor every state_note points at."""
+    ground = 'pad-s seam' if dark else 'paper seam pad-s'
+    return ('\n<section class="' + ground + '" id="state"' + attrs + '>\n'
+            '  <div class="wrap">\n'
+            '    <p class="eyebrow rv">' + (eyebrow or SB_EYEBROW) + '</p>\n'
+            '    <h2 class="h2 rv d1" style="' + H2_UTIL + ';margin-top:16px;max-width:24ch">'
+            + (heading or SB_HEADING) + '</h2>\n'
+            '    <p class="lede rv d2" style="margin-top:20px;max-width:62ch">'
+            + (lede or SB_LEDE) + '</p>\n'
+            '    ' + state_table(dark=dark) + '\n'
+            '    <p class="src rv d3" style="margin-top:22px;max-width:82ch">'
+            + (tail or SB_TAIL) + '</p>\n'
+            '  </div>\n'
+            '</section>\n')
+
+
+def state_note(keys, top=20, center=False, delay='d3'):
+    """One dated sentence at a promise site, drawn from the same rows.
+
+    A disclosure a reader has to go and find is worth nothing, and a page that
+    repeats the whole switchboard four times is unreadable. This is the middle:
+    the one row that bears on the sentence beside it, plus the way to the rest.
+    """
+    parts = [d['short'] for d in STATES if d['key'] in keys]
+    if len(parts) == 1:
+        txt = parts[0]
+    elif len(parts) == 2:
+        txt = parts[0] + ', and ' + parts[1]
+    else:
+        txt = ', '.join(parts[:-1]) + ', and ' + parts[-1]
+    mid = ('margin-inline:auto;text-align:left;width:fit-content;max-width:min(66ch,100%);'
+           if center else 'max-width:66ch;')
+    return ('<p class="src rv ' + delay + '" style="margin-top:' + str(top) + 'px;' + mid + '">'
+            'Stated ' + STATE_DATE + ': ' + txt + '. The whole line between what runs today and '
+            'what does not is <a href="/pricing.html#state">on the pricing page</a>.</p>')
+
+
 # ── /pricing ──────────────────────────────────────────────────────────────────
 PRICING = '''
 
@@ -298,13 +449,13 @@ PRICING = '''
         <div class="pc-price num">$19</div>
         <div class="pc-unit">per job booked in standard hours.<br> <b style="color:var(--bronze-2)">$49</b> for a job booked after hours.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 subscription &middot; $0 per minute &middot; $0 per call &middot; $0 for a wrong number</div>
-        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket.</p>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">One word, <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b>, takes any charge off. No argument, no ticket.</p>
         <div class="pc-meter"><span>A booked job means a name, an address, a callback number and a confirmed window. Anything less is free.</span><span>Your bill stops at <b>$549</b>. You set the cap.</span><span>After 90 days, a quiet line settles at <b>$39</b> a month, credited back against bookings.</span></div>
         <ul class="pc-list">
           <li>Answers your existing number, 24 hours a day</li>
           <li>Qualifies the caller and books into your calendar</li>
           <li>Warm transfers a real emergency to your cell in five seconds</li>
-          <li>Texts you the transcript inside a minute</li>
+          <li>Sends you the transcript inside a minute, by email until texting clears</li>
           <li>Never quotes a price, enforced in three layers</li>
         </ul>
         <div class="pc-foot">
@@ -319,7 +470,7 @@ PRICING = '''
         <div class="pc-price num">$20</div>
         <div class="pc-unit">per human reached on a government line.<br> <b style="color:var(--bronze-2)">$10</b> on a commercial line.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 if nobody ever picks up &middot; your first hold is free &middot; no subscription, ever</div>
-        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket.</p>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">One word, <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b>, takes any charge off. No argument, no ticket.</p>
         <div class="pc-meter"><span><b>One price, the whole errand.</b> However long the queue runs, however many redials it takes. No clock on your bill.</span><span>A connection means a human on the line who can act on your case. A phone tree is not one, and not a charge.</span><span>Government lines are <b>$20</b> because the queues are longer. Commercial lines are <b>$10</b>.</span></div>
         <ul class="pc-list">
           <li>Works the phone tree, enters your reference, survives the transfer</li>
@@ -339,7 +490,7 @@ PRICING = '''
         <div class="pc-price num">15%</div>
         <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 to start &middot; $0 a month &middot; $0 if nothing lands</div>
-        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket.</p>
+        <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">One word, <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b>, takes any charge off. No argument, no ticket.</p>
         <div class="pc-meter"><span>The share exists only on dollars that clear into your account, never on calls placed.</span><span>15% is the standard band. Newer invoices 10%, the oldest 20%, subscribers less on every band. You see the band before the first call, and all three are in the <a href="/terms.html" style="color:inherit">terms</a>.</span><span><b>Autopilot</b> instead: a flat $19 for every invoice that gets paid, no share at all.</span><span>Where state law bars the shape of a contingency fee, you get the flat option automatically.</span></div>
         <ul class="pc-list">
           <li>Calls every invoice past day thirty, in your name and on your caller ID</li>
@@ -356,6 +507,7 @@ PRICING = '''
     <p class="src rv d3" style="margin-top:24px;max-width:88ch;font-size:12.5px;color:rgba(242,244,240,.74)">These figures are worked out from published vendor rates, not measured from our own running system. The arithmetic is below.</p>
   </div>
 </section>
+''' + switchboard(dark=False, attrs=' data-aud="consumer business both"') + '''
 
 <section class="pad-s seam" data-aud="business both" style="padding-top:clamp(40px,5vw,72px)">
   <div class="wrap">
@@ -420,7 +572,7 @@ PRICING = '''
       <circle cx="830" cy="150" r="22" class="bp-node"/>
       <text x="830" y="155" text-anchor="middle" class="bp-lab">05</text>
       <text x="830" y="200" text-anchor="middle" class="bp-t">You</text>
-      <text x="830" y="218" text-anchor="middle" class="bp-sub">text and transcript</text>
+      <text x="830" y="218" text-anchor="middle" class="bp-sub">the transcript</text>
     </g>
 
     <!-- the emergency branch -->
@@ -565,7 +717,7 @@ PRICING = '''
   <div class="wrap narrow">
     <p class="eyebrow rv">Your protection</p>
     <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px">Every charge, provable.<br> <span class="lit">Every dispute, yours.</span></h2>
-    <p class="rv d2" style="margin-top:22px;padding-left:14px;border-left:2px solid var(--bronze);font-size:clamp(17px,1.5vw,21px);line-height:1.45;color:var(--t1);max-width:52ch">$0 base. <b class="num" style="color:var(--bronze-2);font-weight:600">$19</b> when it books. Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> and it comes off.</p>
+    <p class="rv d2" style="margin-top:22px;padding-left:14px;border-left:2px solid var(--bronze);font-size:clamp(17px,1.5vw,21px);line-height:1.45;color:var(--t1);max-width:52ch">$0 base. <b class="num" style="color:var(--bronze-2);font-weight:600">$19</b> when it books. One word, <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b>, and it comes off.</p>
     <details class="disc rv d2" style="margin-top:30px" open>
       <summary>Every charge shows you the call it came from.</summary>
       <div class="disc-body"><p>The recording where consent permits, the transcript, and the appointment record. If you cannot see why you were charged, you should not be charged.</p></div>
@@ -576,7 +728,7 @@ PRICING = '''
     </details>
     <details class="disc rv d3">
       <summary>Quality failures refund themselves before you notice.</summary>
-      <div class="disc-body"><p>A nightly check re-reads every booking. A wrong address, a slot already taken, a callback never logged. Those reverse automatically and text you.</p></div>
+      <div class="disc-body"><p>A nightly check re-reads every booking. A wrong address, a slot already taken, a callback never logged. Those reverse automatically and tell you why.</p></div>
     </details>
     <!-- Same disclosure the trust page carries, because these four are written
          in the present tense about a meter that has not billed anybody yet.
@@ -638,7 +790,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
-        <p class="src" style="margin-top:8px">Adding your number means we may text you what you ask for here. Message and data rates may apply. Reply STOP anytime to stop. How we handle your number: <a href="/privacy">Privacy</a>.</p>
+        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from (916) 350-4869: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Texting is not switched on yet, so for now what you ask for arrives by email.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -762,6 +914,7 @@ RECOVER = '''
       <div class="step rv d2"><h3 class="h3">In three states the flat option is the only one</h3><p>New York, Illinois and North Carolina bar the shape of a contingency fee for this work. If you are in one, the flat option is served automatically, gated on your verified business location.</p></div>
     </div>
     <p class="src rv d3" style="margin-top:24px;max-width:78ch">Recovered means the payment lands within 30 days of our last contact, or by a date the payer promised in writing. Money outside that window is yours alone. The <a href="/terms.html" style="color:var(--bronze-2)">terms</a> win over any page here.</p>
+    ''' + state_note(['lines', 'billing'], top=16) + '''
   </div>
 </section>
 
@@ -804,8 +957,8 @@ TRUST = '''
 <section class="band">
   <div class="wrap" style="padding-inline:0">
     <div class="band-grid">
-      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand, by text.', 'Our design target, published 2026-08-13. Not a measurement, and we will not print one until customer lines are running.', kind='Our commitment') + '''
-      ''' + band_cell('02', '5s', 'from a caller asking for a human to your cell ringing.', 'Our design target, published 2026-08-13. Warm transfer attempt. 20 seconds without a pickup and it takes a callback and texts you.', 'd1', kind='Our commitment') + '''
+      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand.', 'Our design target, published 2026-08-13. Not a measurement, and we will not print one until customer lines are running. It arrives by email while texting is off.', kind='Our commitment') + '''
+      ''' + band_cell('02', '5s', 'from a caller asking for a human to your cell ringing.', 'Our design target, published 2026-08-13. Warm transfer attempt. 20 seconds without a pickup and it takes a callback and sends it to you.', 'd1', kind='Our commitment') + '''
       ''' + band_cell('03', '0', 'prices quoted. Ever. It is not allowed to say a number.', 'Our rule, published 2026-08-13, held by three guardrails below. Two run on the demo line today, so you can test it yourself.', 'd2', kind='Our commitment') + '''
       ''' + band_cell('04', '1st', 'sentence of every call is the AI saying it is an AI.', 'Our rule, published 2026-08-13. Every call, everywhere, whether or not the law requires it. Check it on the demo line.', 'd3', kind='Our commitment') + '''
     </div>
@@ -841,25 +994,22 @@ TRUST = '''
   <div class="wrap">
     <p class="eyebrow rv">Where we actually are</p>
     <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;max-width:30ch">Some of this is running. Some is not.</h2>
-    <div class="steps" style="margin-top:30px">
-      <div class="step rv"><h3 class="h3">Running today, and you can check it yourself</h3><p>The demo line answers. It says it is an AI in its first sentence, it announces the recording, and it will not say a dollar amount. Call it and try to make it quote you a price.</p></div>
-      <div class="step rv d1"><h3 class="h3">Not running yet, because there are no customer lines yet</h3><p>The transcript inside a minute, the warm transfer, the guardrail counter and the nightly replay all need a live customer line. Stated above as targets, not measurements.</p></div>
-      <div class="step rv d2"><h3 class="h3">Numbers we will not print until we have them</h3><p>No answer rate, no recovery rate, no customer count, no logo wall, no testimonial. None of them exists yet. The first pilot produces the real ones, and they go up including the unflattering ones.</p></div>
-    </div>
-    <p class="src rv d3" style="margin-top:24px;max-width:78ch">Stated 2026-08-13. If the first customer lines are live and this still says otherwise, that is a page we failed to update.</p>
+    ''' + state_table(dark=True) + '''
+    <p class="rv d3" style="margin-top:26px;max-width:76ch">Two more things follow from those rows. <b style="font-weight:600">The transcript inside a minute, the warm transfer, the guardrail counter and the nightly replay all need a live customer line</b>, so the four numbers at the top of this page are targets we are binding ourselves to, not measurements of a fleet. And <b style="font-weight:600">there are numbers we will not print until we have them</b>: no answer rate, no recovery rate, no customer count, no logo wall, no testimonial. None of them exists yet. The first pilot produces the real ones, and they go up here including the unflattering ones.</p>
+    <p class="src rv d3" style="margin-top:20px;max-width:78ch">Stated 2026-08-14. If the first customer lines are live and this still says otherwise, that is a page we failed to update.</p>
   </div>
 </section>
 
 <section class="paper seam pad-s" style="padding-top:clamp(58px,6.6vw,100px)">
   <div class="wrap">
     <p class="eyebrow rv">How you audit it</p>
-    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;max-width:30ch">From the truck, in a text.</h2>
+    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;max-width:30ch">From the truck, on your phone.</h2>
     <div class="steps">
       <div class="step rv" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Every call, transcribed to you</h3><p style="color:rgba(30,27,23,.76)">The transcript, a one line summary and the caller's number, inside a minute of the call ending.</p></div>
       <div class="step rv d1" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">It reports its own mistakes first</h3><p style="color:rgba(30,27,23,.76)">A hang up mid sentence. An address it misheard. A callback it promised and never logged. You hear it from us first.</p></div>
       <div class="step rv d2" style="border-color:rgba(30,27,23,.2)"><h3 class="h3">Four numbers, no vanity metrics</h3><p style="color:rgba(30,27,23,.76)">Answer rate. Median pickup, in rings. Escalations delivered to your cell. Price guardrail violations, which should read zero.</p></div>
     </div>
-    <p class="src rv d3" style="margin-top:26px;max-width:80ch;font-size:12.8px;line-height:1.6;color:var(--ink-2)">If the recording system goes down, we stop taking your calls rather than take them unwatched, and text you that. Silent degradation is worse than an outage.</p>
+    <p class="src rv d3" style="margin-top:26px;max-width:80ch;font-size:12.8px;line-height:1.6;color:var(--ink-2)">If the recording system goes down, we stop taking your calls rather than take them unwatched, and tell you that. Silent degradation is worse than an outage.</p>
   </div>
 </section>
 
@@ -944,6 +1094,7 @@ THANKS = '''
     <p class="lede rv d2" data-callgate hidden style="margin-top:22px;margin-inline:auto;max-width:50ch">The demo line is answering right now. It says it is an AI, refuses to quote a price, and books you a slot anyway.</p>
     <p class="lede rv d2" data-callgate-off style="margin-top:22px;margin-inline:auto;max-width:52ch">The demo line is not answering this minute. The seven minute walkthrough is the same voice, and it plays either way.</p>
     ''' + reversal('answered', top=26, center=True) + '''
+    ''' + state_note(['lines', 'billing'], top=16, center=True) + '''
     <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it answer now"><a class="btn btn-primary" href="/#listen">Hear the walkthrough instead</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back.</p>
     <p class="src rv d3" data-callgate-off style="margin-top:14px">A real call is placed to the line every two hours. The number returns by itself.</p>
@@ -957,8 +1108,19 @@ page('thanks.html', 'Thank you. A person has it.',
      'Your note reached a person at Answered. We read every one of these ourselves and you will hear back from a human being.', THANKS)
 
 
-# ── normalise the chrome on the three hand-written pages ──────────────────────
-for slug, active in (('index.html', '/'), ('trades.html', '/trades.html'), ('hold.html', '/hold.html')):
+# ── normalise the chrome on every hand-written page ───────────────────────────
+# THE THREE LEGAL PAGES WERE NEVER IN THIS LOOP, AND THEIR FOOTERS HAD DRIFTED.
+# terms/privacy/recording each carried a byte copy of the chrome as it stood on
+# the day they were written, so by 2026-08-14 the footer on all three was
+# missing FIVE links that FOOT had gained since: /parley, /setup, /terms,
+# /privacy and /recording. Measured consequence: a reader standing on /privacy
+# could not reach /recording, and /privacy's own footer did not link /privacy.
+# Their own header comments asked for exactly this. They are in the guard,
+# _extensionless() and _asset_version() lists already; this closes the last one,
+# and from here their chrome cannot drift again.
+for slug, active in (('index.html', '/'), ('trades.html', '/trades.html'), ('hold.html', '/hold.html'),
+                     ('terms.html', '/terms.html'), ('privacy.html', '/privacy.html'),
+                     ('recording.html', '/recording.html')):
     p = ROOT / slug
     s = p.read_text(encoding='utf-8')
     s = re.sub(r'<header class="nav">.*?</header>\s*<div class="sheet" id="sheet">.*?</div>\n',
@@ -966,6 +1128,45 @@ for slug, active in (('index.html', '/'), ('trades.html', '/trades.html'), ('hol
     s = re.sub(r'<footer class="foot">.*?</footer>', FOOT, s, count=1, flags=re.S)
     p.write_text(s, encoding='utf-8')
     print('chrome normalised in', slug)
+
+
+# ── THE STATE MARKERS ON THE STANDALONE PAGES ─────────────────────────────────
+# terms/privacy/recording are hand-written HTML and cannot call a Python
+# function, so each carries a marker pair that the generator refills on every
+# run. That keeps them standalone to READ and generated to MAINTAIN, which is
+# the only arrangement under which four pages still promise the same thing in
+# the same words a month from now.
+#
+# IT REFUSES RATHER THAN SKIPS. A marker that goes missing in an edit would make
+# this step a silent no-op, and a disclosure that silently stops rendering is
+# worse than one that was never written, because everybody downstream still
+# believes it is there.
+_STATE_BLOCKS = {
+    'terms.html': switchboard(
+        dark=True, eyebrow='Before the bill',
+        heading='Nothing here has billed anybody yet.',
+        lede='Everything on this page is a term we are binding ourselves to in advance. None of it '
+             'describes a bill that somebody received, because there are none. Here is the line, in '
+             'the same words every other page on this site uses.'),
+    'privacy.html': '  ' + state_note(['lines'], top=16) + '\n',
+    'recording.html': '  ' + state_note(['lines'], top=16) + '\n',
+}
+
+def _standalone_state():
+    import re as _re, sys as _s2
+    for slug, block in _STATE_BLOCKS.items():
+        p = ROOT / slug
+        html = p.read_text(encoding='utf-8')
+        if '<!-- STATE:START -->' not in html or '<!-- STATE:END -->' not in html:
+            print('*** BUILD REFUSED: %s has lost its <!-- STATE:START/END --> markers, so the '
+                  'state disclosure would silently stop rendering ***' % slug, file=_s2.stderr)
+            _s2.exit(1)
+        out = _re.sub(r'<!-- STATE:START -->.*?<!-- STATE:END -->',
+                      lambda m: '<!-- STATE:START -->' + block + '<!-- STATE:END -->',
+                      html, count=1, flags=_re.S)
+        if out != html:
+            p.write_text(out, encoding='utf-8')
+        print('state block filled in', slug, len(block), 'bytes')
 
 
 # ── post-step: pricing cards and CTAs, applied to EVERY page from one source ──
@@ -1123,8 +1324,8 @@ def _guard():
     #      per-card isolation without leaving the space between cards dark.
     SANCTIONED = {'8', '10', '13', '15', '18', '20'}
     PAGES = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html',
-             'terms.html', 'privacy.html', 'recording.html']
+             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
+             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
 
     def _scopes(html):
         cards = _re.findall(r'<article class="pcard.*?</article>', html, _re.S)
@@ -1187,7 +1388,158 @@ def _guard():
         _sys.exit(1)
     print('ruling guard: 15% intact, unhedged, modeled label present')
 
+_standalone_state()
 _guard()
+
+
+# ── THE TEXTING TRUTH GUARD ───────────────────────────────────────────────────
+# THE DEFECT THIS EXISTS TO STOP. On 2026-08-14 nine sentences across these
+# pages told a reader that a text message would arrive. No function in this repo
+# sends an SMS to a customer and the A2P campaign has been rejected three times,
+# so every one of those sentences was false, and the ones on /pricing were
+# inside a price card that this same file copies onto three more pages. One
+# wrong sentence, six wrong surfaces.
+#
+# THE PROGRAM ITSELF IS NOT THE DEFECT AND MUST NOT BE SCRUBBED. The consent
+# language on /terms#texting and /privacy#texting is what a carrier reviews, it
+# is correct, and deleting it would make the next campaign submission weaker,
+# not stronger. So this gate does not ban the word. It bans a DELIVERY PROMISE
+# that is not standing next to its status, which is a different thing and is the
+# thing that was actually wrong.
+#
+# IT IS SCOPED SO IT CANNOT OVER-REPORT. A check that cries wolf gets ignored on
+# the day it is right. Every hit is exempt if a status sentence sits within
+# _SMS_WINDOW characters of it, and the gate proves itself on a known-bad and a
+# known-good string before it is allowed to report a clean run.
+_SMS_BANNED = [
+    (r'\btexts you\b',            'delivery', 'says a text goes out'),
+    (r'\bwe text you\b',          'delivery', 'says a text goes out'),
+    (r'\btext you that\b',        'delivery', 'says a text goes out'),
+    (r'\btexts you the\b',        'delivery', 'says a text goes out'),
+    (r'\btext and transcript\b',  'channel',  'names SMS as the channel'),
+    (r'\breply\s+VOID\b',         'channel',  'names a reply channel that cannot receive'),
+]
+# DELIBERATELY NOT BANNED: a bare "by text" or "in a text". Both fired on
+# parley.html's "Settle the price by text", where the two HUMANS text each other
+# from their own phones and this company sends nothing at all, which is true and
+# is the whole reason Parley is unblocked by the carrier problem. Catching a
+# real defect is worth nothing if the same rule brands three true sentences,
+# because the next reader discounts all of it. Both real instances of those two
+# phrasings were fixed at the source in TRUST above.
+# any one of these within the window makes the sentence honest rather than false
+_SMS_OK = ['not switched on', 'until texting clears', 'while texting is off',
+           'not approved by the carrier', 'arrives by email', 'comes by email',
+           'by email instead', 'reaches you by email']
+_SMS_WINDOW = 900
+
+
+def _sms_hits(text):
+    """Every unlabelled delivery promise in one flattened page. Returns
+    (pattern, category, why, excerpt) so a finding can be read without opening
+    the file, and so the categories can be counted separately."""
+    import re as _re
+    out = []
+    low = text.lower()
+    for pat, cat, why in _SMS_BANNED:
+        for m in _re.finditer(pat, text, _re.I):
+            a = max(0, m.start() - _SMS_WINDOW)
+            b = min(len(text), m.end() + _SMS_WINDOW)
+            if any(tok in low[a:b] for tok in _SMS_OK):
+                continue
+            out.append((pat, cat, why, text[max(0, m.start() - 90):m.end() + 90].strip()))
+    return out
+
+
+def _texting_guard():
+    import re as _re
+
+    # ── POSITIVE CONTROL, RUN FIRST ──────────────────────────────────────────
+    # A gate that reports zero is only worth something if it has just been shown
+    # to be capable of reporting one. Both directions are checked, because a
+    # matcher that fires on everything is as useless as one that fires on
+    # nothing: this estate has shipped both.
+    bad = 'It texts you the transcript inside a minute and you reply VOID to any charge.'
+    good = ('Texting is not switched on yet, so what you ask for arrives by email. '
+            'When it clears it texts you the transcript inside a minute.')
+    if not _sms_hits(bad):
+        print('*** BUILD REFUSED: the texting guard failed its own positive control. It did not '
+              'fire on a known-false sentence, so its clean result on the real pages means '
+              'nothing. ***', file=_sys.stderr)
+        _sys.exit(1)
+    if _sms_hits(good):
+        print('*** BUILD REFUSED: the texting guard failed its negative control. It fired on a '
+              'sentence that IS labelled with its status, so it would bury its real findings '
+              'under false ones. ***', file=_sys.stderr)
+        _sys.exit(1)
+
+    # ── WHOSE PAGE IS IT ─────────────────────────────────────────────────────
+    # This gate was written on a repo with several lanes in it at once. Failing
+    # the shared build over a sentence in a file somebody else is mid-edit on
+    # does not fix that sentence, it just makes the next lane delete the gate.
+    # So: REFUSE on the pages the generator owns, and REPORT, loudly and by
+    # name, on the hand-written ones. Move a page into OWNED the day its lane
+    # lands and the report becomes a refusal with no other change.
+    OWNED = ['recover.html', 'pricing.html', 'trust.html', 'thanks.html',
+             'terms.html', 'privacy.html', 'recording.html']
+    OTHERS = ['index.html', 'trades.html', 'hold.html', 'parley.html', 'setup.html']
+    findings, reports = [], []
+    for pg in OWNED + OTHERS:
+        f = ROOT / pg
+        if not f.exists():
+            continue
+        t = _re.sub(r'<[^>]+>', ' ', f.read_text(encoding='utf-8'))
+        t = _re.sub(r'\s+', ' ', t)
+        for pat, cat, why, ex in _sms_hits(t):
+            (findings if pg in OWNED else reports).append((cat, pg, why, ex))
+    PAGES = OWNED + OTHERS
+
+    if reports:
+        cs = {}
+        for c, _p, _w, _e in reports:
+            cs[c] = cs.get(c, 0) + 1
+        print('\n  ┌─ TEXTING TRUTH: %d finding(s) in pages this lane does not own ─────────'
+              % len(reports), file=_sys.stderr)
+        print('  │ %s. Not fatal, because another lane is mid-edit on these files.'
+              % ', '.join('%s=%d' % kv for kv in sorted(cs.items())), file=_sys.stderr)
+        for c, pg, w, ex in reports:
+            print('  │ [%s] %s: %s' % (c, pg, w), file=_sys.stderr)
+            print('  │     ...%s...' % ex[:150], file=_sys.stderr)
+        print('  │ FIX: "Reply VOID" names a channel that cannot receive while A2P is',
+              file=_sys.stderr)
+        print('  │ rejected. The generated pages now read "One word, VOID, and it comes',
+              file=_sys.stderr)
+        print('  │ off." Copy that wording and this goes quiet.', file=_sys.stderr)
+        print('  └────────────────────────────────────────────────────────────────────────\n',
+              file=_sys.stderr)
+
+    # ── THE DISCLOSURE MUST ACTUALLY BE ON THE PAGE ──────────────────────────
+    # Rendering it is not the same as it surviving to the file. A block that
+    # silently stops emitting is the worst outcome available here, because every
+    # sentence it was covering keeps shipping and nobody downstream knows.
+    must_carry = {'pricing.html': _SB_HEAD, 'trust.html': _SB_HEAD, 'terms.html': _SB_HEAD,
+                  'recover.html': 'Stated ' + STATE_DATE, 'thanks.html': 'Stated ' + STATE_DATE,
+                  'privacy.html': 'Stated ' + STATE_DATE, 'recording.html': 'Stated ' + STATE_DATE}
+    for pg, needle in must_carry.items():
+        f = ROOT / pg
+        if f.exists() and needle not in f.read_text(encoding='utf-8'):
+            findings.append(('missing-disclosure', pg,
+                             'the state disclosure did not reach this page', needle))
+
+    if findings:
+        cats = {}
+        for c, _pg, _w, _e in findings:
+            cats[c] = cats.get(c, 0) + 1
+        print('\n*** BUILD REFUSED: a page promises something the product cannot do ***',
+              file=_sys.stderr)
+        print('  %d finding(s): %s' % (len(findings),
+              ', '.join('%s=%d' % kv for kv in sorted(cats.items()))), file=_sys.stderr)
+        for c, pg, w, ex in findings:
+            print('  - [%s] %s: %s -> ...%s...' % (c, pg, w, ex[:170]), file=_sys.stderr)
+        _sys.exit(1)
+    print('texting guard: 0 unlabelled delivery promises across %d pages, disclosure present on %d'
+          % (len(PAGES), len(must_carry)))
+
+_texting_guard()
 
 
 # ── UPSTREAM GUARD ────────────────────────────────────────────────────────────
@@ -1306,9 +1658,9 @@ _refresh_home_cards()
 def _extensionless():
     import re as _re
     pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html',
-             'terms.html', 'privacy.html', 'recording.html']
-    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks|terms|privacy|recording)\.html([?#][^"]*)?"')
+             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
+             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
+    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks|parley|terms|privacy|recording|setup)\.html([?#][^"]*)?"')
     def repl(m):
         slug, rest = m.group(1), m.group(2) or ''
         return 'href="%s%s"' % ('/' if slug == 'index' else '/' + slug, rest)
@@ -1335,8 +1687,8 @@ _extensionless()
 def _asset_version():
     import re as _re, hashlib as _hl
     pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html',
-             'terms.html', 'privacy.html', 'recording.html']
+             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
+             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
     vers = {}
     for a in ('answered.css', 'answered.js'):
         f = ROOT / 'assets' / a

@@ -1,0 +1,702 @@
+<!doctype html>
+<!-- STANDALONE PAGE. Not emitted by _build.py, and its chrome normalizer, extensionless
+     rewriter and asset-version stamper do not touch this file (their PAGES lists do not
+     include it). The nav/footer below is a byte copy of the emitted chrome in terms.html
+     (minus aria-current, plus the legal cluster links in the footer base). AT INTEGRATION:
+     add setup.html to _build.py's guard PAGES, _extensionless() and _asset_version() lists
+     so the chrome and ?v= stamps stay in sync from then on. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Setup. You hear it before your customers do.</title>
+<meta name="description" content="Seven steps you run yourself. Hear it as your shop, set your rules in plain English, change one and hear the call again, try to break it, then let it take only the calls you already missed. It goes live when you say so.">
+<meta name="theme-color" content="#0B0C0E">
+<meta property="og:title" content="Setup. You hear it before your customers do.">
+<meta property="og:description" content="Seven steps you run yourself. Nothing forwards until the last one.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://answered.reddenda.com/assets/og/home.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/answered.css?v=0f28d054">
+<style>
+/* ══ SCOPED TO /setup ═══════════════════════════════════════════════════════
+   Every rule here is prefixed .su-. Nothing in this block can reach another
+   page, and this page adds nothing to the shared stylesheet, which two other
+   lanes are editing this session.
+
+   ONE DELIBERATE AVOIDANCE. This page does NOT use .showcase / .turn. The
+   shared player in answered.js claims every .showcase on the page, ghosts its
+   .turn children and types them word by word behind a caret. The rule editor
+   below RE-RENDERS its transcript on every toggle, which would wipe those
+   spans mid-flight and leave a half-typed line resting invisible. So the
+   transcript here is its own component with its own resting state: legible
+   from first paint, JS or no JS.                                            */
+
+/* the seven-rung index */
+.su-ladder { list-style: none; margin: 40px 0 0; padding: 0; display: grid; gap: 2px;
+  border-top: 1px solid var(--line2); }
+.su-ladder li { border-bottom: 1px solid var(--line); }
+.su-ladder a { display: flex; align-items: baseline; gap: 16px; padding: 15px 4px;
+  text-decoration: none; color: var(--ink-2); }
+.su-ladder a:hover, .su-ladder a:focus-visible { color: var(--ink); }
+.su-ladder .su-n { font-family: var(--mono); font-size: 12px; color: var(--accent-ink);
+  flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.su-ladder .su-l { font-size: 17px; line-height: 1.4; }
+
+/* the mono label every object wears */
+.su-lab { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent-ink); }
+
+/* the honesty label under a drawn object */
+.su-note { font-family: var(--mono); font-size: 11px; line-height: 1.55; color: var(--ink-3);
+  margin-top: 14px; }
+
+/* the rule cards: the customization surface */
+.su-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 16px; margin-top: 44px; }
+.su-card { --ink: var(--t1); --ink-2: var(--t2); --ink-3: var(--t3);
+  --accent-ink: var(--bronze-2);
+  background: var(--ink-900); border: 1px solid var(--line); border-radius: 16px;
+  padding: 22px 22px 24px; }
+.su-card h3 { font-family: var(--sans); font-weight: 700; font-size: 19px; line-height: 1.25;
+  letter-spacing: -.012em; color: var(--ink); margin: 12px 0 0; }
+.su-set { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 9px; }
+/* MEASURED DEFECT, caught in a screenshot and by nothing else. This li was
+   display:flex, and an inline <b> inside a flex container is BLOWN OUT into
+   its own flex item, so every bold value became a separate column with the
+   10px gap in front of it: "It answers as | your shop | , not as us." and a
+   "Never books:" label orphaned on its own line under its own value. Every
+   geometry assertion passed the whole time. The bullet is absolute now and
+   the text stays in normal inline flow, which is what <b> needs. */
+.su-set li { position: relative; padding-left: 16px;
+  font-size: 15.5px; line-height: 1.5; color: var(--ink-2); }
+.su-set li::before { content: ""; position: absolute; left: 0; top: 9px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent-ink); opacity: .8; }
+.su-set b { color: var(--ink); font-weight: 600; }
+
+/* the temperament picker, a real control */
+.su-temp { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.su-t { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  min-height: 44px; padding: 10px 14px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--ink-2); border: 1px solid var(--line2);
+  transition: background .18s var(--e), color .18s var(--e), border-color .18s var(--e); }
+.su-t[aria-pressed="true"] { background: var(--bronze); color: #0B0C0E; border-color: var(--bronze); }
+.su-say { margin-top: 14px; padding: 13px 15px; border-radius: 12px;
+  background: rgba(242,244,240,.04); border: 1px solid var(--line);
+  font-size: 15px; line-height: 1.55; color: var(--ink); }
+
+/* the rule editor */
+.su-ed { display: grid; grid-template-columns: minmax(0,.86fr) minmax(0,1.14fr);
+  gap: clamp(22px, 3vw, 40px); margin-top: 44px; align-items: start; }
+.su-chips { display: grid; gap: 9px; }
+.su-chip { display: flex; align-items: flex-start; gap: 12px;
+  width: 100%; text-align: left; min-height: 44px;
+  padding: 13px 15px; border-radius: 12px; cursor: pointer;
+  font-family: inherit; font-size: 15px; line-height: 1.45;
+  background: var(--ink-900); color: var(--ink-2);
+  border: 1px solid var(--line2);
+  transition: background .18s var(--e), color .18s var(--e), border-color .18s var(--e); }
+/* the box is the affordance. without it these read as cards, and a nervous
+   reader does not click a card. fixed box so the check cannot shift layout. */
+.su-chip::before { content: ""; flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px;
+  border-radius: 5px; border: 1.5px solid var(--line2);
+  display: grid; place-content: center; font-size: 12px; line-height: 1;
+  transition: background .18s var(--e), border-color .18s var(--e); }
+.su-chip[aria-pressed="true"] { background: rgba(227,255,79,.14); color: var(--ink);
+  border-color: rgba(227,255,79,.42); }
+.su-chip[aria-pressed="true"]::before { content: "\2713"; color: #0B0C0E;
+  background: var(--bronze); border-color: var(--bronze); }
+.su-own { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
+.su-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.su-row input { flex: 1 1 190px; min-width: 0; min-height: 44px; padding: 11px 14px;
+  border-radius: 12px; background: var(--ink-950); color: var(--t1);
+  border: 1px solid var(--line2); font-family: inherit; font-size: 15px; }
+.su-row input::placeholder { color: var(--t3); }
+.su-row button { min-height: 44px; padding: 11px 18px; border-radius: 12px; cursor: pointer;
+  font-family: inherit; font-size: 15px; font-weight: 600;
+  background: var(--bronze); color: #0B0C0E; border: 1px solid var(--bronze); }
+.su-mine { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.su-mine li { display: flex; align-items: center; gap: 10px; font-size: 15px; line-height: 1.45;
+  color: var(--ink); background: rgba(242,244,240,.04); border: 1px solid var(--line);
+  border-radius: 12px; padding: 11px 12px 11px 15px; }
+.su-mine span { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.su-x { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  background: transparent; border: 1px solid var(--line2); color: var(--ink-2);
+  font-family: var(--mono); font-size: 14px; line-height: 1; }
+
+/* the transcript this page owns */
+.su-tr { --ink: var(--t1); --ink-2: var(--t2); --ink-3: var(--t3);
+  background: var(--ink-900); border: 1px solid var(--line); border-radius: 16px;
+  overflow: hidden; }
+.su-tr-top { display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  border-bottom: 1px solid var(--line); background: rgba(242,244,240,.03);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--t3); }
+.su-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--bronze); flex: 0 0 auto; }
+.su-tr-body { padding: 18px; display: flex; flex-direction: column; gap: 11px; }
+.su-turn { max-width: 88%; padding: 12px 15px; border-radius: 14px; font-size: 15px;
+  line-height: 1.5; color: var(--t1);
+  background: rgba(242,244,240,.06); border: 1px solid var(--line); align-self: flex-start; }
+.su-turn.us { align-self: flex-end; background: rgba(227,255,79,.10);
+  border-color: rgba(227,255,79,.22); }
+.su-who { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--t3); margin-bottom: 5px; }
+.su-turn.us .su-who { color: var(--bronze-2); }
+.su-turn mark { background: rgba(227,255,79,.24); color: var(--t1);
+  border-radius: 4px; padding: 1px 3px; }
+.su-sms { margin: 0 18px 18px; padding: 14px 16px; border-radius: 14px;
+  background: var(--bone); color: var(--paper-ink); }
+.su-sms .su-lab { color: rgba(11,12,14,.62); }
+.su-sms p { margin: 7px 0 0; font-size: 15px; line-height: 1.5; }
+.su-applied { font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--accent-ink);
+  padding: 0 18px 16px; }
+
+/* what happens when you try to break it */
+.su-try { margin-top: 40px; border-top: 1px solid var(--line2); }
+.su-try > div { display: grid; grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr);
+  gap: 14px 28px; padding: 17px 4px; border-bottom: 1px solid var(--line); }
+.su-try .su-q { font-size: 16.5px; line-height: 1.45; color: var(--ink); font-weight: 600; }
+.su-try .su-a { font-size: 16px; line-height: 1.55; color: var(--ink-2); }
+
+/* the call path */
+.su-path { display: grid; gap: 12px; margin-top: 40px; }
+.su-node { display: flex; align-items: flex-start; gap: 14px; padding: 17px 19px;
+  border-radius: 14px; border: 1px solid var(--line2); background: var(--ink-900);
+  --ink: var(--t1); --ink-2: var(--t2); }
+.su-node.on { border-color: rgba(227,255,79,.42); background: rgba(227,255,79,.08); }
+.su-node .su-k { font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent-ink); flex: 0 0 84px; padding-top: 3px; }
+.su-node .su-v { font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+.su-node .su-v b { color: var(--ink); font-weight: 600; }
+.su-fork { display: flex; align-items: center; gap: 12px; padding-left: 19px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); }
+.su-fork::before { content: ""; width: 22px; height: 1px; background: var(--line2); flex: 0 0 auto; }
+
+/* the debrief text and the rule it becomes */
+.su-thread { display: grid; gap: 10px; margin-top: 40px; max-width: 560px; }
+.su-b { padding: 14px 16px; border-radius: 14px; font-size: 15.5px; line-height: 1.55;
+  background: var(--ink-900); border: 1px solid var(--line); color: var(--t1); }
+.su-b.mine { background: rgba(227,255,79,.10); border-color: rgba(227,255,79,.22);
+  margin-left: auto; max-width: 82%; }
+.su-b.made { background: transparent; border-style: dashed; border-color: rgba(227,255,79,.42);
+  font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em; color: var(--bronze-2); }
+
+/* JS off: the editor controls never render as buttons that cannot press */
+html:not(.js) .su-jsonly { display: none; }
+.su-nojs { display: none; }
+html:not(.js) .su-nojs { display: block; }
+
+@media (max-width: 900px) {
+  .su-grid { grid-template-columns: minmax(0,1fr); }
+  .su-ed { grid-template-columns: minmax(0,1fr); }
+  .su-try > div { grid-template-columns: minmax(0,1fr); gap: 6px; }
+  .su-node .su-k { flex-basis: 72px; }
+}
+@media (max-width: 420px) {
+  .su-node { flex-direction: column; gap: 8px; }
+  .su-node .su-k { flex-basis: auto; padding-top: 0; }
+  .su-turn { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
+    <nav class="nav-links" aria-label="Primary"><a href="/trades">Answered</a><a href="/hold">Hold</a><a href="/recover">Recover</a><a href="/pricing">Pricing</a><a href="/trust">Trust</a></nav>
+    <a class="nav-cta" href="/#early">Get on the list</a>
+    <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
+  </div>
+</header>
+<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Get on the list</a></div>
+<main id="main">
+
+<section class="pad" style="padding-top:calc(var(--nav-h) + clamp(48px,7vw,96px))">
+  <div class="wrap">
+    <p class="eyebrow rv">Setup</p>
+    <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px">You hear it first.<br> <span class="lit">Nobody else does.</span></h1>
+    <p class="lede rv d2" style="margin-top:22px;max-width:58ch">Seven steps stand between you and a customer hearing this voice. You run all seven.</p>
+    <p class="rv d2" style="margin-top:26px;display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center">
+      <span class="cta-slot" data-callslot="Hear it before you set it up"><a class="btn btn-primary" href="/#early">Get on the list</a></span>
+      <a class="btn btn-ghost" href="#rules">See what you get to set</a>
+    </p>
+    <p class="src rv d3" style="margin-top:18px;max-width:62ch">Your line does not change while you do this. Nothing forwards to anything until step seven, and step seven is a tap you make.</p>
+
+    <ol class="su-ladder rv d3">
+      <li><a href="#hear"><span class="su-n">01</span><span class="su-l">Hear it answer as your shop</span></a></li>
+      <li><a href="#rules"><span class="su-n">02</span><span class="su-l">Set your rules, in plain English</span></a></li>
+      <li><a href="#edit"><span class="su-n">03</span><span class="su-l">Change a rule, hear the call again</span></a></li>
+      <li><a href="#break"><span class="su-n">04</span><span class="su-l">Try to break it</span></a></li>
+      <li><a href="#missed"><span class="su-n">05</span><span class="su-l">It takes only the calls you already missed</span></a></li>
+      <li><a href="#read"><span class="su-n">06</span><span class="su-l">Read every word it said</span></a></li>
+      <li><a href="#live"><span class="su-n">07</span><span class="su-l">You turn it live, and you can turn it off</span></a></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ══ 01 ══════════════════════════════════════════════════════════════════ -->
+<section class="pad-s seam" id="hear">
+  <div class="wrap">
+    <p class="eyebrow rv">Step one</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">Call it yourself, before anyone else can.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:58ch">It writes itself from your public listing. Your name, your hours, your trade, your area.</p>
+
+    <div class="su-grid rv d2">
+      <div class="su-card">
+        <p class="su-lab">What it read off your listing</p>
+        <h3>It knows the shop before you type anything.</h3>
+        <ul class="su-set">
+          <li><b>Rivera Plumbing.</b> The name it answers with.</li>
+          <li><b>7:00a to 5:00p, Monday to Friday.</b> Your posted hours.</li>
+          <li><b>Water heaters, drains, repipes.</b> What your listing says you do.</li>
+          <li><b>Nine zip codes.</b> Where your reviews come from.</li>
+        </ul>
+        <p class="su-note">Drawn, not recorded. An example build, not a customer record.</p>
+      </div>
+      <div class="su-card">
+        <p class="su-lab">The first thing a caller hears</p>
+        <h3>Pick how it sounds. The greeting changes.</h3>
+        <div class="su-temp su-jsonly">
+          <button type="button" class="su-t" data-temp="calm" aria-pressed="true">Unflappable</button>
+          <button type="button" class="su-t" data-temp="warm" aria-pressed="false">Cheerful</button>
+          <button type="button" class="su-t" data-temp="firm" aria-pressed="false">Politely relentless</button>
+        </div>
+        <p class="su-say" id="su-greet">Rivera Plumbing. This is an AI assistant and this call is recorded. What is going on?</p>
+        <p class="su-note">All three say the same two things first: what it is, and that the call is recorded. That part is not yours to turn off.</p>
+      </div>
+    </div>
+
+    <div class="su-path rv d3" style="margin-top:40px">
+      <div class="su-node"><span class="su-k">Your line</span><span class="su-v">Untouched. This call goes to our number, not yours.</span></div>
+      <div class="su-node"><span class="su-k">Your customers</span><span class="su-v">Not involved. The only person who hears this is you.</span></div>
+      <div class="su-node"><span class="su-k">Your wallet</span><span class="su-v">No account, no card, nobody calls you back.</span></div>
+    </div>
+
+    <p class="rv d3" style="margin-top:30px"><span class="cta-slot" data-callslot="Hear it answer"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <p class="src rv d3" style="margin-top:16px;max-width:70ch">The public demo answers as a sample plumbing shop. The build wearing your name is the one you call in setup, before anything forwards.</p>
+  </div>
+</section>
+
+<!-- ══ 02 ══════════════════════════════════════════════════════════════════ -->
+<section class="pad seam" id="rules">
+  <div class="wrap">
+    <p class="eyebrow rv">Step two</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">Set the rules before it says a word.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:58ch">No call flow builder. No tree with forty branches. Eight things, in your words.</p>
+
+    <div class="su-grid">
+      <div class="su-card rv"><p class="su-lab">01 Name and voice</p>
+        <h3>What it is called and how it sounds.</h3>
+        <ul class="su-set">
+          <li>It answers as <b>your shop</b>, not as us.</li>
+          <li>Temperament: <b>unflappable, cheerful, or politely relentless.</b></li>
+          <li>It says it is an AI in the first sentence, every time.</li>
+        </ul></div>
+
+      <div class="su-card rv d1"><p class="su-lab">02 Hours</p>
+        <h3>When you are open, and what after hours means.</h3>
+        <ul class="su-set">
+          <li>Standard: <b>7:00a to 5:00p, Monday to Friday.</b></li>
+          <li>After hours: <b>emergencies only.</b></li>
+          <li>Everything else gets a slot in the morning, not a voicemail.</li>
+        </ul></div>
+
+      <div class="su-card rv"><p class="su-lab">03 What it may book</p>
+        <h3>And what it must never book.</h3>
+        <ul class="su-set">
+          <li>Books: <b>service calls, estimates, repeat customers.</b></li>
+          <li>Never books: <b>mobile homes, commercial roofs, anything you do not do.</b></li>
+          <li>It says no cleanly instead of booking a job you cancel Monday.</li>
+        </ul></div>
+
+      <div class="su-card rv d1"><p class="su-lab">04 Service area</p>
+        <h3>Where you go, and what happens past the line.</h3>
+        <ul class="su-set">
+          <li>Drawn <b>by zip</b>, not by a circle on a map.</li>
+          <li>Past Route 9: it says the <b>$95 trip charge</b> before it books.</li>
+          <li>Outside the area: it says so and offers to take a message.</li>
+        </ul></div>
+
+      <div class="su-card rv"><p class="su-lab">05 Emergency</p>
+        <h3>What counts, and where it goes.</h3>
+        <ul class="su-set">
+          <li>Your words: <b>water in the house, gas smell, no heat under 40.</b></li>
+          <li>It calls <b>your cell</b> with a nine second brief before you say hello.</li>
+          <li>No answer in twenty seconds: your second, then your third, then it books the soonest slot and keeps the customer.</li>
+        </ul></div>
+
+      <div class="su-card rv d1"><p class="su-lab">06 What it must never say</p>
+        <h3>Prices, unless you say otherwise.</h3>
+        <ul class="su-set">
+          <li>The default is <b>no number, ever.</b></li>
+          <li>It gives <b>your range</b> or it hands the caller to a person.</li>
+          <li>It does not guess, round, or estimate on your behalf.</li>
+        </ul></div>
+
+      <div class="su-card rv"><p class="su-lab">07 A complaint, or a hot caller</p>
+        <h3>It does not argue with your customer.</h3>
+        <ul class="su-set">
+          <li>Warranty: it says the word out loud and flags the ticket.</li>
+          <li>Angry: it stays level, takes the detail, books the callback.</li>
+          <li><b>You get texted first</b>, before the callback is confirmed.</li>
+        </ul></div>
+
+      <div class="su-card rv d1"><p class="su-lab">08 Where the job lands</p>
+        <h3>Your calendar, your phone, or paper.</h3>
+        <ul class="su-set">
+          <li>Google Calendar, Outlook, a shared team calendar.</li>
+          <li>Or <b>just a text</b>, with the day's list at 6.</li>
+          <li>Running on paper is a real answer and it does not argue with you.</li>
+        </ul></div>
+    </div>
+
+    <p class="src rv d3" style="margin-top:30px;max-width:70ch">Every rule is one sentence in your own words, and it stays in your words. You can read your whole setup out loud. Most shops fit on one page.</p>
+  </div>
+</section>
+
+<!-- ══ 03 ══════════════════════════════════════════════════════════════════
+     THE RULE EDITOR. The toggles below genuinely re-run the render: state
+     changes, the transcript is rebuilt from the base lines, the added words
+     are wrapped in <mark>, and the status line is announced. What it is NOT
+     is a model call: the changed wording is written by us, one authored
+     outcome per rule, which is why the label under it says drawn. A typed
+     rule is added to the list verbatim and is NOT guessed at, because a page
+     that pretended to interpret an arbitrary sentence would be inventing the
+     one thing this whole page exists to prove.                              -->
+<section class="pad seam" id="edit">
+  <div class="wrap">
+    <p class="eyebrow rv">Step three</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">Change a rule. The call changes.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Turn one on and watch the same call come out different.</p>
+
+    <div class="su-ed">
+      <div class="rv d2">
+        <p class="su-lab">Turn one on</p>
+        <div class="su-chips su-jsonly" style="margin-top:14px">
+          <button type="button" class="su-chip" data-rule="trip" aria-pressed="false">Anything past Route 9 is a $95 trip charge. Say it before booking.</button>
+          <button type="button" class="su-chip" data-rule="mobile" aria-pressed="false">We do not do mobile homes.</button>
+          <button type="button" class="su-chip" data-rule="diag" aria-pressed="false">My visit is $89 and it comes off the repair. You can say that.</button>
+          <button type="button" class="su-chip" data-rule="repeat" aria-pressed="false">If they have used us before, say so.</button>
+          <button type="button" class="su-chip" data-rule="photo" aria-pressed="false">Always ask for a photo of the unit.</button>
+          <button type="button" class="su-chip" data-rule="text" aria-pressed="false">Text me the moment it books.</button>
+        </div>
+        <p class="su-nojs su-note" style="margin-top:14px">These six rules need JavaScript to re-run the call. The call beside this is how it answers with none of them on.</p>
+
+        <div class="su-own su-jsonly">
+          <p class="su-lab">Write your own</p>
+          <div class="su-row">
+            <label class="vh" for="su-in">Write a rule in your own words</label>
+            <input id="su-in" type="text" autocomplete="off" placeholder="After 9pm, water and gas only.">
+            <button type="button" id="su-add">Add</button>
+          </div>
+          <ul class="su-mine" id="su-mine"></ul>
+          <p class="su-note">Six of them re-run the call right here. Anything you type lands on your list, in your words, and the real setup reads it back to you before it uses it.</p>
+        </div>
+      </div>
+
+      <div class="rv d2">
+        <div class="su-tr">
+          <div class="su-tr-top"><span class="su-dot" aria-hidden="true"></span> Answering as Rivera Plumbing <span style="margin-left:auto">9:12 AM</span></div>
+          <div class="su-tr-body" id="su-body">
+            <div class="su-turn us"><span class="su-who">Answered</span>Rivera Plumbing. This is an AI assistant and this call is recorded. What is going on?</div>
+            <div class="su-turn"><span class="su-who">Caller</span>My water heater is leaking into the garage. How soon can somebody come?</div>
+            <div class="su-turn us"><span class="su-who">Answered</span>I can have Ray out at 8 tomorrow morning. Can I get the address?</div>
+            <div class="su-turn"><span class="su-who">Caller</span>4412 Alder Street.</div>
+            <div class="su-turn us"><span class="su-who">Answered</span>Booked, 8:00 to 10:00 tomorrow. Texting you the confirmation now.</div>
+          </div>
+          <div class="su-sms" id="su-sms" hidden>
+            <p class="su-lab">Text to you</p>
+            <p>New job. Tue 8:00a. 4412 Alder St. Water heater leaking into the garage. Booked by Answered.</p>
+          </div>
+          <p class="su-applied" id="su-applied" role="status" aria-live="polite">No rules on. This is the call as it ships.</p>
+        </div>
+        <p class="su-note">Drawn, not recorded. The six rules rebuild this transcript in your browser, on wording we wrote. A real call is produced live and never comes out word for word the same.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ 04 ══════════════════════════════════════════════════════════════════ -->
+<section class="paper seam pad" id="break">
+  <div class="wrap">
+    <p class="eyebrow rv">Step four</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:16ch">Try to break it.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Call it drunk on a Friday. Talk over it. Ask what it costs. Be rude. We would rather you did it than a customer.</p>
+
+    <div class="su-try rv d2">
+      <div><p class="su-q">You talk over it.</p><p class="su-a">It stops talking and listens. It does not restart the sentence you already heard.</p></div>
+      <div><p class="su-q">You ask what it costs.</p><p class="su-a">It refuses to invent a number. You get your range, or a person.</p></div>
+      <div><p class="su-q">You get rude.</p><p class="su-a">It stays level, keeps taking the detail, and never gets rude back.</p></div>
+      <div><p class="su-q">You ramble at midnight.</p><p class="su-a">It pulls the four things it needs and lets the rest go by.</p></div>
+      <div><p class="su-q">You ask if it is a person.</p><p class="su-a">It already told you it is not. It tells you again, plainly.</p></div>
+      <div><p class="su-q">You describe a real emergency.</p><p class="su-a">It stops booking and calls your cell, briefed, in nine seconds.</p></div>
+    </div>
+
+    <p class="rv d3" style="margin-top:34px"><span class="cta-slot" data-callslot="Try to break it"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <p class="src rv d3" style="margin-top:16px;max-width:64ch">Confidence comes from watching it hold, not from being told it will. Call it as many times as you want.</p>
+  </div>
+</section>
+
+<!-- ══ 05 ══════════════════════════════════════════════════════════════════ -->
+<section class="pad seam" id="missed">
+  <div class="wrap">
+    <p class="eyebrow rv">Step five</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">It only answers what you already missed.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Your phone rings first, exactly like today. Dial one code and one thing changes.</p>
+
+    <div class="su-path rv d2">
+      <div class="su-node"><span class="su-k">A call comes in</span><span class="su-v"><b>Your phone rings.</b> Four rings, same as this morning.</span></div>
+      <div class="su-fork">You pick it up</div>
+      <div class="su-node"><span class="su-k">Then</span><span class="su-v"><b>It is your call.</b> Answered never hears it, never sees it, never bills it.</span></div>
+      <div class="su-fork">You do not pick it up</div>
+      <div class="su-node on"><span class="su-k">Then</span><span class="su-v"><b>Answered picks up instead of voicemail.</b> The call that was already lost gets handled.</span></div>
+    </div>
+
+    <p class="pull rv d3" style="margin-top:40px;max-width:26ch">The worst thing that can happen is that a call you already lost gets answered.</p>
+
+    <div class="modes rv d3" style="margin-top:40px;grid-template-columns:minmax(0,1fr)">
+      <article class="mode" style="max-width:520px">
+        <div class="mode-code num">*71</div>
+        <h3 class="h3">Catch what you miss</h3>
+        <p>The whole shadow week runs on this one code. Nothing you answer is touched.</p>
+      </article>
+    </div>
+    <p class="src rv d3" style="margin-top:24px;max-width:80ch">Codes shown are the Verizon set. We detect your carrier and text you the exact string. Carrier forwarding codes from Verizon and T-Mobile primary documentation, accessed 2026-08-10.</p>
+  </div>
+</section>
+
+<!-- ══ 06 ══════════════════════════════════════════════════════════════════ -->
+<section class="pad seam" id="read">
+  <div class="wrap">
+    <p class="eyebrow rv">Step six</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:20ch">You read every word it said.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:56ch">Every call, every day, transcript and recording, for as long as you want them.</p>
+
+    <div class="su-thread rv d2">
+      <div class="su-b"><span class="su-lab">Day one, 6:04 PM</span><p style="margin:8px 0 0">3 calls answered. 2 booked. Here is every word of all three. Anything you would have said differently?</p></div>
+      <div class="su-b mine">Do not book Saturdays. Ray is off.</div>
+      <div class="su-b made">Rule added. No Saturday bookings. Live tonight.</div>
+    </div>
+
+    <p class="rv d3" style="margin-top:30px;max-width:56ch;font-size:17px;line-height:1.6;color:var(--ink-2)">Anything you did not like becomes a rule with one reply. You are not filing a ticket. You are correcting a new guy, and he does not need telling twice.</p>
+    <p class="su-note rv d3" style="max-width:64ch">Drawn, not recorded. An example of the daily text, not a customer record.</p>
+  </div>
+</section>
+
+<!-- ══ 07 ══════════════════════════════════════════════════════════════════ -->
+<section class="pad seam" id="live">
+  <div class="wrap">
+    <p class="eyebrow rv">Step seven</p>
+    <h2 class="h2 rv d1" style="margin-top:16px;max-width:22ch">You decide when it takes a live call.</h2>
+    <p class="lede rv d2" style="margin-top:20px;max-width:58ch">Not a day sooner. It never answers a call you would have picked up until you tap the thing that says it can.</p>
+
+    <div class="modes rv d2">
+      <article class="mode">
+        <div class="mode-code num">*71</div>
+        <h3 class="h3">Where you start</h3>
+        <p>Missed calls only. This is the default and it stays the default until you change it.</p>
+      </article>
+      <article class="mode">
+        <div class="mode-code num">*72</div>
+        <h3 class="h3">When you decide</h3>
+        <p>It takes the line. One tap, and one tap back. You can undo it the same afternoon.</p>
+      </article>
+      <article class="mode off">
+        <div class="mode-code num">*73</div>
+        <h3 class="h3">Off, in ten seconds</h3>
+        <p>One code and your line is exactly what it was. Your number never moved.</p>
+      </article>
+    </div>
+
+    <p class="src rv d3" style="margin-top:26px;max-width:80ch">Nothing is ported, so there is nothing to port back. No notice period, no call with anybody, no exit form. The <a href="/terms">terms</a> say the same thing in writing.</p>
+  </div>
+</section>
+
+<!-- ══ CLOSE ══════════════════════════════════════════════════════════════ -->
+<section class="paper seam pad">
+  <div class="wrap narrow" style="text-align:center">
+    <p class="eyebrow rv" style="justify-content:center">The whole promise</p>
+    <h2 class="h2 rv d1" style="margin-top:16px">Nobody hears it before you do.</h2>
+    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:50ch">You build it, you set it, you call it, you try to break it. It answers a customer only after you have heard it yourself and said go.</p>
+    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" data-callslot="Hear it answer"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <p class="src rv d3" style="margin-top:16px">Seven steps. You run all seven. Nothing forwards until the last one.</p>
+  </div>
+</section>
+
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
+        <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+      </div>
+      <div>
+        <h4>Products</h4>
+        <ul>
+          <li><a href="/trades">Answered, for your line</a></li>
+          <li><a href="/hold">Hold, for everyone</a></li>
+          <li><a href="/recover">Recover, for your invoices</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/setup">How you set it up</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/trust">Trust and guardrails</a></li>
+          <li><a href="/#honesty">What we will not say</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-base">
+      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
+      <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
+      <p class="src">The rest of the fine print: <a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/recording">You talked to an AI</a></p>
+    </div>
+  </div>
+</footer>
+<script src="/assets/answered.js?v=50e6ef43" defer></script>
+<script>
+/* ══ /setup, page-scoped. Two real controls and nothing pretending to be one.
+   Kept out of assets/answered.js on purpose: two other lanes are editing that
+   file this session, and nothing here is wanted on any other page.        ══ */
+(function () {
+  'use strict';
+
+  /* ── the temperament picker ─────────────────────────────────────────────
+     Three greetings, all three carrying the two sentences that are not the
+     owner's to remove: it is an AI, and the call is recorded.             */
+  var GREET = {
+    calm: 'Rivera Plumbing. This is an AI assistant and this call is recorded. What is going on?',
+    warm: 'Thanks for calling Rivera Plumbing. I am an AI assistant and this call is recorded. How can I help you today?',
+    firm: 'Rivera Plumbing. This is an AI assistant and this call is recorded. Tell me what is wrong and I will find you a slot before we hang up.'
+  };
+  var greet = document.getElementById('su-greet');
+  var temps = [].slice.call(document.querySelectorAll('.su-t'));
+  temps.forEach(function (b) {
+    b.addEventListener('click', function () {
+      temps.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      if (greet) greet.textContent = GREET[b.getAttribute('data-temp')] || GREET.calm;
+    });
+  });
+
+  /* ── the rule editor ────────────────────────────────────────────────────
+     BASE is the call as it ships. Each rule contributes authored words to a
+     named line; the render rebuilds every line from BASE plus whatever is on,
+     so turning a rule OFF is the same code path as turning one on and the
+     transcript can never drift out of sync with the chips.                */
+  var BASE = [
+    { who: 'Answered', us: true,  t: 'Rivera Plumbing. This is an AI assistant and this call is recorded. What is going on?' },
+    { who: 'Caller',   us: false, t: 'My water heater is leaking into the garage. How soon can somebody come?' },
+    { who: 'Answered', us: true,  t: 'I can have Ray out at 8 tomorrow morning. Can I get the address?' },
+    { who: 'Caller',   us: false, t: '4412 Alder Street.' },
+    { who: 'Answered', us: true,  t: 'Booked, 8:00 to 10:00 tomorrow. Texting you the confirmation now.' }
+  ];
+  var RULES = {
+    repeat: { line: 0, add: 'Good to hear from you again.' },
+    mobile: { line: 2, add: 'One thing first: is that a house or a mobile home? We do not take mobile homes.' },
+    diag:   { line: 2, add: 'The visit is $89 and it comes off the repair.' },
+    trip:   { line: 4, add: 'Alder is past Route 9, so there is a $95 trip charge on top of the estimate. Is that alright?' },
+    photo:  { line: 4, add: 'Text a photo of the tank to this number and Ray will load the right one.' },
+    text:   { sms: true }
+  };
+  var ORDER = ['repeat', 'mobile', 'diag', 'trip', 'photo', 'text'];
+
+  var chips = [].slice.call(document.querySelectorAll('.su-chip'));
+  var body = document.getElementById('su-body');
+  var sms = document.getElementById('su-sms');
+  var applied = document.getElementById('su-applied');
+  var on = {};
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function render() {
+    if (!body) return;
+    var count = 0, i;
+    for (i = 0; i < ORDER.length; i++) { if (on[ORDER[i]]) count++; }
+
+    var html = '';
+    BASE.forEach(function (ln, idx) {
+      var extra = '';
+      ORDER.forEach(function (id) {
+        var r = RULES[id];
+        if (on[id] && r && r.line === idx) extra += ' <mark>' + esc(r.add) + '</mark>';
+      });
+      html += '<div class="su-turn' + (ln.us ? ' us' : '') + '"><span class="su-who">' +
+              esc(ln.who) + '</span>' + esc(ln.t) + extra + '</div>';
+    });
+    body.innerHTML = html;
+
+    if (sms) sms.hidden = !on.text;
+    if (applied) {
+      applied.textContent = count
+        ? (count === 1 ? 'One rule on. Call re-run.' : count + ' rules on. Call re-run.')
+        : 'No rules on. This is the call as it ships.';
+    }
+  }
+
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      var id = c.getAttribute('data-rule');
+      on[id] = !on[id];
+      c.setAttribute('aria-pressed', String(!!on[id]));
+      render();
+      /* stacked layout: the transcript sits below the chips, so a press with
+         nothing visible happening is a press that did nothing as far as the
+         reader is concerned. Bring the changed line to him. */
+      if (on[id] && window.innerWidth <= 900) {
+        var hit = id === 'text' ? sms : document.querySelector('#su-body mark');
+        if (hit && hit.scrollIntoView) hit.scrollIntoView({ block: 'center' });
+      }
+    });
+  });
+
+  /* ── rules the owner types ──────────────────────────────────────────────
+     These are added to his list VERBATIM and are never interpreted. A page
+     that guessed what an arbitrary sentence changes would be inventing the
+     one thing this page exists to prove, so it does not guess: it shows him
+     his own words on the list and says where they get read back.          */
+  var input = document.getElementById('su-in');
+  var add = document.getElementById('su-add');
+  var mine = document.getElementById('su-mine');
+
+  function addMine() {
+    if (!input || !mine) return;
+    var v = input.value.trim();
+    if (!v) { input.focus(); return; }
+    var li = document.createElement('li');
+    var sp = document.createElement('span');
+    sp.textContent = v;
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'su-x';
+    x.setAttribute('aria-label', 'Remove this rule');
+    x.textContent = '×';
+    x.addEventListener('click', function () { li.remove(); });
+    li.appendChild(sp);
+    li.appendChild(x);
+    mine.appendChild(li);
+    input.value = '';
+    input.focus();
+  }
+  if (add) add.addEventListener('click', addMine);
+  if (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); addMine(); }
+    });
+  }
+})();
+</script>
+</body>
+</html>

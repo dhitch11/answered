@@ -1404,6 +1404,35 @@
   document.addEventListener('submit', function (e) { var f = e.target; if (f && f.getAttribute && f.getAttribute('action') === '/api/interest') answeredEvent('interest_submitted', { form: f.getAttribute('name') || '' }); }, true);
 })();
 
+/* ══ ONE HEALTH READ, SHARED BY EVERY GATE ═════════════════════════════════
+   Two gates now read /api/demo-health: the demo-number gate below, which asks
+   for the whole line (healthy === true), and the activation gate under it,
+   which asks only for the outbound check. They must not fire two requests for
+   one answer, and they must not disagree because one of them read a newer
+   body than the other. So the fetch happens once and both await the same
+   promise.
+
+   IT NEVER REJECTS. A non-200, malformed JSON and a dead network all resolve
+   to null, because every consumer's honest fail direction is the same: leave
+   the page exactly as it shipped. A consumer that wants to tell "red" apart
+   from "unreachable" checks for null itself.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var pending = null;
+  window.answeredHealth = function () {
+    if (pending) return pending;
+    if (!window.fetch || !window.Promise) {
+      pending = { then: function (f) { try { f(null); } catch (e) {} return this; } };
+      return pending;
+    }
+    pending = fetch('/api/demo-health', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    return pending;
+  };
+})();
+
 /* ══ THE HEALTH GATE ═══════════════════════════════════════════════════════
    SITE WIDE, ONE FETCH. Every slot that server-renders as a ghost carries
    [data-callslot]; every section that must stay dark until the line is green
@@ -1575,15 +1604,254 @@
     }
   }
 
-  fetch('/api/demo-health', { cache: 'no-store' })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) {
-      if (j && j.healthy === true) { upgrade(); return; }
-      console.info('Answered: demo line is not green right now; keeping the list CTA.');
-    })
-    .catch(function () {
-      console.info('Answered: demo health unreachable; keeping the list CTA.');
+  // one read, shared with the activation gate below. null means the read
+  // itself failed, which is reported differently and treated identically.
+  window.answeredHealth().then(function (j) {
+    if (j && j.healthy === true) { upgrade(); return; }
+    console.info(j
+      ? 'Answered: demo line is not green right now; keeping the list CTA.'
+      : 'Answered: demo health unreachable; keeping the list CTA.');
+  });
+})();
+
+/* ══ THE ONE LINE ACTIVATION ═══════════════════════════════════════════════
+   DAVID, 2026-08-14, verbatim: "Make the call to action actually actionable,
+   not to get on a list, but literally a one-click, or they input their phone
+   number and our system calls them to sign them up."
+
+   So the close of every funnel page carries ONE field and ONE button: your
+   number, and a call placed to it now. The email list is still there,
+   underneath, one tap away, because the outbound path can be down and a
+   control that cannot act must never render.
+
+   THE GATE IS THE OUTBOUND CHECK, NOT THE WHOLE LINE. /api/demo-health
+   reports checks.outbound as the probe-landed law requires, two booleans that
+   are never conflated. This mounts only on landed === true AND ok === true.
+   A MISSING outbound field, landed:false, ok:false, a non-200, malformed
+   JSON, a dead network and JS itself failing all leave the email list
+   standing, which is the honest fail direction: the list always works.
+
+   WHY THE MARKUP IS IN A <template>. The copy belongs in the page, where the
+   consent sentence can be read and reviewed in the file it ships from. And
+   template content is inert in every engine: it cannot paint, cannot be
+   styled into visibility and cannot be tabbed to, so no CSS rule has to hold
+   the line. That is the exact failure that once painted two "Get on the list"
+   buttons on /trades, where .btn{display:inline-flex} beat the UA's [hidden].
+
+   CONSENT. The sentence sits BETWEEN the field and the button, so it is
+   physically at the point of consent, and it says what the press does: one
+   call, to that number, now, with the privacy page one tap away. consent:true
+   is only ever sent from that press.
+
+   EVERY STATE IS HONEST. Nothing says a call was placed until the server said
+   ok:true. A refusal prints the server's own reason and re-offers the list. A
+   dropped connection says that instead. Nothing here can show a success for a
+   request that did not land.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (!window.fetch || !window.Promise || typeof window.answeredHealth !== 'function') return;
+
+  var host = document.querySelector('[data-activate]');
+  var tpl = document.getElementById('act-tpl');
+  if (!host || !tpl || !('content' in tpl) || !tpl.content.firstElementChild) return;
+
+  var listWrap = document.querySelector('[data-listfallback]');
+  var ENDPOINT = '/api/call-me';
+  var alt = null;
+
+  function track() {
+    var t = (host.getAttribute('data-activate') || '').trim();
+    if (t) return t;
+    return document.body.classList.contains('track-biz') ? 'biz' : 'me';
+  }
+
+  /* US numbers only, and said out loud rather than discovered at the carrier.
+     Ten digits, or eleven starting with a 1. Anything else returns '' and the
+     person is told what shape is wanted before anything is sent. */
+  function e164(raw) {
+    var d = String(raw || '').replace(/[^\d]/g, '');
+    if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+    return d.length === 10 ? '+1' + d : '';
+  }
+
+  function pretty(raw) {
+    var d = String(raw || '').replace(/[^\d]/g, '');
+    if (d.length === 11 && d.charAt(0) === '1') d = d.slice(1);
+    d = d.slice(0, 10);
+    if (d.length > 6) return '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6);
+    if (d.length > 3) return '(' + d.slice(0, 3) + ') ' + d.slice(3);
+    if (d.length > 0) return '(' + d;
+    return '';
+  }
+
+  function mount() {
+    var form = tpl.content.firstElementChild.cloneNode(true);
+    host.appendChild(form);
+
+    var row = form.querySelector('.act-row');
+    var input = form.querySelector('.act-in');
+    var btn = form.querySelector('.act-go');
+    var consent = form.querySelector('.act-consent');
+    var state = form.querySelector('.act-state');
+    if (!row || !input || !btn || !consent || !state) return;
+    var LABEL = btn.textContent;
+
+    function say(msg, kind) {
+      state.className = 'act-state' + (kind ? ' is-' + kind : '');
+      state.textContent = msg;
+      state.hidden = false;
+    }
+
+    /* the list, demoted rather than deleted. it is one press away the whole
+       time, and every refusal path brings it straight back. */
+    function showList(msg) {
+      if (!listWrap) return;
+      listWrap.hidden = false;
+      if (alt && alt.parentNode) { alt.parentNode.removeChild(alt); alt = null; }
+      if (msg) {
+        var p = listWrap.querySelector('.act-listnote');
+        if (!p) {
+          p = document.createElement('p');
+          p.className = 'act-listnote';
+          listWrap.insertBefore(p, listWrap.firstChild);
+        }
+        p.textContent = msg;
+      }
+    }
+
+    function demoteList() {
+      if (!listWrap) return;
+      listWrap.hidden = true;
+      alt = document.createElement('button');
+      alt.type = 'button';
+      alt.className = 'act-alt';
+      alt.textContent = 'Rather leave an email?';
+      alt.addEventListener('click', function () {
+        showList('');
+        var f = listWrap.querySelector('input');
+        if (f) f.focus();
+      });
+      form.appendChild(alt);
+    }
+
+    function refused(reason) {
+      var text = String(reason || '').trim();
+      // a server that answers with HTML rather than its own sentence must not
+      // have that HTML poured into the page, and it is set as TEXT regardless.
+      if (!text || text.length > 240 || text.indexOf('<') > -1) {
+        text = 'That did not go through. It is our side, not yours.';
+      }
+      say(text, 'no');
+      btn.disabled = false;
+      btn.textContent = LABEL;
+      showList('Leave an email instead and we will come to you.');
+    }
+
+    function placed() {
+      row.hidden = true;
+      consent.hidden = true;
+      state.className = 'act-state is-ok';
+      state.textContent = '';
+      var b = document.createElement('b');
+      b.textContent = 'Calling you now.';
+      state.appendChild(b);
+      state.appendChild(document.createTextNode(
+        ' Your phone rings in about ten seconds. Answer it and it sets you up on that call.'));
+      state.hidden = false;
+      var again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'act-again';
+      again.textContent = 'It did not ring. Try again';
+      again.addEventListener('click', function () {
+        if (again.parentNode) again.parentNode.removeChild(again);
+        row.hidden = false;
+        consent.hidden = false;
+        state.hidden = true;
+        btn.disabled = false;
+        btn.textContent = LABEL;
+        input.focus();
+      });
+      form.appendChild(again);
+    }
+
+    // format as they type, and ONLY with the caret at the end, so editing the
+    // middle of a number never teleports the caret to the end of it.
+    input.addEventListener('input', function () {
+      if (input.value.indexOf('+') === 0) return;
+      var atEnd = input.selectionStart === input.value.length;
+      if (!atEnd) return;
+      var p = pretty(input.value);
+      if (p !== input.value) input.value = p;
     });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (form.dataset.sending === '1') return;
+      var num = e164(input.value);
+      if (!num) {
+        say('We need a ten digit US number, area code first. Check it and press again.', 'no');
+        input.focus();
+        return;
+      }
+      form.dataset.sending = '1';
+      btn.disabled = true;
+      btn.textContent = 'Dialing';
+      say('Dialing your number.');
+
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: num, track: track(), consent: true }),
+        credentials: 'same-origin'
+      }).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (j) {
+          form.dataset.sending = '';
+          if (r.ok && j && j.ok === true) {
+            placed();
+            if (typeof window.answeredEvent === 'function') window.answeredEvent('callme_placed', { track: track() });
+            return;
+          }
+          refused(j && j.reason);
+          if (typeof window.answeredEvent === 'function') window.answeredEvent('callme_refused', { track: track() });
+        });
+      }).catch(function () {
+        form.dataset.sending = '';
+        refused('That did not reach us, and it looks like the connection dropped rather than your number.');
+      });
+    });
+
+    demoteList();
+    if (typeof window.answeredEvent === 'function') window.answeredEvent('callme_rendered', { track: track() });
+  }
+
+  /* the copy gate. Sections that DESCRIBE the one line activation ship hidden
+     ([data-actgate]) and the sentence that is true without it ships VISIBLE
+     ([data-actgate-off]), which is the same default-visible law the demo gate
+     learned the hard way: a page that states a present fact about a control
+     that is not there is not a degraded page, it is a false one. */
+  function copyGate() {
+    var on = document.querySelectorAll('[data-actgate]');
+    for (var i = 0; i < on.length; i++) on[i].hidden = false;
+    var off = document.querySelectorAll('[data-actgate-off]');
+    for (var j = 0; j < off.length; j++) off[j].hidden = true;
+    // and the buttons that used to send people to a list now name the act
+    var ctas = document.querySelectorAll('[data-actcta]');
+    for (var k = 0; k < ctas.length; k++) {
+      var lab = ctas[k].getAttribute('data-act-label');
+      if (lab) ctas[k].textContent = lab;
+    }
+  }
+
+  window.answeredHealth().then(function (j) {
+    var o = j && j.checks && j.checks.outbound;
+    if (!o || o.landed !== true || o.ok !== true) {
+      console.info('Answered: the outbound path is not green; keeping the email list.');
+      return;
+    }
+    mount();
+    copyGate();
+  });
 })();
 
 /* ══ THE POINTER ENGINE ════════════════════════════════════════════════════

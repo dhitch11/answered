@@ -28,6 +28,15 @@
 // Before the first canary has ever run, this check is landed=false with
 // reason "no canary has run yet": which honestly keeps healthy=false.
 //
+// Check 5, "outbound" (2026-08-14): can this site place a one click activation
+// call right now? It is the gate for the /api/call-me button, exactly the way
+// healthy is the gate for the demo number, and it carries its own landed/ok
+// pair plus a `parts` object with one landed/ok pair per piece. IT IS NOT PART
+// OF healthy, on purpose: healthy decides whether the demo NUMBER renders
+// site wide, and an unset activation env var must never take the site's main
+// call to action dark. The front end reads outbound_ready (top level) or
+// checks.outbound. See probeOutbound below for the four parts.
+//
 // ⚠️ BOOTSTRAP ESCAPE HATCH. TEMPORARY BY DESIGN, REMOVE WITHIN A DAY.
 // CANARY_BOOTSTRAP=allow treats a MISSING canary record (and only a missing
 // record: never a failed or stale one) as landed=true ok=true reason
@@ -43,9 +52,14 @@
 //   TWILIO_AUTH_TOKEN      probe 3, Lookup auth
 //   ANSWERED_DEMO_NUMBER   probe 3, the number being looked up
 //   CANARY_BOOTSTRAP       check 4, "allow" = bootstrap window (see above)
+//   ANSWERED_CALLME_FROM   check 5, optional caller ID override for /api/call-me
+//   ANSWERED_ONBOARD_AGENT_ID  check 5, the ElevenLabs setup agent
+//   ANSWERED_EL_AGENT_ID   check 5, read only to refuse if the two ids match
 //
-// THE FRONT-END CONTRACT DOES NOT CHANGE: nothing on any page calls this yet.
-// Shape stays {healthy, checks: {...}, checked}, GET-only, no-store.
+// THE FRONT-END CONTRACT DOES NOT CHANGE for the demo number: healthy still
+// means the same four checks. Shape is {healthy, outbound_ready, checks: {...},
+// checked}, GET-only, no-store. Both added keys are additive: assets/answered.js
+// reads j.healthy and is unaffected.
 'use strict';
 
 const CACHE_MS = 60000; // page loads must not stampede the vendors
@@ -184,6 +198,94 @@ async function probeCanary(event) {
   return { landed: true, ok, reason };
 }
 
+// ── check 5: can this site place an outbound activation call right now? ─────
+// The /api/call-me button is gated on THIS check, exactly the way the demo
+// number is gated on `healthy`. It is reported as its own landed/ok pair with
+// its parts underneath, and it is deliberately NOT folded into `healthy`:
+// `healthy` decides whether the DEMO NUMBER renders site wide, and an
+// unconfigured activation line has nothing to do with whether the demo line
+// answers. Folding it in would have taken the site's main call to action dark
+// over an unrelated env var.
+//
+// Three parts, each landed separately:
+//   caller_id      the number we would dial FROM is set, E.164, and Twilio
+//                  Lookup says it is a valid number
+//   el             ElevenLabs can speak. Reuses probe 1's result rather than
+//                  asking the same vendor the same question twice in one pass;
+//                  it is the same fact, and it says so.
+//   consent_store  the Blobs store "consent" can be written AND read back. A
+//                  store that cannot be written means no consent record, and
+//                  no consent record means no dial, so an unwritable store is
+//                  an outbound red before anybody clicks anything.
+//   onboard_agent  ANSWERED_ONBOARD_AGENT_ID is set and is not the demo agent
+async function probeOutbound(event, el) {
+  const parts = {};
+
+  const keySid = (process.env.TWILIO_API_SID || '').trim();
+  const keySecret = (process.env.TWILIO_API_SECRET || '').trim();
+  const from = (process.env.ANSWERED_CALLME_FROM || process.env.ANSWERED_DEMO_NUMBER || '').trim().replace(/[^+\d]/g, '');
+  if (!keySid || !keySecret || !from) {
+    parts.caller_id = probeFail('env not set');
+  } else if (!/^\+\d{10,15}$/.test(from)) {
+    parts.caller_id = probeFail('the caller ID number is not E.164');
+  } else {
+    try {
+      const r = await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(from), {
+        headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!r.ok) {
+        parts.caller_id = { landed: true, ok: false, reason: 'caller ID lookup returned ' + r.status };
+      } else {
+        const j = await r.json();
+        parts.caller_id = j.valid === true
+          ? { landed: true, ok: true, reason: '' }
+          : { landed: true, ok: false, reason: 'lookup says the caller ID number is not valid' };
+      }
+    } catch (e) {
+      parts.caller_id = probeFail('caller ID lookup failed: ' + String(e && e.message).slice(0, 80));
+    }
+  }
+
+  // the same fact as check 1, named as a reuse rather than measured twice
+  parts.el = { landed: el.landed, ok: el.ok, reason: el.reason || (el.ok ? '' : 'see el_subscription') };
+
+  const agent = (process.env.ANSWERED_ONBOARD_AGENT_ID || '').trim();
+  const demoAgent = (process.env.ANSWERED_EL_AGENT_ID || '').trim();
+  if (!agent) {
+    parts.onboard_agent = { landed: true, ok: false, reason: 'ANSWERED_ONBOARD_AGENT_ID is not set, so no setup call can be placed' };
+  } else if (demoAgent && agent === demoAgent) {
+    parts.onboard_agent = { landed: true, ok: false, reason: 'the setup agent id equals the demo agent id; a real signup would be answered by the demo persona' };
+  } else {
+    parts.onboard_agent = { landed: true, ok: true, reason: '' };
+  }
+
+  // WRITE THEN READ BACK. A write that returns without throwing is not proof
+  // the value landed; the read back is. This is the one probe in this file
+  // that changes state, and it changes exactly one small key.
+  try {
+    const blobs = await import('@netlify/blobs');
+    if (typeof blobs.connectLambda === 'function') {
+      try { blobs.connectLambda(event); } catch (e) { /* the write below is the verdict */ }
+    }
+    const store = blobs.getStore('consent');
+    const stamp = new Date().toISOString();
+    await store.setJSON('health/probe', { at: stamp, by: 'demo-health' });
+    const back = await store.get('health/probe', { type: 'json' });
+    parts.consent_store = back && back.at === stamp
+      ? { landed: true, ok: true, reason: '' }
+      : { landed: true, ok: false, reason: 'the consent store accepted a write that did not read back' };
+  } catch (e) {
+    parts.consent_store = probeFail('consent store write failed: ' + String(e && e.message).slice(0, 80));
+  }
+
+  const all = Object.values(parts);
+  const landed = all.every((p) => p.landed);
+  const ok = landed && all.every((p) => p.ok);
+  const failing = Object.entries(parts).filter(([, p]) => !(p.landed && p.ok)).map(([k, p]) => k + ': ' + (p.reason || 'not ok'));
+  return { landed, ok, reason: failing.join('; '), parts };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, headers: { Allow: 'GET' }, body: 'Method not allowed' };
@@ -202,10 +304,15 @@ exports.handler = async (event) => {
       probeTwilioNumber(),
       probeCanary(event),
     ]);
+    // runs after probe 1 on purpose: it reuses that result instead of asking
+    // ElevenLabs the same question a second time on every page load
+    const outbound = await probeOutbound(event, el);
 
-    const checks = { el_subscription: el, brain_ready: brain, twilio_number: twilio, canary };
+    const checks = { el_subscription: el, brain_ready: brain, twilio_number: twilio, canary, outbound };
+    // UNCHANGED, DELIBERATELY. healthy is still the four demo line checks.
     const healthy = [el, brain, twilio, canary].every((c) => c.landed && c.ok);
-    body = { healthy, checks, checked: new Date().toISOString() };
+    const outboundReady = outbound.landed && outbound.ok;
+    body = { healthy, outbound_ready: outboundReady, checks, checked: new Date().toISOString() };
     cached = { at: now, body };
   }
 

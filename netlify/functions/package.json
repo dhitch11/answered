@@ -1,0 +1,9 @@
+{
+  "name": "answered-functions",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dependency manifest for the Answered Netlify functions. THIS FILE EXISTS BECAUSE THE HOUSE DEPLOY RUNS `npm install` IN THIS DIRECTORY. Without it that step installed nothing, @netlify/blobs was absent from the deployed bundle, the scheduled canary never loaded, and /api/demo-health reported healthy:false site wide, which hid every call control on the live site. Measured on prod 2026-08-14. Do NOT add \"type\": \"module\": the .js handlers in this directory (demo-health.js, event.js, interest.js, answered-voice.js, site-directory.js) are CommonJS and would all break at once; the .mjs handlers are ESM by extension and need no help.",
+  "dependencies": {
+    "@netlify/blobs": "^8.0.0"
+  }
+}

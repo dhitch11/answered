@@ -63,6 +63,15 @@
   status = 200
   force = true
 
+# /internal/ops — the daily operating view (@LANE-OPS). Gated server side inside
+# the function exactly like /internal and /internal/cockpit: nothing is
+# serialized before the PIN check. Read only: it cannot dial, text, or spend.
+[[redirects]]
+  from = "/internal/ops"
+  to = "/.netlify/functions/ops"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/api/call-voice"
   to = "/.netlify/functions/call-voice"
@@ -131,5 +140,36 @@
 [[redirects]]
   from = "/api/call-me"
   to = "/.netlify/functions/call-me"
+  status = 200
+  force = true
+
+# ── the meter, the ledger and the money (@LANE-BILLING) ──────────────────────
+# /statement/:token deliberately has NO redirect block. bill-statement.mjs is a
+# Netlify v2 function that declares its own routes in-file (export const config
+# .path = ['/statement/:token','/api/statement']), and declaring a custom path
+# removes the default /.netlify/functions/ route, so a forced redirect pointing
+# there would shadow the live route with a dead target. Same reasoning, and the
+# same hard-won lesson, as the answered-brain note above.
+#
+# The webhook route is declared FIRST and is an exact match, never a splat:
+# /api/billing must not be able to swallow /api/billing/webhook, because the
+# webhook is the only path in this file that is authenticated by a Stripe
+# signature instead of the operator bearer token.
+
+[[redirects]]
+  from = "/api/billing/webhook"
+  to = "/.netlify/functions/bill-stripe"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/billing"
+  to = "/.netlify/functions/bill-stripe"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/meter"
+  to = "/.netlify/functions/bill-meter"
   status = 200
   force = true
