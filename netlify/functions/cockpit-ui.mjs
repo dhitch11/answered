@@ -1066,7 +1066,14 @@ $("master").onclick = function(){
   if(!targets.length){ toast("Every campaign is halted. Read the halt reason before resuming one.","err"); return; }
   if(!anyOn && !window.confirm(
       "Arm " + targets.length + " campaign" + (targets.length>1?"s":"") + "? This starts placing real calls to real people."
-      + (halted ? "\n\n" + halted + " halted campaign(s) will be left alone." : ""))) return;
+      // ★ DOUBLE-BACKSLASH, NOT SINGLE. This whole file is a template literal, so a single
+      // backslash escape is consumed HERE and emits a REAL newline into the browser's string
+      // literal. That is a syntax error, and it killed the ENTIRE 38KB inline script: the cockpit
+      // rendered nothing at all, with no board, no dialer, no keyboard handler, and every control
+      // inert. It looked exactly like a correct empty state and was reported as one.
+      // (Writing the escape sequence into this comment reproduced the identical bug a second time,
+      // because a comment is emitted too. Do not name it here; the test asserts it instead.)
+      + (halted ? "\\n\\n" + halted + " halted campaign(s) will be left alone." : ""))) return;
   Promise.all(targets.map(function(c){
     return api("autopilot",{id:c.id,name:c.name,mode:c.mode,on:!anyOn,pacing_per_min:c.pacing_per_min,max_concurrent:c.max_concurrent});
   })).then(function(){ toast(anyOn?"All campaigns paused":"All campaigns armed","ok"); tick(); })
