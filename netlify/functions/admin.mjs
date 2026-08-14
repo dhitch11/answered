@@ -42,6 +42,7 @@ import { loginPage, consolePage } from './lib/admin-ui.mjs';
 import { CATALOG } from './lib/meter.mjs';
 import * as outreach from './lib/outreach.mjs';
 import * as ai from './lib/anthropic.mjs';
+import { ask as askData } from './lib/ask.mjs';
 
 export const config = {
   path: [
@@ -55,6 +56,7 @@ export const config = {
     '/api/admin/calls',
     '/api/admin/call',
     '/api/admin/call/summarize',
+    '/api/admin/ask',
     '/api/admin/usage',
     '/api/admin/billing',
     '/api/admin/events',
@@ -282,7 +284,7 @@ async function getConsole(req, url) {
 const MUTATING = new Set([
   'account-status', 'refund', 'attribute-backfill', 'log',
   'crm/update', 'crm/bulk', 'crm/note', 'crm/task', 'crm/email', 'crm/sms', 'crm/call',
-  'crm/draft', 'call/summarize',
+  'crm/draft', 'call/summarize', 'ask',
 ]);
 
 async function apiRoute(req, url, name) {
@@ -545,6 +547,20 @@ async function apiRoute(req, url, name) {
       await audit(admin, req, 'outreach.call', {
         targetKind: 'contact', targetId: b.contact_id, payload: { to: b.to },
         result: r.ok ? 'ok' : 'blocked',
+      });
+      return json(200, r);
+    }
+
+    // ASK YOUR DATA. The model chooses which measured query to run and phrases the result; it
+    // never writes a number, only slot references the server substitutes. See lib/ask.mjs.
+    case 'ask': {
+      const b = await readJson(req);
+      const r = await askData({ question: b.question, actor: admin.email });
+      await audit(admin, req, 'ask', {
+        result: r.ok ? 'ok' : 'refused',
+        payload: { question: String(b.question || '').slice(0, 300), refused: r.refused || null,
+                   detail: r.detail || null, model: r.model || null, cost_usd: r.cost_usd || null,
+                   tools: (r.trail || []).map((x) => x.tool) },
       });
       return json(200, r);
     }

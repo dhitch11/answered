@@ -687,6 +687,7 @@ export function consolePage({ admin, buildInfo = {} }) {
 
     <div class="nav-h">Flight deck</div>
     <button class="nav" data-view="cockpit" aria-current="page"><span class="nav-ico">✈</span>Cockpit</button>
+    <button class="nav" data-view="ask"><span class="nav-ico">?</span>Ask</button>
 
     <div class="nav-h">Business</div>
     <button class="nav" data-view="overview"><span class="nav-ico">◎</span>Overview</button>
@@ -895,6 +896,7 @@ const S = {
   q: '',
   overview: null,
   dense: false,
+  ask: null,
   filters: { crm: { lane: null, disposition: null, state: null, trade: null, line_type: null,
                     reach: null, enriched: null, suppressed: null, sort: 'recent', offset: 0 },
              customers: { status: null, sort: 'recent', offset: 0 },
@@ -1353,9 +1355,24 @@ VIEWS.crm = async () => {
   // ── the honest headline. fixed_line is a PROPERTY. callable_now is a PERMISSION. ──────────
   const reachCard =
     '<div class="grid g4">' +
-      tile('Emailable today', n(facets.emailable_now),
-        'Have a business email and are not suppressed. This channel needs no carrier, no registry ' +
-        'and no state clearance.', facets.emailable_now ? 'brand' : '') +
+      // ★ THIS TILE USED TO READ "Emailable today ... needs no carrier, no registry and no state
+      // clearance." Both halves were wrong, and wrong in the direction that invites a bad send.
+      //
+      // The label was a PERMISSION word over a PROPERTY count: emailable_now is has-an-email minus
+      // suppressed, with no gate expression behind it at all. And the sentence asserted that email
+      // is an unregulated channel, which @ANSWERED-RESEARCH refuted from primary text: CAN-SPAM
+      // reaches a cold commercial first touch in full, Cal. B&P 17529.5 carries a PRIVATE right of
+      // action at $1,000 per email that a business recipient can bring, and WA CEMA carries $500
+      // per message. Phone risk is gateable by subscribing to a registry. Email risk is litigation
+      // risk, and no subscription immunises it.
+      //
+      // So the tile now counts a property, says so, and states plainly that the channel is not
+      // cleared. A count with an honest caveat is worth more than a confident label.
+      tile('Have an email on file', n(facets.emailable_now),
+        'A property of the record: an address is present and the lead is not suppressed. ' +
+        'It is NOT permission to send. Email is a different regime, not an open one: CAN-SPAM ' +
+        'applies in full to a cold commercial message, and CA and WA carry per-message private ' +
+        'damages. Gated pending verification.', '') +
       tile('Callable right now', n(facets.callable_now),
         facets.callable_blocked_because ||
         'Fixed business lines, scrubbed and inside a cleared state.',
@@ -2143,6 +2160,123 @@ const row3 = (label, ok, detail) =>
     : ok === false ? '<span class="pill bad">no</span>'
     : '<span class="pill warn">unknown</span>') + '</td></tr>';
 
+/**
+ * ASK. The operator types a question; SQL answers it; a model only phrases it.
+ *
+ * THE EVIDENCE TRAIL IS NOT OPTIONAL DECORATION. Every figure in the answer is shown again below
+ * it, with the query that produced it and the JSON path it came from. An operator who wants to know
+ * where a number came from should never have to ask, and a surface that cannot show its working has
+ * not earned the right to state a number at all.
+ *
+ * A REFUSAL RENDERS AS AN ANSWER, NOT AS AN ERROR. "These tools cannot answer that" and "the model
+ * tried to author a figure so it was withheld" are both the system working correctly. Styling them
+ * as failures would teach the operator to retry until something slips through, which is the exact
+ * opposite of the point.
+ */
+VIEWS.ask = async () => {
+  const last = S.ask || null;
+  return '<div class="card">' +
+      '<div class="tile-k">Ask your data</div>' +
+      '<div class="tile-s" style="font-size:13.5px;margin-top:4px">' +
+        'Ask in plain English. The question chooses which measured query runs; the answer is phrased ' +
+        'by Claude on the direct Anthropic API. <strong>The model never writes a number.</strong> It ' +
+        'references measured values and the server substitutes them, then checks that no quantity ' +
+        'appears in the answer that it did not put there. If it cannot answer honestly it says so, ' +
+        'and that is a real answer.' +
+      '</div>' +
+      '<div class="row" style="gap:8px;margin-top:12px;align-items:flex-start">' +
+        '<input class="input" id="askq" type="text" maxlength="500" style="flex:1" ' +
+          'placeholder="How many leads are waiting on a state review?" ' +
+          'value="' + esc((last && last.question) || '') + '">' +
+        '<button class="btn" id="askgo" data-act="ask-go">Ask</button>' +
+      '</div>' +
+      '<div class="sm muted" style="margin-top:8px">' +
+        ['How many leads do we have, and how many are on a fixed line?',
+         'Where can we legally call, and how many leads are waiting on a review?',
+         'How many calls have we made?'].map((q) =>
+          '<button class="btn ghost sm" data-askex="' + esc(q) + '" style="margin:3px 4px 0 0">' + esc(q) + '</button>').join('') +
+      '</div>' +
+    '</div>' +
+    '<div id="askout">' + (last ? renderAsk(last) : '') + '</div>';
+};
+
+function renderAsk(r) {
+  if (!r) return '';
+  const trail = (r.trail || []).length
+    ? '<div class="card pad0" style="margin-top:12px"><div class="card-h"><h2>What it actually ran</h2>' +
+      '<span class="sp muted">every figure above, traced to the query that produced it</span></div>' +
+      '<div class="tw"><table><thead><tr><th>Query</th><th>Database function</th><th>Returned</th></tr></thead><tbody>' +
+      r.trail.map((x) => '<tr><td class="mono">' + esc(x.tool) + '</td>' +
+        '<td class="mono muted">' + esc(x.rpc || '') + '</td><td>' +
+        (x.error
+          ? '<span class="pill bad">failed</span> <span class="muted">' + esc(x.error) + '</span>'
+          : Object.keys(x.slots || {}).map((k) => '<span class="pill">' + esc(k.replace(/_/g, ' ')) + '</span>').join(' ')) +
+        '</td></tr>').join('') + '</tbody></table></div></div>'
+    : '';
+
+  const slots = (r.slots || []).filter((s) => s.display);
+  const figures = slots.length
+    ? '<div class="card pad0" style="margin-top:12px"><div class="card-h"><h2>Every figure, and where it came from</h2></div>' +
+      '<div class="tw"><table><thead><tr><th>Value</th><th>Meaning</th><th>Source</th></tr></thead><tbody>' +
+      slots.map((s) => '<tr><td class="num mono"><strong>' + esc(s.display) + '</strong></td>' +
+        '<td>' + esc(String(s.path || '').replace(/_/g, ' ')) +
+          (s.measured === false ? ' <span class="pill warn">asserted, not measured</span>' : '') +
+          (s.null_means ? ' <span class="pill">never measured</span>' : '') +
+          (s.note ? '<div class="sm muted">' + esc(s.note) + '</div>' : '') + '</td>' +
+        '<td class="mono muted">' + esc(s.rpc || '') + '</td></tr>').join('') +
+      '</tbody></table></div></div>'
+    : '';
+
+  if (r.ok) {
+    return '<div class="card" style="margin-top:12px">' +
+        '<div class="sumbox"><div style="font-size:15px;line-height:var(--lh-base);white-space:pre-wrap">' +
+          esc(r.answer) + '</div></div>' +
+        '<div class="sm muted" style="margin-top:11px">' + esc(r.model || '') +
+          (r.cost_usd != null ? ' · $' + r.cost_usd.toFixed(4) + ', modeled from published rates' : '') +
+          (r.steps ? ' · ' + r.steps + ' round trip' + (r.steps === 1 ? '' : 's') : '') +
+          (r.repairs ? ' · rephrased once after the firewall stopped a quantity it wrote itself' : '') +
+        '</div>' +
+      '</div>' + figures + trail;
+  }
+
+  const title = r.refused === 'cannot_answer' ? 'These tools cannot answer that'
+    : r.refused === 'ai_unconfigured' ? 'The AI layer is off'
+    : 'The answer was withheld';
+  return '<div class="card" style="margin-top:12px">' +
+      '<div class="alert warn"><strong>' + esc(title) + '</strong><br>' + esc(r.why || '') +
+      (r.what_would_answer_it ? '<div style="margin-top:8px"><strong>What would answer it:</strong> ' +
+        esc(r.what_would_answer_it) + '</div>' : '') + '</div>' +
+      (r.draft
+        ? '<div style="margin-top:11px"><div class="tile-k">What was refused, so you can judge it yourself</div>' +
+          '<blockquote class="quote" style="white-space:pre-wrap">' + esc(r.draft) + '</blockquote></div>'
+        : '') +
+      '<div class="sm muted" style="margin-top:11px">' + esc(r.model || '') +
+        (r.cost_usd != null ? ' · $' + r.cost_usd.toFixed(4) : '') +
+        (r.detail ? ' · ' + esc(r.detail) : '') + '</div>' +
+    '</div>' + figures + trail;
+}
+
+async function runAsk(q) {
+  const question = String(q || (($('#askq') || {}).value) || '').trim();
+  if (!question) return;
+  const out = $('#askout');
+  const btn = $('#askgo');
+  if (btn) { btn.disabled = true; btn.textContent = 'Asking…'; }
+  if (out) out.innerHTML = '<div class="card" style="margin-top:12px">' +
+    '<div class="skel" style="width:72%"></div><div class="skel" style="width:48%;margin-top:8px"></div>' +
+    '<div class="sm muted" style="margin-top:10px">Choosing which measured query answers this, then running it.</div></div>';
+  try {
+    const r = await api('ask', { body: { question } });
+    r.question = question;
+    S.ask = r;
+    if (out) out.innerHTML = renderAsk(r);
+  } catch (e) {
+    if (out) out.innerHTML = errState('The question could not be run', e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ask'; }
+  }
+}
+
 VIEWS.audit = async () => {
   const d = await api('audit?limit=200');
   S.lastMeasuredAt = new Date().toISOString(); freshness();
@@ -2561,6 +2695,7 @@ async function actionClick(t, act) {
     case 'add-task':  addTask(t.dataset.contact); return true;
     case 'ai-draft':  aiDraft(t.dataset.contact); return true;
     case 'backfill':  backfill(t); return true;
+    case 'ask-go':    await runAsk(); return true;
     case 'status':    statusChange(t.dataset.value); return true;
     case 'summarize-call': await summarizeCall(t.dataset.sid, t); return true;
     case 'toggle-interim': {
@@ -2577,7 +2712,7 @@ async function actionClick(t, act) {
 
 function wire() {
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],[data-cktarget],.pal-i');
+    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],[data-cktarget],[data-askex],.pal-i');
     if (!t) return;
 
     // ── CRM ────────────────────────────────────────────────────────────────────────────────
@@ -2649,6 +2784,7 @@ function wire() {
       }
       return;
     }
+    if (t.dataset.askex) { const i = $('#askq'); if (i) i.value = t.dataset.askex; runAsk(t.dataset.askex); return; }
     if (t.dataset.bulk) { bulkAction(t.dataset.bulk, t.dataset.value); return; }
     if (t.dataset.setdisp) { setDisposition(t.dataset.setdisp); return; }
     if (t.dataset.task) { taskSet(t.dataset.task, t.dataset.status); return; }
@@ -2712,6 +2848,15 @@ function wire() {
     f.offset = 0;
     S.selected.clear();
     go('crm');
+  });
+
+  // Enter in the Ask box submits. Delegated on the document so it survives every repaint of the
+  // view, and scoped to that one field so it cannot swallow Enter anywhere else.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (!e.target || !e.target.matches || !e.target.matches('#askq')) return;
+    e.preventDefault();
+    runAsk(e.target.value);
   });
 
   let cq;
