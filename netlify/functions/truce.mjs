@@ -10,11 +10,23 @@
 //
 // ★ THE PROPERTY THIS FILE MUST NEVER BREAK: no response ever contains the other party's limit.
 // That is enforced in Postgres — the limits live in a `sealed` schema nothing can select from, and
-// every read is a function that can only reach the limit belonging to the token it was given. This
-// file cannot leak what it is never able to fetch. Keep it that way: do not add an op that takes a
-// deal id instead of a token.
+// every read is a function that can only reach the limit belonging to the token it was given.
+//
+// ★★ AND THAT DEFENCE IS NOW WEAKER THAN IT WAS, DELIBERATELY, SO SAY SO RATHER THAN LEAVE A
+// COMMENT CLAIMING A PROPERTY THE CODE NO LONGER HAS. This file used to be unable to leak a limit
+// because it was never able to FETCH one. The `say` op ends that: an agent cannot haggle on
+// somebody's behalf without knowing the floor it must not cross, so `tr_agent_brief` hands this
+// process the represented side's sealed limit, under the OPERATOR credential, never the party
+// token. The secret is now in memory here, and structural impossibility has been traded for two
+// controls that must therefore be treated as load bearing:
+//   1. the brief is fetched with rpc(), never open(), so a party token can never reach it; and
+//   2. lib/parley-agent.mjs runs a deterministic firewall over every generated reply and refuses
+//      to return text containing that number in any written or spoken form. It fails CLOSED: if it
+//      cannot produce a safe reply it sends none and says so.
+// If you add an op, keep it token-first, and never return a brief, or any part of one, to a caller.
 
 import { rpc, dbConfigured } from './lib/db.mjs';
+import { negotiate } from './lib/parley-agent.mjs';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -123,7 +135,7 @@ export const handler = async (event) => {
 
   // Every token-authenticated op validates the shape first, so a malformed token never reaches
   // the database and a scan gets a 400 rather than a timing signal.
-  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact'];
+  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact', 'say'];
   if (needsToken.includes(op) && !TOKEN.test(token)) return bad(400, 'that link is not valid');
 
   try {
@@ -162,6 +174,78 @@ export const handler = async (event) => {
       // A party leaving THEIR OWN address so we can tell them how it ended. There is no path for
       // one side to supply the other side's contact, here or anywhere: the token identifies one
       // row, and the whole invitation model is that the sender passes the link on themselves.
+      // ★ THE NEGOTIATION ITSELF. You say something, and the OTHER side's agent answers, holding
+      // their sealed limit and never revealing it. This is the product as it was specced: you
+      // haggle with their agent, not with a form. The same call serves the web thread today and the
+      // SMS thread the moment the number is live, because the transport is not this function's
+      // business.
+      case 'say': {
+        const said = String(body.body || '').trim();
+        if (!said) return bad(400, 'say something first');
+        if (said.length > 1200) return bad(400, 'that message is too long');
+
+        // Rate limited on the TOKEN, because the door is open by design: a party has no account,
+        // and every reply costs a top-tier model call. Durable, so a cold start cannot reset it.
+        try {
+          const gate = await rpc('sv_rate_take', {
+            p_bucket: 'truce_say', p_key: token, p_limit: 60, p_window: '1 hour',
+          });
+          if (!gate || gate.allowed !== true) {
+            return bad(429, 'that is a lot of messages on one deal in an hour. Give it a few minutes.');
+          }
+        } catch (e) {
+          console.error('truce say: rate limiter unreadable; refusing rather than waving through');
+          return bad(503, 'we cannot take that message right now. Try again shortly.');
+        }
+
+        const wrote = await open('tr_say', { p_token: token, p_body: said });
+        if (!wrote || wrote.ok !== true) return bad(400, (wrote && wrote.reason) || 'that message did not send');
+
+        // Everything the replying agent needs, including a sealed limit, so it is fetched with the
+        // OPERATOR credential and never with the party token.
+        const brief = await rpc('tr_agent_brief', { p_token: token });
+        if (!brief || brief.ok !== true) {
+          return ok({ ok: true, sent: true, reply: null, note: 'Your message is in. No reply could be prepared.' });
+        }
+
+        const answer = await negotiate(brief);
+        if (!answer.ok) {
+          // The message IS stored. Say plainly that no reply came rather than inventing one.
+          console.error('truce say: no agent reply:', answer.reason);
+          return ok({
+            ok: true, sent: true, reply: null,
+            note: 'Your message is in. The other side\'s agent could not answer just now, so nothing was said back.',
+          });
+        }
+        let settled = null;
+        if (answer.generated) {
+          // ★ THE CLOSE IS RECORDED, NOT LEFT IN THE PROSE. Measured 2026-08-14: the agent said
+          // "Deal at 8600, cash on pickup tonight" and the deal still read `negotiating` an hour
+          // later. A negotiation that concludes and records nothing has no settlement, no sheet to
+          // sign, no notification and nothing to charge a success fee on. The DATABASE decides,
+          // never the model: tr_agent_settle re-reads both sealed limits and refuses anything on
+          // the wrong side of either, so an agent that is persuaded, confused or attacked into
+          // agreeing below the floor still cannot bind anyone to it.
+          if (answer.accept && answer.amount !== null) {
+            const s = await rpc('tr_agent_settle', {
+              p_deal: brief.deal.id, p_side: brief.represents.side, p_amount: answer.amount,
+            });
+            if (s && s.ok) settled = s.settled_value;
+            else console.error(`truce say: agent tried to settle at ${answer.amount} and the database refused: ${(s && s.reason) || 'unknown'}`);
+          }
+          await rpc('tr_agent_say', {
+            p_deal: brief.deal.id, p_side: brief.represents.side,
+            p_body: answer.text, p_amount: answer.amount, p_move: settled ? 'accept' : 'agent',
+          });
+          if (settled) {
+            await notifySettled(brief.deal.id).catch((e) => {
+              console.error('truce: settled in conversation but could not notify:', String(e && e.message).slice(0, 160));
+            });
+          }
+        }
+        return ok({ ok: true, sent: true, reply: answer.text, generated: !!answer.generated, settled });
+      }
+
       case 'set_contact':
         return ok(await open('tr_set_contact', { p_token: token, p_contact: String(body.contact || '') }));
 
