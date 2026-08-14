@@ -13,3 +13,12 @@ node_modules/
 # research corpus: real business contact data, never deployed, never committed
 research/data/
 research/data-pull.log
+
+# ── NEVER COMMIT: 71KB of competitor intelligence, and this repo is PUBLIC ──
+# Rule 9 says /competitors is internal and must never be public. It is correctly
+# PIN-gated server-side, so the HTTP door is shut. This closes the OTHER door:
+# `dhitch11/answered` is a public GitHub repo (verified anonymously: HTTP 200,
+# visibility "public"), so committing this file publishes the intelligence to
+# the open internet just as surely as serving it would. A bulk `git add -A`
+# would have done it silently.
+netlify/functions/competitors.js
