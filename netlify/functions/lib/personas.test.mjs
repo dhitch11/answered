@@ -290,8 +290,18 @@ t('scout: a spoken number from the callee counts as said', () => {
 });
 
 t('riley does NOT get the spoken number widening', () => {
+  // The context became a SET when the numeral firewall stopped being a substring test — it was
+  // matching any number appearing anywhere in the caller's concatenated digits, which let six of
+  // seven invented figures through. The SUBSTANCE of this assertion is unchanged and is what
+  // matters: Riley's context contains no number the caller only SPELLED OUT, so she is still held
+  // to digits alone and the live line's behaviour is not widened.
   const ctx = contextDigits(riley, ['we open at seven thirty']);
-  assert.equal(ctx, '', 'riley context is raw digits only, exactly as it was');
+  assert.equal(ctx.size, 0, 'riley context must not pick up spelled-out numbers');
+  const withDigits = contextDigits(riley, ['my number is 916 350 4869']);
+  assert.ok(withDigits.has('916') && withDigits.has('9163504869'),
+    'riley still grounds on digits the caller actually said, including the run read back as one');
+  assert.ok(!withDigits.has('16') && !withDigits.has('6350'),
+    'but no longer on arbitrary substrings spanning unrelated numbers');
 });
 
 t('onboard: it cannot say anything is live, but it can read a setup back', () => {

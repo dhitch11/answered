@@ -135,20 +135,65 @@ const CONTACT_MSG_RE = /\b(?:i(?:'ll| will| can| am going to)? (?:text|email) yo
 // it is the fabrication most likely to be written down and acted on. The only
 // digits a persona may speak are its own allowlist plus whatever the caller
 // said first.
-function badNumeral(text, ctxDigits, allow) {
+// ★ THIS WAS A SUBSTRING TEST AND IT LET INVENTED PRICES THROUGH ON THE LIVE LINE.
+//
+// The last line used to read `if (ctxDigits && ctxDigits.includes(d)) continue;`, where ctxDigits
+// was every digit the caller had uttered CONCATENATED WITH NO SEPARATORS. So the question it asked
+// was "does this number appear somewhere in the digit soup", not "did the caller say this number".
+//
+// After a caller says "my number is 916 350 4869 and my zip is 97204", the soup is
+// "916350486997204", and six of these seven inventions passed, each spoken to the caller as fact:
+//     $350 a month · 16 openings · 35 dollars · 4869 days · 6350 jobs · $9,163      ALLOWED
+//     $742 a month                                                                 blocked
+// The guard was weakest exactly when a caller had given a phone number, which on an inbound line is
+// nearly always. Found and reproduced by @ANSWERED-INTEL; the reproduction reads this file directly
+// so it cannot drift from what ships (research/numeral-firewall.test.mjs).
+//
+// The fix is a SHAPE change, not a tuning change: the context is now a SET and this is a MEMBERSHIP
+// test. Substring matching cannot be made safe by widening or narrowing it.
+//
+// ★ WHAT IT STILL DOES NOT SOLVE, said plainly rather than left implied: a digit-run the caller
+// genuinely spoke is still allowed in any role. "$350 a month" survives, because the caller really
+// did say "350" — as part of their phone number. Distinguishing a price from a phone fragment needs
+// semantic role, which this guard does not have. It closes four of the six holes; the remaining two
+// need the money-word path or a grounded-figures allowlist.
+function badNumeral(text, ctx, allow) {
+  // Back-compatible: a caller that still passes a string gets the old behaviour rather than a crash.
+  const has = ctx instanceof Set ? (d) => ctx.has(d) : (d) => Boolean(ctx) && String(ctx).includes(d);
   const toks = String(text).match(/\d[\d:.,-]*/g) || [];
   for (const t of toks) {
     const d = t.replace(/\D+/g, '');
     if (!d) continue;
     if (allow.has(d)) continue;
-    if (ctxDigits && ctxDigits.includes(d)) continue;
+    if (has(d)) continue;
     return t;
   }
   return null;
 }
 
+/**
+ * Every number the caller actually SAID, as a set of exact tokens — plus the concatenations of
+ * CONSECUTIVE tokens, so reading a phone number back as one string is still a read-back rather than
+ * an invention. That is the one widening that is honest: "916 350 4869" -> "9163504869" is the same
+ * number the caller gave. An arbitrary substring spanning unrelated numbers is not.
+ */
+function numberSet(texts) {
+  const ctx = new Set();
+  for (const t of texts) {
+    const toks = (String(t).match(/\d[\d:.,-]*/g) || [])
+      .map((x) => x.replace(/\D+/g, '')).filter(Boolean);
+    for (let i = 0; i < toks.length; i += 1) {
+      let run = '';
+      // Bounded: a phone number is at most a few tokens. An unbounded join would rebuild the soup.
+      for (let j = i; j < Math.min(i + 5, toks.length); j += 1) { run += toks[j]; ctx.add(run); }
+    }
+  }
+  return ctx;
+}
+
 // Riley's context is the caller's raw digits, exactly as it always was.
-const rawDigits = (texts) => texts.join(' ').replace(/\D+/g, '');
+// Now a SET of exact tokens (plus consecutive-run concatenations), not a digit soup.
+const rawDigits = (texts) => numberSet(texts);
 
 // The outbound voices get one honest widening: a caller who says "we open at
 // seven thirty" has said a number, and reading it back as 7:30 is a read-back,
@@ -174,7 +219,8 @@ function spokenDigits(texts) {
   }
   return out.join(' ');
 }
-const digitsPlusSpoken = (texts) => rawDigits(texts) + ' ' + spokenDigits(texts);
+// Union of the digits the caller typed/spoke and the numbers they spelled out in words.
+const digitsPlusSpoken = (texts) => new Set([...numberSet(texts), ...numberSet([spokenDigits(texts)])]);
 
 // ── the money firewall, for the persona that is allowed to talk about money ──
 // A customer line MAY quote a price, because its owner wrote one down. The
@@ -201,14 +247,20 @@ function composeNumberWords(phrase) {
   return total + run;
 }
 
-function badMoneyWords(text, ctxDigits, allow) {
+function badMoneyWords(text, ctx, allow) {
+  // The SECOND consumer of the context, and it had the identical substring bug. Fixing badNumeral
+  // alone would have left a spelled price ("three fifty dollars") still tested against the digit
+  // soup — and worse, once the context became a Set this line threw `ctxDigits.includes is not a
+  // function`, which the money-word floor would have surfaced as a crash rather than a refusal.
+  // Two call sites, one contract: membership, with the string form kept working for safety.
+  const has = ctx instanceof Set ? (d) => ctx.has(d) : (d) => Boolean(ctx) && String(ctx).includes(d);
   MONEY_WORD.lastIndex = 0; // the pattern carries /g; never trust its cursor
   let m;
   while ((m = MONEY_WORD.exec(String(text))) !== null) {
     const d = String(composeNumberWords(m[1]));
     if (d === '0') continue;
     if (allow.has(d)) continue;
-    if (ctxDigits && ctxDigits.includes(d)) continue;
+    if (has(d)) continue;
     return m[0];
   }
   return null;
@@ -541,7 +593,7 @@ export const PERSONAS = {
     // The only persona that reads the SYSTEM note for numbers, because the note
     // is where the owner's own hours and prices live. A number he wrote down is
     // his to say; a number nobody wrote down is a fabrication either way.
-    ctx: (texts, systemText) => digitsPlusSpoken(texts) + ' ' + digitsPlusSpoken([String(systemText || '')]),
+    ctx: (texts, systemText) => new Set([...digitsPlusSpoken(texts), ...digitsPlusSpoken([String(systemText || '')])]),
     numAllow: new Set(['911']),
     ackBank: ['Okay.', 'Sure.', 'Alright.', 'Got it.', 'Mm-hm.'],
     breaker: 'Sorry, my line just glitched for a second. Are you still there?',
