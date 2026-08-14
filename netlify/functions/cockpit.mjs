@@ -55,8 +55,12 @@ async function run(op, body, operator) {
       }
       const phone = body.phone || contact?.phone;
       if (!phone) return { error: 'no number' };
+      // A hand-typed number has no state on file, and the calling-hours check cannot run without
+      // one. The operator asserts it; it is carried onto the call record as an assertion rather
+      // than as sourced data, so an audit can tell the two apart.
       return placeCall({
         phone, contact, mode: body.mode || 'measure', operator,
+        assertedState: body.state || null,
         campaignId: body.campaign_id, lineId: body.line_id, fromNumber: body.from,
       });
     }

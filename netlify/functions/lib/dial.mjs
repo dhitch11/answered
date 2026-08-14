@@ -58,7 +58,7 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
 }
 
 export async function placeCall(opts) {
-  const { phone, mode, operator, campaignId, lineId, fromNumber } = opts;
+  const { phone, mode, operator, campaignId, lineId, fromNumber, assertedState } = opts;
   let contact = opts.contact;
 
   // An unrecognised mode must never quietly become a different call than was asked for. Falling
@@ -66,7 +66,7 @@ export async function placeCall(opts) {
   // would ever notice because both calls sound plausible on the recording.
   if (!SCRIPTS[mode] || mode === 'voicemail') return { placed: false, error: `unknown script "${mode}"` };
 
-  const gated = await gateFor(phone, { state: contact?.state });
+  const gated = await gateFor(phone, { state: contact?.state || assertedState });
   const { verdict, lineType, lookupOk } = gated;
   contact = gated.contact || contact;
 
@@ -82,6 +82,9 @@ export async function placeCall(opts) {
     lane: verdict.lane, dialable: verdict.dialable, reasons: verdict.reasons,
     line_type: lineType, lookup_ok: lookupOk, obligations: verdict.obligations || [],
     script: mode, policy: DEFAULT_POLICY, decided_at: new Date().toISOString(),
+    // Which state was used for the calling-hours check, and whether anybody actually knew it.
+    state_used: contact?.state || assertedState || null,
+    state_source: contact?.state ? 'sourced' : (assertedState ? `asserted by ${operator}` : 'none'),
   };
 
   if (!verdict.dialable) {

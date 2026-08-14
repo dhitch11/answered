@@ -329,7 +329,7 @@ export const PAGE = () => `<!doctype html><html lang="en"><head><meta charset="u
 var S = {
   view: "board", board: null, sel: null, since: 0, utts: [],
   contacts: {rows:[],total:0}, calls: [], filters: {}, drawer: null,
-  dialNum: "", dialMode: "measure", verdict: null, checking: false, err: 0
+  dialNum: "", dialMode: "measure", dialState: "", verdict: null, checking: false, err: 0
 };
 var $ = function(id){ return document.getElementById(id); };
 var el = function(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; };
@@ -484,7 +484,7 @@ function verdictPanel(){
   if(!v){
     w.dataset.lane = "";
     var vh0 = el("div","vh"); vh0.appendChild(el("div","vlane","--"));
-    vh0.appendChild(el("div","",S.checking?"Checking the line...":"Enter a number to see whether it may be dialled."));
+    vh0.appendChild(el("div","", S.checking ? "Checking the line..." : (!S.dialState ? "Pick the state first. Calling hours are local to the shop, and this system will not guess where a number is." : "Enter a number to see whether it may be dialled.")));
     w.appendChild(vh0);
     return w;
   }
@@ -516,9 +516,9 @@ function verdictPanel(){
 
 function checkGate(){
   var d = S.dialNum.replace(/\\D/g,"");
-  if(d.length < 10){ S.verdict=null; renderView(); return; }
+  if(d.length < 10 || !S.dialState){ S.verdict=null; renderView(); return; }
   S.checking = true; renderView();
-  api("gatecheck",{phone:"+1"+d.slice(-10)}).then(function(r){
+  api("gatecheck",{phone:"+1"+d.slice(-10), state:S.dialState||null}).then(function(r){
     S.verdict = r; S.checking=false; renderView();
   }).catch(function(e){ S.checking=false; S.verdict=null; toast(e.message,"err"); renderView(); });
 }
@@ -560,6 +560,19 @@ function viewDialer(){
   sel.onchange = function(){ S.dialMode = sel.value; };
   modeRow.appendChild(el("span","eyebrow","Script"));
   modeRow.appendChild(sel);
+
+  // The calling-hours check needs to know where the phone is. A hand-typed number carries no
+  // state, and guessing one from the area code is exactly the kind of near-enough that rings a
+  // Texan at seven in the morning. So the operator asserts it, and the assertion is recorded on
+  // the call alongside the verdict.
+  var stSel = el("select");
+  var ph = el("option",null,"where is this shop?"); ph.value=""; stSel.appendChild(ph);
+  ["AL","AK","AZ","AR","CA","CO","CT","DE","DC","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"].forEach(function(st){
+    var o=el("option",null,st); o.value=st; if(S.dialState===st)o.selected=true; stSel.appendChild(o);
+  });
+  stSel.onchange = function(){ S.dialState = stSel.value; S.verdict=null; renderView(); if(S.dialNum.length===10) checkGate(); };
+  modeRow.appendChild(el("span","eyebrow","State"));
+  modeRow.appendChild(stSel);
   right.appendChild(modeRow);
   right.appendChild(verdictPanel());
 
@@ -575,7 +588,7 @@ function viewDialer(){
     dial.disabled = !canDial;
     dial.onclick = function(){
       dial.disabled = true;
-      api("dial",{phone:"+1"+S.dialNum.replace(/\\D/g,""), mode:S.dialMode}).then(function(r){
+      api("dial",{phone:"+1"+S.dialNum.replace(/\\D/g,""), mode:S.dialMode, state:S.dialState}).then(function(r){
         if(r.placed){ toast("Calling " + fmtPhone("+1"+S.dialNum) + " \\u00b7 " + r.call_sid,"ok"); S.dialNum=""; S.verdict=null; go("board"); }
         else { toast("Refused: " + ((r.gate&&r.gate.reasons||[]).join("; ")||"blocked"),"err"); renderView(); }
         tick();

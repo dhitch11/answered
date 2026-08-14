@@ -117,7 +117,19 @@ function directoryPage() {
 <tr><td class="u">/api/answered-voice</td><td>The Twilio webhook for the demo number. Health-gates ElevenLabs, falls back to an honest spoken message if anything is down. Never dead air.</td></tr>
 <tr><td class="u">answered-canary</td><td>Scheduled, every 2 hours: places a REAL call to the demo line, finds the conversation on the platform, and asserts the first sentence contained the AI disclosure. Result feeds /api/demo-health.</td></tr>
 <tr><td class="u">answered-keepwarm</td><td>Scheduled, every 5 minutes: warm pings so the first caller of the hour never hits a cold start.</td></tr>
+<tr><td class="u">/api/call-voice</td><td>OUTBOUND. The TwiML for every call this system places. Branches on Twilio's answering-machine result: a person hears the locked disclosure, a machine gets one short honest voicemail and no second call, a fax gets a hangup. Starts live transcription before it speaks.</td></tr>
+<tr><td class="u">/api/call-turn</td><td>One conversational turn. Stop words suppress the number and end the call before anything else is considered. "Are you a robot" gets one honest sentence. Hard stop at four turns.</td></tr>
+<tr><td class="u">/api/call-status</td><td>Every state change. This is where ring time is measured, since Twilio does not report it: the gap between initiated and answered.</td></tr>
+<tr><td class="u">/api/call-transcription</td><td>Live words off the wire into the console, and the stop tripwire. It watches the raw stream, so someone who says "take me off your list" three seconds in is heard immediately rather than whenever a turn happens to complete.</td></tr>
+<tr><td class="u">/api/call-recording</td><td>Stores the pointer, never the audio.</td></tr>
+<tr><td class="u">/api/recording</td><td>Streams a recording to a signed-in operator only. The stored URL points here, never at Twilio, so a leaked link is worth nothing without the cockpit cookie.</td></tr>
+<tr><td class="u">campaign-runner</td><td>Scheduled, every minute: autopilot. Stops itself if the stop rate climbs, if the gate is refusing almost everything, at the daily cap, at concurrency, or if ANSWERED_AUTOPILOT_KILL is set. A halt is sticky and says why in plain words.</td></tr>
 </table>
+
+<h2>The cockpit</h2>
+<div class="card"><span class="u">/internal/cockpit</span><span class="tag">live</span>
+<p>Call and text operations. Same PIN and the same server-side gate as this page: measured at 2,033 anonymous bytes with zero privileged content and 401 on every API path. A live board of calls in flight as flight strips, each with its own clock and its own last spoken line. Live transcript. Listen, whisper, barge, and take over a running AI call mid-sentence. Contact book with full history and playable recordings. The line pool, built for a hundred numbers. Autopilot.</p>
+<p class="k">THE PART THAT MATTERS: every dial, manual or automated, goes through one gate. There is exactly one place in the whole codebase that can create a call. A number the gate refuses cannot be dialled from this interface at all, and the reason prints where the button would be. Refused numbers are written to the call log like any other call, with the full verdict attached, because the refusals are the evidence the gate ran.</p></div>
 
 <h2>How deploys work here</h2>
 <div class="card"><p>Run <span class="u">python3 _build.py</span> in the repo first, always. It regenerates pricing/recover/trust/thanks from templates (hand edits to those four get overwritten), normalizes the menu and footer everywhere, rewrites links extensionless, stamps content-hashed ?v= versions on the css and js, and REFUSES to build if a price is hedged, the 15% is missing, or a recovery share outside the sanctioned tiers appears anywhere, including the audio narration transcript.</p>
