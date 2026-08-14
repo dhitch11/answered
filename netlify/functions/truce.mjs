@@ -64,13 +64,22 @@ export const handler = async (event) => {
       case 'view':
         return ok(await open('tr_view', { p_token: token }));
 
+      // Two numbers, not one. `opening` is PUBLIC — what you are asking or offering, shown to the
+      // other side. `amount` is the SEALED limit — the number you will not cross, which no
+      // response on any path will ever hand to the other party.
       case 'set_limit': {
         const amount = Number(body.amount);
         if (!Number.isFinite(amount) || amount < 0) return bad(400, 'a limit needs a number');
         if (!['max', 'min'].includes(body.direction)) return bad(400, 'direction must be max or min');
+        const opening = body.opening === undefined || body.opening === null || body.opening === ''
+          ? null : Number(body.opening);
+        if (opening !== null && (!Number.isFinite(opening) || opening < 0)) {
+          return bad(400, 'an opening needs a number');
+        }
         const musts = Array.isArray(body.must_haves) ? body.must_haves.slice(0, 8).map((s) => String(s).slice(0, 120)) : [];
         return ok(await open('tr_set_limit', {
-          p_token: token, p_direction: body.direction, p_amount: amount, p_must_haves: musts,
+          p_token: token, p_direction: body.direction, p_amount: amount,
+          p_must_haves: musts, p_opening: opening,
         }));
       }
 
