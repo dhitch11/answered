@@ -180,21 +180,87 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * stale silently and a stale cost that reads as measured is exactly the class of lie this estate
  * keeps finding. The token counts beside it ARE measured, and they are what to trust.
  */
+// ★ CORRECTED 2026-08-14 FROM THE PUBLISHED PRICE LIST, because the previous table was wrong in
+// BOTH DIRECTIONS and the cache arithmetic was wrong by an order of magnitude.
+//
+//   Source: https://platform.claude.com/docs/en/docs/about-claude/pricing, read 2026-08-14.
+//
+//                       was (wrong)        is (published)
+//   claude-opus-5       15.00 / 75.00      5.00 / 25.00     -> overstated 3x
+//   claude-sonnet-5      3.00 / 15.00      2.00 / 10.00     -> overstated 1.5x
+//   claude-haiku-4-5     0.80 /  4.00      1.00 /  5.00     -> UNDERstated
+//   claude-fable-5      15.00 / 75.00     10.00 / 50.00     -> overstated 1.5x
+//
+// The old table was not merely stale, it was wrong in opposite directions on different rows, which
+// is the worst shape for a cost figure: it does not bias a total, it scrambles the COMPARISON
+// between models, and comparing models is the only thing an operator uses this number for.
+//
+// THE CACHE ARITHMETIC WAS THE BIGGER ERROR. The previous version summed input, cache-creation and
+// cache-read tokens and charged all three at the full input rate. The published multipliers,
+// relative to base input, are:
+//
+//   5-minute cache write   1.25x     (what cache_control {type:'ephemeral'} buys)
+//   1-hour cache write     2.00x
+//   cache read (hit)       0.10x
+//
+// So every cache READ was being billed at TEN TIMES its real price. On a surface whose whole point
+// is a long stable system prompt read back cheaply, that is exactly backwards: prompt caching would
+// have appeared to make this console more expensive the better it worked, and the estate has a card
+// about a spend ceiling that under-throttled 300x for the mirror-image reason.
+//
+// A rate table in a source file still goes stale silently. That is why every figure derived from it
+// stays labelled MODELED, and why the token counts beside it - which ARE measured, and come from
+// the API's own usage object - are the ones to trust.
 const RATES = Object.freeze({
-  'claude-opus-5':             { in: 15.00, out: 75.00 },
-  'claude-sonnet-5':           { in: 3.00,  out: 15.00 },
-  'claude-haiku-4-5-20251001': { in: 0.80,  out: 4.00 },
-  'claude-fable-5':            { in: 15.00, out: 75.00 },
+  'claude-opus-5':             { in: 5.00,  out: 25.00 },
+  'claude-opus-4-8':           { in: 5.00,  out: 25.00 },
+  'claude-sonnet-5':           { in: 2.00,  out: 10.00 },
+  'claude-sonnet-4-6':         { in: 3.00,  out: 15.00 },
+  'claude-haiku-4-5-20251001': { in: 1.00,  out: 5.00  },
+  'claude-fable-5':            { in: 10.00, out: 50.00 },
 });
 
+/** Published multipliers on the BASE INPUT price. Not guesses: see the citation above. */
+const CACHE_WRITE_5M = 1.25;
+const CACHE_WRITE_1H = 2.00;
+const CACHE_READ     = 0.10;
+
+/**
+ * Longest-prefix match, so a dated model id (claude-haiku-4-5-20251001) resolves to its family and
+ * a genuinely unknown model resolves to nothing. Sorted longest-first because 'claude-opus-4-8'
+ * must win over any shorter key that also prefixes it.
+ */
+const RATE_KEYS = Object.keys(RATES).sort((a, b) => b.length - a.length);
+
 export function estimateCost(model, usage) {
-  const r = RATES[model] || RATES[Object.keys(RATES).find((k) => String(model || '').startsWith(k.split('-').slice(0, 2).join('-')))];
+  const id = String(model || '');
+  const r = RATES[id] || RATES[RATE_KEYS.find((k) => id.startsWith(k) || k.startsWith(id))];
   if (!r) return null;                       // an unknown model gets null, never a guessed price
-  const inTok = (usage.input_tokens || 0)
-    + (usage.cache_creation_input_tokens || 0)
-    + (usage.cache_read_input_tokens || 0);
-  const outTok = usage.output_tokens || 0;
-  return Number(((inTok / 1e6) * r.in + (outTok / 1e6) * r.out).toFixed(6));
+
+  const fresh = usage.input_tokens || 0;                     // uncached input, full rate
+  const reads = usage.cache_read_input_tokens || 0;          // 0.1x input
+  const out   = usage.output_tokens || 0;
+
+  // ★ THE API SPLITS CACHE WRITES BY TTL AND THEY ARE PRICED DIFFERENTLY (1.25x vs 2x), so read the
+  // breakdown rather than assuming. Measured on a live round trip 2026-08-14, the usage object
+  // carries: cache_creation: { ephemeral_5m_input_tokens, ephemeral_1h_input_tokens }.
+  // The flat cache_creation_input_tokens is kept as the fallback for when the breakdown is absent,
+  // priced at 1.25x because that is what cache_control {type:'ephemeral'} buys, which is the only
+  // kind this file writes.
+  const split  = usage.cache_creation && typeof usage.cache_creation === 'object' ? usage.cache_creation : null;
+  const w5m    = split ? (split.ephemeral_5m_input_tokens || 0) : 0;
+  const w1h    = split ? (split.ephemeral_1h_input_tokens || 0) : 0;
+  const wFlat  = split ? 0 : (usage.cache_creation_input_tokens || 0);
+
+  const dollars =
+      (fresh / 1e6) * r.in
+    + (w5m   / 1e6) * r.in * CACHE_WRITE_5M
+    + (w1h   / 1e6) * r.in * CACHE_WRITE_1H
+    + (wFlat / 1e6) * r.in * CACHE_WRITE_5M
+    + (reads / 1e6) * r.in * CACHE_READ
+    + (out   / 1e6) * r.out;
+
+  return Number(dollars.toFixed(6));
 }
 
 /**
