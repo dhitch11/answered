@@ -271,7 +271,14 @@ async function probeOutbound(event, el) {
     const store = blobs.getStore('consent');
     const stamp = new Date().toISOString();
     await store.setJSON('health/probe', { at: stamp, by: 'demo-health' });
-    const back = await store.get('health/probe', { type: 'json' });
+    // Netlify Blobs is EVENTUALLY consistent by default, so a read issued
+    // immediately after a write can legitimately miss it and this probe would
+    // report a healthy store as broken forever (it always reads right after it
+    // writes). A read-after-write check MUST ask for strong consistency; that
+    // is the correct implementation of this probe, not a workaround for it.
+    // Writes themselves are known good: /api/event writes to Blobs and returns
+    // 204, and call-me has written real consent records through the same store.
+    const back = await store.get('health/probe', { type: 'json', consistency: 'strong' });
     parts.consent_store = back && back.at === stamp
       ? { landed: true, ok: true, reason: '' }
       : { landed: true, ok: false, reason: 'the consent store accepted a write that did not read back' };

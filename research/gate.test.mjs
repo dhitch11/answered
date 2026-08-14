@@ -27,7 +27,8 @@ const WEEKEND = new Date('2026-08-15T18:00:00Z');
 
 // Ohio: single-timezone, no solicitor licensing gate, no biometric gate. The neutral state for
 // testing everything that is not itself about geography.
-const base = { phone: '+15125550142', state: 'OH', lookupOk: true, callCount30d: 0 };
+// dncListed false = checked against a fresh snapshot and not listed. null = could not check.
+const base = { phone: '+15125550142', state: 'OH', lookupOk: true, callCount30d: 0, dncListed: false };
 
 // ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
 // not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
@@ -201,6 +202,29 @@ test('consent still clears the licensing states, because it is a different basis
 test('the licensing and biometric lists are the verified ones, not guesses', () => {
   assert.deepEqual([...LICENSING_REQUIRED_STATES].sort(), ['FL', 'TX', 'WA']);
   assert.deepEqual([...BIOMETRIC_RISK_STATES], ['IL']);
+});
+
+console.log('\nTHE REGISTRY ANSWER IS THREE-STATE');
+test('a number ON the registry is refused', () => {
+  const v = classify({ ...base, lineType: 'landline', dncListed: true }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /Do-Not-Call Registry/i);
+});
+test('an UNANSWERABLE registry check is a refusal, not permission', () => {
+  const v = classify({ ...base, lineType: 'landline', dncListed: null }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /unanswerable is not permission/);
+});
+test('a missing dncListed field is also a refusal', () => {
+  const rec = { ...base, lineType: 'landline' };
+  delete rec.dncListed;
+  assert.equal(classify(rec, READY, new Set(), OPEN).dialable, false);
+});
+test('consent still clears a registry listing, because the registry governs solicitation', () => {
+  const v = classify(
+    { ...base, lineType: 'mobile', dncListed: true, consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'ring_test' } },
+    READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.GREEN);
 });
 
 console.log('\nOBLIGATIONS');

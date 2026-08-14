@@ -45,7 +45,17 @@ export function opening() {
   const cb = spokenNumber(CALLBACK());
   return [
     'Hi, this is Answered.',
-    "I'm an A I voice, and this call is recorded.",
+    // ★ THE THIRD PARTY IS NAMED, not just the recording.
+    // Six adversarial lenses found the largest exposure in this whole program is the AI that
+    // LISTENS and never speaks, and that a wiretap claim is the class-certifiable one because the
+    // disclosure is a single uniform practice applied identically to every callee, at $5,000 a
+    // violation with no injury element. Cal. Penal Code 632.7 reaches any call involving a cellular
+    // phone, has NO confidential-communication element, and applies to PARTIES, not only
+    // eavesdroppers (Smith v. LoanMe (2021) 11 Cal.5th 183). Ribas v. Clark (1985) 38 Cal.3d 355
+    // found liability against a listener who never spoke: the vice is the UNANNOUNCED SECOND
+    // AUDITOR. "This call is recorded" discloses the wrong object. So the sentence names what is
+    // actually on the line.
+    "I'm an A I voice, this call is recorded, and software is transcribing it as we speak.",
     cb ? `If you want to reach a person here, the number is ${cb}.` : '',
     "I'm not selling anything.",
   ].filter(Boolean).join(' ');

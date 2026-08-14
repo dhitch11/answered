@@ -152,6 +152,14 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
     if (!policy.dncScrubbed) {
       return deny('the national do-not-call registry has not been scrubbed; 47 CFR 64.1200(c)(2) has no business exemption and the FCC expressly refused to create one in 2005');
     }
+    // The per-number answer is three-state. `null` means we could not check, and an unanswerable
+    // question is a refusal here exactly as it is everywhere else in this gate.
+    if (rec.dncListed === true) {
+      return deny('this number is on the national Do-Not-Call Registry');
+    }
+    if (rec.dncListed !== false) {
+      return deny('could not check this number against a fresh registry snapshot; unanswerable is not permission');
+    }
     if (!policy.dncProceduresInPlace) {
       return deny('47 CFR 64.1200(d) is a condition precedent: without the written policy, training, internal list, identification, affiliate scope and five-year retention there is no safe harbour to invoke');
     }

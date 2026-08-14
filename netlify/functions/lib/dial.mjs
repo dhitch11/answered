@@ -19,6 +19,27 @@ export const site = () => process.env.URL || 'https://answered.reddenda.com';
  * Everything the gate needs, read fresh from the database on every single dial.
  * Never trust a caller-supplied suppression state, call count or consent record.
  */
+/**
+ * ★ THE DNC PROGRAM IS READ, NEVER ASSUMED.
+ * 47 CFR 64.1200(d) is a condition precedent, so the gate must not open because somebody set a
+ * boolean in a config file. It opens on evidence that exists in the database: a registry snapshot
+ * that is present AND under 31 days old, plus the written policy, affiliate scope, retention policy
+ * and training records the rule enumerates. Missing paper is a shut gate.
+ * Cached briefly because it is the same answer for every number in a batch.
+ */
+let _readiness = { at: 0, value: null };
+export async function dncReadiness() {
+  if (Date.now() - _readiness.at < 60000 && _readiness.value) return _readiness.value;
+  try {
+    const r = await db.rpc('sv_dnc_readiness');
+    _readiness = { at: Date.now(), value: r };
+    return r;
+  } catch (e) {
+    console.error('DNC readiness read failed; treating the program as ABSENT:', String(e.message).slice(0, 140));
+    return { scrub_ready: false, procedures_ready: false, read_failed: true };
+  }
+}
+
 export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
   const ctx = await db.dialContext(phone).catch((e) => {
     console.error('dial context read failed:', String(e.message).slice(0, 160));
@@ -58,6 +79,14 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
     lt = res.lineType; lo = res.lookupOk;
   }
 
+  // The live policy: the two preconditions come from the database, not from the constant.
+  const ready = await dncReadiness();
+  const policy = {
+    ...DEFAULT_POLICY,
+    dncScrubbed: Boolean(ready.scrub_ready),
+    dncProceduresInPlace: Boolean(ready.procedures_ready),
+  };
+
   const verdict = classify(
     {
       phone,
@@ -70,12 +99,13 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
         ? { grantedAt: ctx.consent.granted_at, expiresAt: ctx.consent.expires_at, scope: ctx.consent.scope, source: ctx.consent.source, written: ctx.consent.written }
         : null,
       callCount30d: Number(ctx.calls_30d || 0),
+      dncListed: ctx.dnc_listed,   // true | false | null, and null is a refusal
     },
-    DEFAULT_POLICY,
+    policy,
     new Set(ctx.suppressed ? [phone] : []),
     new Date(),
   );
-  return { verdict, lineType: lt, lookupOk: lo, context: ctx, contact };
+  return { verdict, lineType: lt, lookupOk: lo, context: ctx, contact, readiness: ready };
 }
 
 /**
@@ -120,6 +150,18 @@ export async function placeCall(opts) {
   const hasConsent = Boolean(gated.context && gated.context.consent);
   const callClass = classifyCall({ mode, hasConsent, operator });
 
+  // ── COMPLIANCE EVIDENCE, recorded per call because it must be answerable years later from a row.
+  // ai_speaking decides whether 64.1200(a)(1) and FCC 24-17 reach the call at all.
+  // ai_listening is the field a state all-party wiretap claim turns on, and it is TRUE even when
+  // nothing artificial speaks, because transcription is a third party receiving the audio. That is
+  // the exposure the adversarial verification found to be the largest one in this whole program.
+  const evidence = {
+    ai_speaking: mode !== 'conference',
+    ai_listening: true,                       // live transcription runs on every call we place
+    dnc_scrubbed_at_dial: Boolean(DEFAULT_POLICY.dncScrubbed),
+    dnc_procedures_at_dial: Boolean(DEFAULT_POLICY.dncProceduresInPlace),
+  };
+
   const gateRecord = {
     lane: verdict.lane, dialable: verdict.dialable, reasons: verdict.reasons,
     call_class: callClass, has_consent: hasConsent,
@@ -134,7 +176,7 @@ export async function placeCall(opts) {
     await db.recordCall({
       contact_id: contact?.id || null, campaign_id: campaignId || null, to_number: phone,
       from_number: fromNumber || null, status: 'refused', gate: gateRecord, operator,
-      call_class: callClass,
+      call_class: callClass, ...evidence,
       placed: false, refused_reason: (verdict.reasons || []).join('; '),
     });
     return { placed: false, gate: gateRecord, retryAt: verdict.retryAt || null, contact };
@@ -164,7 +206,7 @@ export async function placeCall(opts) {
   await db.recordCall({
     call_sid: call.sid, contact_id: contact?.id || null, campaign_id: campaignId || null,
     line_id: lineId || null, to_number: phone, from_number: from, status: call.status,
-    gate: gateRecord, operator, call_class: callClass, placed: true,
+    gate: gateRecord, operator, call_class: callClass, ...evidence, placed: true,
   });
 
   return { placed: true, call_sid: call.sid, status: call.status, gate: gateRecord, contact };
