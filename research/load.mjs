@@ -55,7 +55,14 @@ const OPEN = new Date();
 OPEN.setUTCHours(18, 0, 0, 0);
 while ([0, 6].includes(OPEN.getUTCDay())) OPEN.setUTCDate(OPEN.getUTCDate() + 1);
 
-const gated = gateAll(joined, DEFAULT_POLICY, new Set(), OPEN);
+// ★ THE STORED LANE IS A SNAPSHOT OF THE NUMBER'S OWN MERITS, not of our program readiness.
+// Evaluated with the do-not-call program assumed in place, because otherwise every row reads RED
+// for a reason that has nothing to do with that number, and the console shows a book of 4,000
+// worthless leads when what it actually has is 4,000 leads and one missing federal subscription.
+// The DIAL-TIME gate in lib/dial.mjs applies the real, current program state on every call and is
+// the only thing that decides whether a call happens. This snapshot never authorises anything.
+const SNAPSHOT_POLICY = { ...DEFAULT_POLICY, dncScrubbed: true, dncProceduresInPlace: true };
+const gated = gateAll(joined.map((r) => ({ ...r, dncListed: false })), SNAPSHOT_POLICY, new Set(), OPEN);
 
 const rows = gated.records.map((r) => ({
   phone: r.phone, name: r.name, trade: r.trade, state: r.state, city: r.city, street: r.street,
