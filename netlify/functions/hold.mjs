@@ -393,8 +393,14 @@ p{margin:0 0 14px;color:rgba(247,247,245,.86)}
 .card{border:1px solid var(--line);border-radius:14px;padding:20px;margin:0 0 16px;background:rgba(255,255,255,.03)}
 label{display:block;font-size:13.5px;letter-spacing:.02em;color:rgba(247,247,245,.72);margin:16px 0 6px}
 input,select,textarea{width:100%;max-width:100%;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;color:var(--paper);padding:13px 14px;font:inherit;font-size:16px}
-input:focus,select,textarea:focus{outline:2px solid var(--hi);outline-offset:1px}
-select{appearance:none}
+/* ★ THIS SELECTOR WAS WRONG AND ONLY A SCREENSHOT SHOWED IT. It read
+   "input:focus,select,textarea:focus", so the bare "select" matched ALWAYS and every dropdown on
+   the page wore a permanent yellow focus ring whether or not it had focus. Two controls looked
+   focused at once, which is exactly the state a keyboard user relies on being unambiguous. */
+input:focus,select:focus,textarea:focus{outline:2px solid var(--hi);outline-offset:1px}
+/* appearance:none removes the platform caret, so one is drawn back in. A select with no caret is
+   a select nobody knows they can open. */
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23E3FF4F' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:38px;text-overflow:ellipsis}
 textarea{min-height:88px;resize:vertical}
 .row{display:grid;grid-template-columns:1fr;gap:0}
 @media(min-width:560px){.row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px}}
@@ -453,10 +459,10 @@ function startPage() {
   <label for="target">The number to call</label>
   <input id="target" name="target" type="tel" inputmode="tel" required placeholder="800 555 0134">
 
-  <label for="line_class">Is it a government line or a business?</label>
+  <label for="line_class">Is it a government line or a business? The price is $10 either way unless it is government, which is $20.</label>
   <select id="line_class" name="line_class">
-    <option value="commercial">A business. $10 when a person picks up.</option>
-    <option value="gov">Government. $20 when a person picks up.</option>
+    <option value="commercial">A business, $10</option>
+    <option value="gov">Government, $20</option>
   </select>
 
   <label for="reason">What is it about?</label>
@@ -470,7 +476,12 @@ function startPage() {
     <div><label for="callback">Your number</label><input id="callback" name="callback" type="tel" inputmode="tel" required autocomplete="tel" placeholder="916 555 0180"></div>
   </div>
   <div class="row">
-    <div><label for="state">Your state</label><select id="state" name="state" required>${STATES.map((s) => `<option>${s}</option>`).join('')}</select></div>
+    <div><label for="state">Your state</label><select id="state" name="state" required>
+      <!-- ★ NO DEFAULT. A select that opens on Alabama submits Alabama for everybody who does not
+           notice it, and this field decides the quiet-hours check on the number we ring back.
+           A silently wrong state is a call placed at the wrong hour in somebody's own timezone. -->
+      <option value="" disabled selected>Pick one</option>
+      ${STATES.map((s) => `<option>${s}</option>`).join('')}</select></div>
     <div><label for="email">Your email, for the receipt</label><input id="email" name="email" type="email" maxlength="120" autocomplete="email" placeholder="Optional"></div>
   </div>
 
@@ -579,6 +590,21 @@ tick();
   return html(shell('Your hold, live', body));
 }
 
+/**
+ * ★ THE RECORDING LINE HAS THREE ANSWERS, NOT TWO, AND A SCREENSHOT IS WHAT FOUND IT.
+ * It used to read "none, because nobody was reached" whenever no recording existed, and printed
+ * that sentence directly underneath a row saying "Human reached 1:09:39 PM" on the same receipt.
+ * Every assertion in the suite passed while the artifact contradicted itself two rows apart.
+ * Absence of a recording and absence of a person are different facts, and the receipt now says
+ * which one it is looking at.
+ */
+function recordingLine(r) {
+  if (r.has_recording) return `${r.recording_seconds || 0} seconds, kept from the moment a person answered`;
+  if (r.connected_at) return 'no audio was saved for this one';
+  if (r.human_reached_at) return 'none, because you were never connected';
+  return 'none, because nobody was reached';
+}
+
 // ── /hold/receipt/:token ─────────────────────────────────────────────────────────────────────
 async function receiptPage(token) {
   let v = null;
@@ -617,7 +643,7 @@ ${row('Keys pressed', r.keys_pressed.length ? r.keys_pressed.join(', ') : 'none'
 ${row('Attempts', r.attempts)}
 ${row('Human reached', r.human_reached_at ? new Date(r.human_reached_at).toLocaleString() : 'no')}
 ${row('You were connected', r.connected_at ? new Date(r.connected_at).toLocaleString() : 'no')}
-${row('Recording', r.has_recording ? `${r.recording_seconds || 0} seconds, kept from the moment a person answered` : 'none, because nobody was reached')}
+${row('Recording', recordingLine(r))}
 </tbody></table></div>
 
 <h2>What it cost</h2>

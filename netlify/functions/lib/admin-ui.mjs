@@ -366,6 +366,7 @@ export function consolePage({ admin, buildInfo = {} }) {
 
     <div class="nav-h">Business</div>
     <button class="nav" data-view="overview" aria-current="page"><span class="nav-ico">◎</span>Overview</button>
+    <button class="nav" data-view="crm"><span class="nav-ico">☰</span>Leads<span class="nav-n" data-count="leads"></span></button>
     <button class="nav" data-view="customers"><span class="nav-ico">◧</span>Customers<span class="nav-n" data-count="accounts"></span></button>
     <button class="nav" data-view="billing"><span class="nav-ico">§</span>Billing</button>
     <button class="nav" data-view="parley"><span class="nav-ico">⇄</span>Parley</button>
@@ -497,11 +498,16 @@ const S = {
   view: 'overview',
   q: '',
   overview: null,
-  filters: { customers: { status: null, sort: 'recent', offset: 0 },
+  filters: { crm: { lane: null, disposition: null, state: null, trade: null, line_type: null,
+                    dialable: null, suppressed: null, sort: 'recent', offset: 0 },
+             customers: { status: null, sort: 'recent', offset: 0 },
              calls: { recorded: null, direction: null, offset: 0 },
              events: { name: null, offset: 0 } },
   lastMeasuredAt: null,
   drawerAccount: null,
+  drawerContact: null,
+  selected: new Set(),
+  facets: null,
 };
 
 // ── empty and error states, which are not the same thing ──────────────────
@@ -1106,7 +1112,7 @@ function pager(group, d) {
 }
 
 // ── router ────────────────────────────────────────────────────────────────
-const TITLES = { overview:'Overview', customers:'Customers', calls:'Calls and recordings',
+const TITLES = { overview:'Overview', crm:'Leads', customers:'Customers', calls:'Calls and recordings',
   usage:'Usage', billing:'Billing', parley:'Parley', events:'Behaviour', compliance:'Compliance',
   audit:'Audit log', system:'System' };
 
@@ -1434,7 +1440,7 @@ function wire() {
     }
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
     if (e.target !== document.body) return;
-    const map = { g:'overview', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
+    const map = { g:'overview', d:'crm', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
       e:'events', k:'compliance', a:'audit', s:'system' };
     if (map[e.key]) { e.preventDefault(); go(map[e.key]); }
   });

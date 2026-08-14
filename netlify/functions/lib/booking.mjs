@@ -153,6 +153,14 @@ export function normalize(input) {
     cs: callSid,
     src: clean(i.source, 60) || 'api',
     at: new Date().toISOString(),
+    // ★ THE NUMBER THAT WAS DIALLED, which is how a job finds its owner.
+    // A booking belongs to whoever owns the LINE the caller rang, and that is not always the number
+    // printed on the van: an Answered customer's published number and his Answered number can be
+    // two different numbers during a port. So an explicit `line_number` wins where it is given, and
+    // `shop_phone` is the fallback the voice path already carries. Empty is honest and common (a
+    // web form was never dialled at all), and lib/jobs.mjs records the job unowned and says so
+    // rather than guessing an owner. Dropped from the token when empty, like every other field.
+    ln: e164(i.line_number ?? i.dialed_number ?? i.dialled_number ?? i.to),
   };
   return { ok: true, errors: [], job };
 }

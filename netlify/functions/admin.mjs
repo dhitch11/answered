@@ -279,7 +279,7 @@ async function getConsole(req, url) {
 const MUTATING = new Set([
   'account-status', 'refund', 'attribute-backfill', 'log',
   'crm/update', 'crm/bulk', 'crm/note', 'crm/task', 'crm/email', 'crm/sms', 'crm/call',
-  'crm/draft', 'views',
+  'crm/draft',
 ]);
 
 async function apiRoute(req, url, name) {
@@ -531,6 +531,8 @@ async function apiRoute(req, url, name) {
 
     case 'views': {
       if (req.method === 'POST') {
+        // Saving a view is a mutation, so it carries the same second lock as every other write.
+        if (!csrfOk(req)) return json(403, { error: 'missing the console header' });
         const b = await readJson(req);
         const r = b.delete
           ? await rpc('sv_admin_view_delete', { p_owner: admin.admin_id, p_id: b.id })

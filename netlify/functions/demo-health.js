@@ -114,7 +114,7 @@ async function probeBrainReady(host) {
 }
 
 // ── probe 3: Twilio Lookup v2 on the demo number ────────────────────────────
-async function probeTwilioNumber() {
+async function probeTwilioNumber(event) {
   // This account authenticates by API key pair; the auth token is not
   // available. Lookup accepts either credential shape as Basic auth.
   const keySid = (process.env.TWILIO_API_SID || '').trim();
@@ -347,7 +347,7 @@ exports.handler = async (event) => {
     const [el, brain, twilio, canary] = await Promise.all([
       probeElSubscription(),
       probeBrainReady(host),
-      probeTwilioNumber(),
+      probeTwilioNumber(event),
       probeCanary(event),
     ]);
     // runs after probe 1 on purpose: it reuses that result instead of asking

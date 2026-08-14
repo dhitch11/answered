@@ -15,6 +15,10 @@
 //   delivery.crm              HubSpot upsert + note + task (hard rule 6).
 //   delivery.webhook          signed POST to ANSWERED_WEBHOOK_URL.
 //   delivery.durable          best-effort telemetry copy. CANNOT break the link (see lib/booking).
+//   delivery.job              the QUERYABLE, JOINED copy of this job (see lib/jobs.mjs). Second
+//                             write, deliberately non-fatal, joined to accounts.id by the number
+//                             that was DIALLED. Until this existed a booked job belonged to nobody
+//                             and "show me this customer's jobs" had no answer.
 //   delivery.sms              ALWAYS { skipped: true }, with the real reason, forever, until the
 //                             A2P campaign passes. Nothing here may claim a text arrives.
 //
@@ -26,6 +30,7 @@
 
 import * as bk from './lib/booking.mjs';
 import * as out from './lib/outbox.mjs';
+import * as jobs from './lib/jobs.mjs';
 import { authorize } from './lib/bearer.mjs';
 
 const MAX_BODY = 16 * 1024;
@@ -183,8 +188,12 @@ export default async (req) => {
     return json(405, {
       ok: false,
       error: 'POST only.',
-      how: 'POST /api/booking with Authorization: Bearer <secret> and a JSON body: { shop_name, shop_phone, customer_name, customer_phone, customer_email, address, service, starts_at, minutes, tz, notes, call_sid, mode }.',
+      how: 'POST /api/booking with Authorization: Bearer <secret> and a JSON body: { shop_name, shop_phone, line_number, customer_name, customer_phone, customer_email, address, service, starts_at, minutes, tz, notes, call_sid, source, mode }.',
       required: ['shop_name', 'customer_name', 'service', 'starts_at'],
+      notes: {
+        line_number: 'The number the caller DIALLED. This is how the job finds its owning account, so a booking without it is recorded with no owner and will not appear in a customer portal. shop_phone is used as the fallback.',
+        source: 'Free text. It is categorised into one of voice, form, operator, api for the job record, and the raw string you sent is kept beside it.',
+      },
     });
   }
 
@@ -251,7 +260,7 @@ export default async (req) => {
     `<p>Job page: <a href="${out.esc(links.job)}">${out.esc(links.job)}</a></p>` +
     `<p>${out.esc(SMS_TRUTH)}</p>`;
 
-  const [customerRes, crmRes, hookRes, durableRes] = await Promise.all([
+  const [customerRes, crmRes, hookRes, durableRes, jobRes] = await Promise.all([
     job.ce
       ? (async () => {
         const cm = customerMail(job, links);
@@ -270,7 +279,26 @@ export default async (req) => {
       notes: job.n, call_sid: job.cs, url: links.job, ics_url: links.ics,
     }).catch((e) => ({ ok: false, reason: String((e && e.message) || e).slice(0, 160) })),
     durable(job, token).catch((e) => ({ ok: false, reason: String((e && e.message) || e).slice(0, 160) })),
+    // ── THE JOB RECORD: the second write, and the one that gives this booking an owner ────────
+    //
+    // It runs beside the raw log, never in front of it, and it can never fail the request. The
+    // customer has already been emailed by the time this line runs. lib/jobs.mjs never throws, and
+    // this .catch() is the belt on top of the braces because a booking that already succeeded must
+    // not be able to 500 on the way out of the building.
+    jobs.recordBooking(job).catch((e) => ({
+      ok: false, landed: false, reason: String((e && e.message) || e).slice(0, 160),
+    })),
   ]);
+
+  // A job that landed with no owner is invisible to every query that walks accounts, so it is said
+  // out loud at the moment it is created rather than discovered later underneath a confident empty
+  // state. This is the orphan defect that already cost this estate a billing panel.
+  if (jobRes && jobRes.landed && !jobRes.account_matched) {
+    console.warn(`booking ${job.id}: recorded with NO OWNING ACCOUNT. ${jobRes.orphan_warning}`);
+  }
+  if (jobRes && !jobRes.landed) {
+    console.error(`booking ${job.id}: the queryable job row did NOT land (${jobRes.reason}). The booking itself succeeded: the customer has the link and the shop has the email.`);
+  }
 
   return json(201, {
     ok: true,
@@ -286,6 +314,7 @@ export default async (req) => {
       crm: crmRes,
       webhook: hookRes,
       durable: durableRes,
+      job: jobRes,
       sms: { ok: false, skipped: true, reason: SMS_TRUTH },
     },
   });
