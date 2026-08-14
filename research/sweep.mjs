@@ -29,8 +29,25 @@ if (!corpus.length) {
 const idx = await lookupIndex();
 
 if (!argv['report-only']) {
-  const todo = corpus.filter((r) => !idx.has(r.phone)).slice(0, Number(argv.limit || 500));
-  console.log(`corpus ${corpus.length} · already classified ${idx.size} · looking up ${todo.length}`);
+  // ★ A FAILED LOOKUP IS NOT A CLASSIFICATION, SO IT MUST NOT BE SKIPPED FOREVER.
+  //
+  // This used to read `!idx.has(r.phone)`, which meant a number whose lookup ERRORED counted as
+  // done. On 2026-08-14 the Twilio account ran out of credits and every lookup returned 401 —
+  // Twilio sends the same authentication error for an unfunded account as for a bad key — and 277
+  // numbers, including ALL 175 Oregon leads in the one state we are legally clear to call, were
+  // written to the index as failures and would never have been retried. The gate handled it
+  // correctly (a failed lookup is RED), so nothing unsafe could happen; the damage was that the
+  // book would have stayed permanently unclassified after the provider came back, waiting on a
+  // human to notice and force a re-run.
+  //
+  // Now a failure is retryable by construction: the moment the provider answers again, the next
+  // sweep picks these up with nobody having to remember. A capability behind a temporary provider
+  // outage should turn itself back on when the outage ends.
+  const unresolved = (p) => { const l = idx.get(p); return !l || l.lookupOk === false; };
+  const retries = corpus.filter((r) => idx.has(r.phone) && unresolved(r.phone)).length;
+  const todo = corpus.filter((r) => unresolved(r.phone)).slice(0, Number(argv.limit || 500));
+  const resolved = idx.size - retries;
+  console.log(`corpus ${corpus.length} · classified ${resolved} · unresolved ${retries} (retryable) · looking up ${todo.length}`);
 
   let done = 0;
   const BATCH = 10;                            // polite concurrency, well inside Twilio's limits
