@@ -37,7 +37,16 @@ const base = { phone: '+15125550142', state: 'OR', lookupOk: true, callCount30d:
 // ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
 // not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
 // two programs stood up, which is what the line-type and clock cases are actually about.
-const READY = { ...DEFAULT_POLICY, dncScrubbed: true, dncProceduresInPlace: true };
+// `subscribedAreaCodes` is part of READY for the same reason the two DNC flags are: without it the
+// 16 CFR 310.8(a) fence refuses everything, and every line-type, clock and consent case below would
+// fail for a reason that has nothing to do with what it is testing. The fence gets its own section
+// at the end, with its own explicit policies.
+const READY = {
+  ...DEFAULT_POLICY,
+  dncScrubbed: true,
+  dncProceduresInPlace: true,
+  subscribedAreaCodes: new Set(['512', '503', '971', '541', '458']),
+};
 
 console.log('\nLINE TYPE');
 test('a verified landline is dialable', () => {
@@ -333,6 +342,43 @@ console.log('\nSUPPRESSION ROUND TRIP (write it, then read it back through the g
     if (backup !== null) await writeFile(paths.suppression, backup, 'utf8');
   }
 }
+
+
+// ★ THIS BLOCK ONCE SAT BELOW process.exit() AND THEREFORE NEVER RAN.
+// Appending tests to the end of this file puts them after the summary and the exit, so they
+// print nothing, assert nothing, and cannot fail. The only reason it was caught is that the
+// pass count did not move when four tests were added — the assertions themselves were silent.
+// If you add a section, add it ABOVE the summary, and check the count changes by what you expect.
+console.log('\nTHE SUBSCRIPTION FENCE (16 CFR 310.8(a)) — a different violation from a bad scrub');
+test('with no subscription on file, even a perfect number is refused', () => {
+  // Explicitly strips subscribedAreaCodes back off READY: this is the case where the scrub and the
+  // procedures are both in place and the ONLY thing missing is the subscription itself.
+  const noSub = { ...READY, subscribedAreaCodes: null };
+  const v = classify({ ...base, lineType: 'landline', dncListed: false }, noSub, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /310\.8\(a\)|unsubscribed area code/);
+});
+test('a number OUTSIDE the subscribed area codes is refused, however clean it is', () => {
+  // 512 is a real, valid, fixed business line in a verified-clean state. It is still refused,
+  // because we never bought that area code, and a flawless scrub is no defence for that.
+  const pol = { ...READY, subscribedAreaCodes: new Set(['503', '971', '541', '458']) };
+  const v = classify({ ...base, phone: '+15125550142', lineType: 'landline', dncListed: false }, pol, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /area code 512 is not in our do-not-call subscription/);
+});
+test('a number INSIDE the subscribed area codes passes', () => {
+  const pol = { ...READY, subscribedAreaCodes: new Set(['503', '971', '541', '458']) };
+  const v = classify({ ...base, phone: '+15035550142', lineType: 'landline', dncListed: false }, pol, new Set(), OPEN);
+  assert.equal(v.dialable, true, v.reasons.join(' '));
+});
+test('AN OVERLAY IS A SECOND SUBSCRIPTION, NOT THE SAME ONE', () => {
+  // The billable unit is the NPA, never the geography. 971 overlays 503 across identical ground,
+  // so subscribing to 503 buys nothing for 971 and five free codes is not five markets.
+  const pol = { ...READY, subscribedAreaCodes: new Set(['503']) };
+  const v = classify({ ...base, phone: '+19715550142', lineType: 'landline', dncListed: false }, pol, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED, '971 must not ride in on 503');
+});
+
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

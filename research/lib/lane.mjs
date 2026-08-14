@@ -183,6 +183,22 @@ export const DEFAULT_POLICY = {
   dncScrubbed: false,          // national DNC registry, snapshot no older than 31 days
   dncProceduresInPlace: false, // the six elements of 64.1200(d), written, trained, retained
 
+  // ★ THE AREA CODES OUR DNC SUBSCRIPTION ACTUALLY COVERS. `null` means no subscription exists.
+  //
+  // This is a SEPARATE control from `dncScrubbed`, and conflating them is the trap. 16 CFR 310.8(a)
+  // makes calling into an area code you have NOT subscribed to a violation IN ITSELF, independent of
+  // whether the number dialled is registered — and unlike a mis-scrub, it has NO safe harbour and no
+  // "it was an error" defence. A flawless 31-day scrub of five area codes gives exactly zero
+  // protection for one call into a sixth.
+  //
+  // So the subscription is a HARD FENCE around which numbers may be dialled at all, not a data-
+  // coverage preference, and the dialler needs an allowlist interlock rather than only a suppression
+  // list. The billable unit is the NPA, never the geography: 15 U.S.C. 6152(b)(1)(A) and 16 CFR
+  // 310.8(c) both read "each area code of data". Overlays are therefore two subscriptions, not one —
+  // 503 does not get you 971 — which means five free codes is not five markets, and in overlay-heavy
+  // geography it is closer to two and a half.
+  subscribedAreaCodes: null,
+
   // ★ ADDED 2026-08-14 from the four-state primary-law verification (CA / NV / AZ / OR).
   //
   // A live human personally makes the Pub. Util. Code 2874 announcement before the AI speaks:
@@ -284,6 +300,16 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
     }
     if (!policy.dncProceduresInPlace) {
       return deny('47 CFR 64.1200(d) is a condition precedent: without the written policy, training, internal list, identification, affiliate scope and five-year retention there is no safe harbour to invoke');
+    }
+    // ★ THE SUBSCRIPTION FENCE. Checked separately from the scrub because it is a different
+    // violation with a different defence: a perfect scrub does not excuse one call into an NPA we
+    // never bought. Fails closed on a missing list, like everything else here.
+    const npa = rec.phone.slice(2, 5);
+    if (!policy.subscribedAreaCodes) {
+      return deny('no DNC area-code subscription is on file, and 16 CFR 310.8(a) makes a call into an unsubscribed area code a violation in itself, with no safe harbour');
+    }
+    if (!policy.subscribedAreaCodes.has(npa)) {
+      return deny(`area code ${npa} is not in our do-not-call subscription; 16 CFR 310.8(a) makes that call a violation independently of whether the number is registered, and there is no error defence for it`);
     }
   }
 
