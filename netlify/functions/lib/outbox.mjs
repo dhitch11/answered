@@ -12,13 +12,17 @@
 // `skipped:true` means "not configured, so it truthfully did not happen" and is never dressed up
 // as success.
 //
-// SMS IS NOT A CHANNEL HERE, ON PURPOSE. The A2P 10DLC campaign has failed three times, so a text
-// message from this system does not arrive. Nothing in this file may claim one will. Email is the
-// honest channel until a campaign passes; when it does, an sms() sibling goes here and the callers
-// change one line.
+// SMS IS A REAL CHANNEL HERE AND IT IS SWITCHED OFF BY CONFIGURATION, WHICH IS NOT THE SAME THING
+// AS ABSENT. The A2P 10DLC campaign a carrier requires before a business number may send has
+// failed three times, so a text from this system does not reach a phone today. The code that
+// sends one is written, gated, and honest: sms() refuses with a stated reason while
+// ANSWERED_SMS_ENABLED is off, and the day the campaign passes, turning it on is setting two
+// environment variables. No caller changes. Nothing in this file may ever claim a text arrived
+// that did not: every return carries the provider's own verdict, never an assumption.
 //
 // Secrets by env name only: RESEND_API_KEY, HUBSPOT_TOKEN, ANSWERED_WEBHOOK_URL,
-// ANSWERED_WEBHOOK_SECRET, ADMIN_EMAILS. None of them is ever logged or echoed in a response.
+// ANSWERED_WEBHOOK_SECRET, ADMIN_EMAILS, TWILIO_API_SID, TWILIO_API_SECRET, TWILIO_ACCOUNT_SID.
+// None of them is ever logged or echoed in a response.
 
 import crypto from 'node:crypto';
 
@@ -88,6 +92,84 @@ export async function email(m) {
   } catch (e) {
     console.error(`outbox email threw: ${String((e && e.message) || e).slice(0, 200)}`);
     return { ok: false, reason: 'resend unreachable' };
+  }
+}
+
+// ── SMS ──────────────────────────────────────────────────────────────────────────────────────
+//
+// ★ THE SWITCH IS CONFIGURATION, NOT CODE. Every gate below is a fact about the environment, in
+// cost-and-certainty order: the cheapest, most certain check runs first, so a disabled channel
+// never spends a network round trip to find out it is disabled.
+//
+// ★ THE SUPPRESSION CHECK LIVES IN HERE, NOT IN THE CALLER. A person who has said stop must not
+// be textable by any code path, including one written next month by somebody who never read this
+// file. A check a caller can forget is not a control. It fails CLOSED: if the do-not-contact list
+// cannot be read, nothing is sent, because "we could not check" is not "they did not opt out".
+
+export const SMS_OFF_REASON = 'Text messaging is switched off. The A2P 10DLC campaign that a carrier requires before a business number may send text messages is not approved yet, so a text from this system would not reach a phone.';
+
+/** What the environment says about texting, with no network calls. Safe to print in a health page. */
+export function smsStatus() {
+  const enabled = /^(1|true|yes|on)$/i.test(String(process.env.ANSWERED_SMS_ENABLED || '').trim());
+  const from = String(process.env.ANSWERED_SMS_FROM || '').trim();
+  const service = String(process.env.ANSWERED_SMS_MESSAGING_SERVICE_SID || '').trim();
+  const creds = Boolean(process.env.TWILIO_API_SID && process.env.TWILIO_API_SECRET && process.env.TWILIO_ACCOUNT_SID);
+  const ready = enabled && creds && Boolean(from || service);
+  let reason = '';
+  if (!enabled) reason = SMS_OFF_REASON;
+  else if (!creds) reason = 'ANSWERED_SMS_ENABLED is on but the Twilio credentials are not set, so nothing can send';
+  else if (!from && !service) reason = 'ANSWERED_SMS_ENABLED is on but neither ANSWERED_SMS_FROM nor ANSWERED_SMS_MESSAGING_SERVICE_SID is set, so there is no sender';
+  return { enabled, ready, has_sender: Boolean(from || service), has_credentials: creds, uses_messaging_service: Boolean(service), reason };
+}
+
+/**
+ * @param {object} m
+ * @param {string} m.to     E.164
+ * @param {string} m.body   plain text; a link is fine, an unexplained one is not
+ * @param {boolean} [m.transactional]  a recap to the shop that owns the line, not marketing
+ */
+export async function sms(m) {
+  const status = smsStatus();
+  if (!status.ready) return { ok: false, skipped: true, reason: status.reason };
+
+  const to = String((m && m.to) || '').trim();
+  if (!/^\+\d{8,15}$/.test(to)) return { ok: false, skipped: true, reason: 'no usable E.164 recipient' };
+  const text = String((m && m.body) || '').trim();
+  if (!text) return { ok: false, skipped: true, reason: 'refusing to send an empty message' };
+
+  // do-not-contact, fail closed
+  try {
+    const db = await import('./db.mjs');
+    if (db.dbConfigured()) {
+      const ctx = await db.dialContext(to);
+      if (ctx && ctx.suppressed) {
+        console.error('outbox sms refused: the recipient is on the suppression list');
+        return { ok: false, skipped: true, suppressed: true, reason: 'this number is on the do-not-contact list, so nothing was sent' };
+      }
+    } else {
+      return { ok: false, skipped: true, reason: 'the do-not-contact list could not be checked (the call spine is not configured), and an unchecked number is not a cleared number' };
+    }
+  } catch (e) {
+    console.error(`outbox sms refused: suppression check failed: ${String((e && e.message) || e).slice(0, 160)}`);
+    return { ok: false, skipped: true, reason: 'the do-not-contact list could not be read, so nothing was sent' };
+  }
+
+  const params = { To: to, Body: text.slice(0, 1500) };
+  const service = String(process.env.ANSWERED_SMS_MESSAGING_SERVICE_SID || '').trim();
+  if (service) params.MessagingServiceSid = service;
+  else params.From = String(process.env.ANSWERED_SMS_FROM || '').trim();
+
+  try {
+    const twilio = await import('./twilio-rest.mjs');
+    const msg = await twilio.sendMessage(params);
+    // ★ A 201 FROM TWILIO IS NOT A DELIVERED TEXT. `queued` means accepted for sending; the
+    // carrier rejection for an unregistered campaign arrives later on the status callback. So the
+    // provider's own status travels back with the result and nothing here says "delivered".
+    return { ok: true, id: msg.sid, status: msg.status || '', to, note: 'Twilio accepted the message. Acceptance is not delivery: a carrier can still reject it.' };
+  } catch (e) {
+    const why = String((e && e.message) || e).slice(0, 200);
+    console.error(`outbox sms failed: ${why}`);
+    return { ok: false, reason: why, code: (e && e.code) || null };
   }
 }
 

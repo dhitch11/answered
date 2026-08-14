@@ -85,6 +85,10 @@ const logToHubSpot = async (token, { email, name, phone, product, note, source }
     // Reddenda one, which is the whole thing this prevents.
     answered_product: 'answered',
     answered_source: 'interest form, ' + source,
+    // set on every write: HubSpot keeps the earliest value on a date property
+    // it already holds, and a first-seen that is only set on create is missing
+    // on every contact that existed before this stamp shipped.
+    answered_first_seen: new Date().toISOString().slice(0, 10),
   };
   if (name) {
     const sp = name.lastIndexOf(' ');
