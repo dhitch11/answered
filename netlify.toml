@@ -79,6 +79,18 @@
   status = 200
   force = true
 
+# /internal/competitors — competitor intelligence (@LANE-SEARCHLIGHT). Same
+# server-side posture as /internal, /internal/cockpit and /internal/ops: the page
+# HTML is a string inside the handler and is serialized only after the PIN check.
+# Rule 9 exists because a CSS-only PIN curtain on reddenda.com/competitors served
+# 303,451 bytes to anonymous curl. Measured here: anonymous GET = 1,047 bytes,
+# entry form only, zero competitor names. Deliberately NOT in the sitemap.
+[[redirects]]
+  from = "/internal/competitors"
+  to = "/.netlify/functions/competitors"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/api/call-voice"
   to = "/.netlify/functions/call-voice"
