@@ -58,6 +58,10 @@ export const ROUTES = [
   // here is the proof it deployed. It is the only thing allowed to record that money moved, so if
   // it is missing, settlements silently stop being paid for and nothing else reports it.
   { path: '/api/parley-webhook',   kind: 'api', expect: [405, 400], what: 'Stripe telling us a settlement was actually paid. The only writer of a succeeded payout.' },
+  // Internal, PIN-gated server-side. A 200 here is the LOGIN FORM, never the page: the content
+  // lives inside the handler and is serialized only past the PIN. Its source file is deliberately
+  // git-ignored, because this repository is public and the file is competitor intelligence.
+  { path: '/internal/competitors', kind: 'api', expect: [200, 401, 503], what: 'Internal competitor intelligence. Anonymous callers get the PIN form and nothing else.' },
   { path: '/api/call-me',          kind: 'api', expect: [405, 400, 200], what: 'One click activation.' },
 
   // ── Recover: first-party invoice calls, in the creditor own name (@LANE-RECOVER) ───────────

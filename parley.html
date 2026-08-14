@@ -1369,11 +1369,23 @@ body.deal-only .sheet { display: none !important; }
   }
 
   /* ══ RUNNING A DEAL ════════════════════════════════════════════════════*/
-  var TOKEN = (function () {
-    var m = location.pathname.match(/^\/truce\/([0-9a-f]{32,96})\/?$/i);
+  // ★ A TOKEN OR AN INVITATION. A 48 character token IS the credential. A 24 character code is an
+  // INVITATION, which is exchanged once for the credential and then dies, so that the person who
+  // created the deal never holds anything that can read the other side's numbers. Measured live
+  // before this existed: the creator kept the second link, opened it after the other side set
+  // their number, and read their sealed limit and goal verbatim.
+  var URLSEG = (function () {
+    var m = location.pathname.match(/^\/truce\/([0-9a-f]{16,96})\/?$/i);
     return m ? m[1].toLowerCase() : '';
   })();
-  if (!TOKEN || !TOKEN_RE.test(TOKEN)) return;
+  if (!URLSEG) return;
+
+  var STORE_KEY = 'parley.tok.' + URLSEG;
+  var TOKEN = TOKEN_RE.test(URLSEG) ? URLSEG : (function () {
+    // An invitation already redeemed on THIS device keeps working, so a refresh or a back button
+    // does not look like somebody stole the link.
+    try { return sessionStorage.getItem(STORE_KEY) || ''; } catch (e) { return ''; }
+  })();
 
   var hero = document.getElementById('hero');
   if (hero) hero.hidden = true;
@@ -1831,6 +1843,20 @@ body.deal-only .sheet { display: none !important; }
   }
 
   function load() {
+    // Redeem the invitation the first time, then behave exactly as a token link does.
+    if (!TOKEN) {
+      return post({ op: 'claim', code: URLSEG }).then(function (r) {
+        if (!r || !r.token) {
+          stage.innerHTML = '<div class="pd-card"><div class="pd-k">THIS INVITATION IS SPENT</div>'
+            + '<p class="pd-p">' + esc((r && r.error) || 'This invitation has already been opened, or it is not valid.') + '</p>'
+            + '<p class="pd-fine">An invitation opens once, on one device. That is what stops anybody else, including the person who sent it, from acting as you or reading your number.</p></div>';
+          return null;
+        }
+        TOKEN = r.token;
+        try { sessionStorage.setItem(STORE_KEY, TOKEN); } catch (e) { /* a refresh will re-ask; the claim is already spent so it will fail closed */ }
+        return post({ op: 'view', token: TOKEN }).then(render);
+      });
+    }
     return post({ op: 'view', token: TOKEN }).then(render);
   }
 

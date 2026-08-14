@@ -141,6 +141,16 @@ export const handler = async (event) => {
 
   try {
     switch (op) {
+      // Exchange an invitation for the credential it stands for, once. The page calls this when the
+      // URL carries a 24 character code rather than a 48 character token.
+      case 'claim': {
+        const code = String(body.code || '').trim();
+        if (!/^[0-9a-f]{16,32}$/.test(code)) return bad(400, 'that invitation is not valid');
+        const r = await open('tr_claim', { p_code: code });
+        if (!r || r.ok !== true) return bad(410, (r && r.reason) || 'that invitation is not valid');
+        return ok({ ok: true, token: r.token });
+      }
+
       case 'view':
         return ok(await open('tr_view', { p_token: token }));
 
@@ -387,11 +397,15 @@ export const handler = async (event) => {
           p_b_role: String(body.b_role || 'side b').slice(0, 40),
         });
         const site = process.env.URL || 'https://answered.reddenda.com';
+        // ★ ONE TOKEN AND ONE INVITATION. Never two tokens. Measured live: the creator kept a copy
+        // of the second link and could open it after the other side set their number, reading their
+        // sealed limit and goal verbatim. `them` is now an invitation code that is exchanged once,
+        // by whoever opens it, and dies in the same transaction, so the sender ends up holding
+        // nothing that can read anything.
         return ok({
           deal_id: r.deal_id,
-          // Your link and their link. Only ever hand out the one that belongs to that person.
           you: `${site}/truce/${r.a_token}`,
-          them: `${site}/truce/${r.b_token}`,
+          them: `${site}/truce/${r.b_claim}`,
         });
       }
 
