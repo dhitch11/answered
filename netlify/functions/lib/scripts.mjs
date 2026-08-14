@@ -26,6 +26,21 @@ export function spokenNumber(e164) {
   return `${say(d.slice(0, 3))}, ${say(d.slice(3, 6))}, ${say(d.slice(6))}`;
 }
 
+/**
+ * The locked disclosure. It carries all four legal obligations and it is spoken FIRST, in a bare
+ * <Say>, before any <Gather> exists on the document.
+ *
+ * ★ MEASURED 2026-08-14, first real end-to-end call, and this is the reason the shape of the
+ * TwiML is not a matter of taste: the disclosure originally lived INSIDE the <Gather>, and a
+ * nested <Say> is cut off the instant the other party makes a sound. The callee answered with
+ * "Hey there, thanks for calling Cedar Ridge", which barged straight over it, and the entire
+ * spoken output on our side of that call was the single word "Hi." The recording notice and the
+ * AI disclosure were never said. Every real call starts with a human saying their company name,
+ * so this would have silenced the disclosure on essentially all of them while the code, the
+ * script file and the obligations list all still read as correct.
+ *
+ * A <Say> outside a <Gather> cannot be interrupted by speech. Keep it there.
+ */
 export function opening() {
   const cb = spokenNumber(CALLBACK());
   return [
@@ -40,17 +55,21 @@ export const SCRIPTS = {
   // Pure measurement. The point is to observe what happens when a customer calls, so the call is
   // as short and as honest as it can be, and it never asks for anything.
   measure: {
-    id: 'measure.v1',
+    id: 'measure.v2',
     obligations: ['identify_caller_at_open', 'state_callback_number', 'disclose_ai_at_open', 'announce_recording_if_recorded'],
-    open: () => `${opening()} We are studying how home service calls get handled, and you have just helped by picking up. That is the whole call. Thanks for your time, and have a good one.`,
+    // Spoken in a bare <Say>. Uninterruptible. Carries every obligation.
+    disclosure: () => opening(),
+    // Spoken inside the <Gather>, where being interrupted is fine and even welcome.
+    ask: () => 'We are studying how home service calls get handled, and you just helped by picking up. That is the whole call. Thanks for your time, and have a good one.',
     listenSeconds: 4,
   },
 
   // The real one. One question about the past, then the offer, then out.
   discovery: {
-    id: 'discovery.v1',
+    id: 'discovery.v2',
     obligations: ['identify_caller_at_open', 'state_callback_number', 'disclose_ai_at_open', 'announce_recording_if_recorded', 'honour_stop_immediately'],
-    open: () => `${opening()} This takes under two minutes. When a customer calls you after hours and you are on a job, what happens to that call right now?`,
+    disclosure: () => opening(),
+    ask: () => 'This takes under two minutes. When a customer calls you after hours and you are on a job, what happens to that call right now?',
     // The payload. Delivered only after they have answered something.
     offer: () => 'Here is why I asked. We will take the calls you are already missing, free, for a week, and send you the list of everything that came in. Your phone still rings first. One code turns it off. Want me to text you the code?',
     listenSeconds: 12,
@@ -70,7 +89,8 @@ export const SCRIPTS = {
   conference: {
     id: 'conference.v1',
     obligations: ['identify_caller_at_open', 'state_callback_number', 'disclose_ai_at_open', 'announce_recording_if_recorded'],
-    open: () => opening(),
+    disclosure: () => opening(),
+    ask: () => '',
     listenSeconds: 0,
   },
 
@@ -85,11 +105,23 @@ export const SCRIPTS = {
 // Any of these on any call, in any mode, suppresses the number immediately and permanently.
 // Deliberately broad. A false positive costs one research call. A false negative costs a
 // complaint, and rightly.
+// ★ MEASURED: a bare /\bstop\b/ is too broad and it fails in the worst possible direction. The
+// discovery question is literally "what happens to that call right now", and a contractor
+// answering "we stop taking calls at six" was being permanently suppressed for giving us exactly
+// the answer we rang to get. So "stop" only counts when it is aimed at us: as an imperative, at
+// the start of an utterance, or attached to what it wants stopped.
 const STOP_PATTERNS = [
-  /\bstop\b/i, /\btake me off\b/i, /\bremove me\b/i, /\bdo not call\b/i, /\bdon'?t call\b/i,
-  /\bnot interested\b/i, /\bno thank(s| you)\b/i, /\bunsubscribe\b/i, /\bopt out\b/i,
-  /\bquit calling\b/i, /\bstop calling\b/i, /\bnever call\b/i, /\blose (my|this) number\b/i,
-  /\bfuck off\b/i, /\bleave me alone\b/i, /\bharass/i, /\bsue\b/i, /\blawyer\b/i, /\battorney\b/i,
+  /^\s*stop\b/i,                                   // the whole utterance opens with it
+  /\bstop\s+(call|contact|phon|ring|bother|dial|it\b|that\b)/i,
+  /\b(please|just|hey|ok|okay|now)\s+stop\b/i,
+  /\bquit\s+(calling|phoning|bothering)\b/i,
+  /\btake me off\b/i, /\bremove me\b/i, /\btake this number off\b/i,
+  /\bdo not call\b/i, /\bdon'?t call\b/i, /\bnever call\b/i, /\bno more calls\b/i,
+  /\bnot interested\b/i, /\bno thank(s| you)\b/i,
+  /\bunsubscribe\b/i, /\bopt out\b/i,
+  /\blose (my|this) number\b/i, /\bhow did you get (my|this) number\b/i,
+  /\bfuck off\b/i, /\bleave me alone\b/i, /\bharass/i,
+  /\b(sue|suing) you\b/i, /\bmy lawyer\b/i, /\bmy attorney\b/i, /\breport you\b/i,
 ];
 
 export function isStop(text) {

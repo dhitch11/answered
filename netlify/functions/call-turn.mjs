@@ -107,7 +107,7 @@ export const handler = async (event) => {
     // They answered the question about what happens to an after-hours call. Acknowledge in their
     // own terms if the brain is available, then deliver the offer exactly as written.
     const ack = await brain(mode, heard, [
-      { role: 'assistant', content: SCRIPTS.discovery.open() },
+      { role: 'assistant', content: SCRIPTS.discovery.ask() },
     ]);
     const lead = prefix + (ack ? `${ack} ` : 'That is what most shops tell us. ');
     try { await db.updateCall(p.CallSid, { disposition: 'reached', outcome: { answer_1: heard } }); } catch { /* noop */ }

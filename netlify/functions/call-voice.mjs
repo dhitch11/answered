@@ -100,10 +100,14 @@ export const handler = async (event) => {
     return XML(
       `<Response>`
       + transcriptionStart(base, { callSid: p.CallSid, mode })
+      // The disclosure sits OUTSIDE the <Gather> so that speech cannot cut it off. Nested
+      // inside, it was measured being silenced by the callee's own "hello" on the very first
+      // real call. See the comment on opening() in lib/scripts.mjs.
+      + SAY(s.disclosure())
       + `<Gather input="speech" speechTimeout="auto" timeout="${s.listenSeconds}" `
       + `action="${esc(`${base}/api/call-turn?mode=discovery&turn=1`)}" method="POST" `
       + `actionOnEmptyResult="true" language="en-US">`
-      + SAY(s.open())
+      + SAY(s.ask())
       + `</Gather></Response>`,
     );
   }
@@ -113,10 +117,11 @@ export const handler = async (event) => {
   return XML(
     `<Response>`
     + transcriptionStart(base, { callSid: p.CallSid, mode })
+    + SAY(s.disclosure())
     + `<Gather input="speech" speechTimeout="auto" timeout="${s.listenSeconds}" `
     + `action="${esc(`${base}/api/call-turn?mode=measure&turn=1`)}" method="POST" `
     + `actionOnEmptyResult="true" language="en-US">`
-    + SAY(s.open())
+    + SAY(s.ask())
     + `</Gather></Response>`,
   );
 };
