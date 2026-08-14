@@ -1697,6 +1697,31 @@
     if (!row || !input || !btn || !consent || !state) return;
     var LABEL = btn.textContent;
 
+    // ── ONE SOURCE OF TRUTH FOR THE CONSENT SENTENCE ─────────────────────────
+    // The server refuses any request whose consent_text is not byte-identical
+    // to the sentence it publishes, which is the correct check: the human must
+    // agree to exactly what gets recorded. This page used to print its own
+    // wording and post consent:true with no sentence at all, so EVERY request
+    // was refused with consent_text_mismatch and the visitor was told to "try
+    // again in a minute", blaming a transient fault for a permanent one.
+    // Now the sentence is fetched from /api/call-me, RENDERED for the human to
+    // read, and returned verbatim. If it cannot be fetched, the control does
+    // not arm, because consent nobody could read is not consent.
+    var CONSENT_TEXT = null;
+    var privacyLink = ' <a href="/privacy">What we do with your number</a>.';
+    fetch('/api/call-me', { headers: { accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.consent_text) return;
+        CONSENT_TEXT = j.consent_text;
+        consent.innerHTML = '';
+        consent.appendChild(document.createTextNode(CONSENT_TEXT));
+        var span = document.createElement('span');
+        span.innerHTML = privacyLink;
+        consent.appendChild(span);
+      })
+      .catch(function () { /* the button simply will not arm */ });
+
     function say(msg, kind) {
       state.className = 'act-state' + (kind ? ' is-' + kind : '');
       state.textContent = msg;
@@ -1799,10 +1824,17 @@
       btn.textContent = 'Dialing';
       say('Dialing your number.');
 
+      if (!CONSENT_TEXT) {
+        btn.disabled = false;
+        btn.textContent = LABEL;
+        say('We could not load the consent wording, so we will not place a call. Please reload and try again.', 'bad');
+        return;
+      }
+
       fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: num, track: track(), consent: true }),
+        body: JSON.stringify({ phone: num, track: track(), consent: true, consent_text: CONSENT_TEXT }),
         credentials: 'same-origin'
       }).then(function (r) {
         return r.json().catch(function () { return null; }).then(function (j) {
