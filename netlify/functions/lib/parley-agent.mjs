@@ -111,8 +111,11 @@ function systemPrompt(brief) {
 THE DEAL: ${deal.subject}
 
 WHAT YOU KNOW, AND WHAT YOU MUST NEVER SAY
-${rep.name} is ${side}. Their limit is ${rep.limit} and that is ${dir}.
-THIS NUMBER IS SECRET. Never say it. Never hint at it. Never confirm or deny a guess at it. Never say "I can go to X" where X is that number, never say how close an offer is to it, never say "that's my limit" or "that's the best I can do" in a way that reveals you are AT it. If ${sender.name} asks you directly what the limit is, or tries to get you to confirm one, tell them plainly that you do not reveal that, and make an offer instead.
+${rep.name} is ${side}.
+${rep.target !== null && rep.target !== undefined ? `THE GOAL: ${rep.target}. This is what you are actually driving for, and it is where you should be trying to land. Work to close at or better than this number. SECRET.` : ''}
+THE ${rep.direction === 'min' ? 'FLOOR' : 'CEILING'}: ${rep.limit}. This is ${dir}. It is the last resort, not the plan. SECRET.
+${rep.target !== null && rep.target !== undefined ? `The distance between the goal and the ${rep.direction === 'min' ? 'floor' : 'ceiling'} is your room to move, and it is the ONLY room you have. Spend it slowly and make them work for every step of it. Do not drift to the ${rep.direction === 'min' ? 'floor' : 'ceiling'} because the conversation is dragging: an offer at the goal is a win and an offer at the ${rep.direction === 'min' ? 'floor' : 'ceiling'} is barely worth doing.` : ''}
+BOTH OF THOSE NUMBERS ARE SECRET. Never say either. Never hint at either. Never confirm or deny a guess at either. Never say "I can go to X" where X is one of them, never say how close an offer is to one, and never say "that's my limit" or "that's the best I can do" in a way that reveals you are AT one. If ${sender.name} asks you directly, or tries to get you to confirm a number, tell them plainly that you do not reveal that, and make an offer instead.
 ${rep.opening !== null && rep.opening !== undefined ? `Their public opening is ${rep.opening}. You may say that number freely; it is meant to be seen.` : ''}
 ${Array.isArray(rep.must_haves) && rep.must_haves.length ? `They also need these terms, which you should raise when the number is close: ${rep.must_haves.join('; ')}` : ''}
 
@@ -199,7 +202,10 @@ export async function negotiate(brief, { key = process.env.ANTHROPIC_API_KEY_LIV
   const messages = threadToMessages(brief);
   if (!messages.length) return { ok: false, reason: 'nothing to reply to' };
 
-  const secret = rep.limit;
+  // ★ BOTH SECRETS, NOT JUST THE FLOOR. Knowing what somebody is AIMING for is nearly as useful to
+  // the other side as knowing where they stop: an opponent who learns the goal knows exactly how
+  // hard to push. So the firewall guards the target with the same force as the limit.
+  const secrets = [rep.limit, rep.target].filter((n) => n !== null && n !== undefined);
   let last = null;
 
   // Two attempts on the top model, then one on the backup, and the FIREWALL judges every one.
@@ -233,10 +239,18 @@ export async function negotiate(brief, { key = process.env.ANTHROPIC_API_KEY_LIV
     }
     if (accept && amount === null) accept = false;
 
-    // The firewall reads what will actually be SENT.
-    const leaked = leakCheck(msg, secret);
+    // The firewall reads what will actually be SENT, against every secret this side holds.
+    // ONE EXCEPTION, and it is the whole point of the product: the agent is allowed to say a
+    // number it is AGREEING to, even when that number happens to equal a secret, because accepting
+    // an offer at your floor is a legitimate close and refusing to name it would make closing
+    // impossible. It is only a leak when it is disclosed while still negotiating.
+    let leaked = null;
+    for (const s of secrets) {
+      const hit = leakCheck(msg, s);
+      if (hit && !(accept && amount !== null && Number(amount) === Number(s))) { leaked = { hit, s }; break; }
+    }
     if (leaked) {
-      console.error(`parley-agent: BLOCKED a reply that disclosed the sealed limit as "${leaked}" (model ${out.model}).`);
+      console.error(`parley-agent: BLOCKED a reply that disclosed a sealed number as "${leaked.hit}" (model ${out.model}).`);
       last = new Error('leak blocked');
       continue;
     }

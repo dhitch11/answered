@@ -54,6 +54,10 @@ export const ROUTES = [
   { path: '/api/call-recording',   kind: 'api', expect: [405, 403, 200], what: 'Stores the recording pointer.' },
   { path: '/api/recording',        kind: 'api', expect: [401, 403, 405, 400], what: 'Gated recording proxy. A stranger must not get audio.' },
   { path: '/api/truce',            kind: 'api', expect: [405, 400, 200], what: 'The text negotiation engine.' },
+  // A GET must be refused: this endpoint only ever accepts a signed POST from Stripe, and a 405
+  // here is the proof it deployed. It is the only thing allowed to record that money moved, so if
+  // it is missing, settlements silently stop being paid for and nothing else reports it.
+  { path: '/api/parley-webhook',   kind: 'api', expect: [405, 400], what: 'Stripe telling us a settlement was actually paid. The only writer of a succeeded payout.' },
   { path: '/api/call-me',          kind: 'api', expect: [405, 400, 200], what: 'One click activation.' },
 
   // ── Recover: first-party invoice calls, in the creditor own name (@LANE-RECOVER) ───────────

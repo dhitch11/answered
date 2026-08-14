@@ -27,6 +27,7 @@
 
 import { rpc, dbConfigured } from './lib/db.mjs';
 import { negotiate } from './lib/parley-agent.mjs';
+import { createPayeeAccount, onboardingLink, payeeReady, checkoutForSettlement } from './lib/parley-money.mjs';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
@@ -135,7 +136,7 @@ export const handler = async (event) => {
 
   // Every token-authenticated op validates the shape first, so a malformed token never reaches
   // the database and a scan gets a 400 rather than a timing signal.
-  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact', 'say'];
+  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact', 'say', 'payout_setup', 'payout_status', 'pay'];
   if (needsToken.includes(op) && !TOKEN.test(token)) return bad(400, 'that link is not valid');
 
   try {
@@ -156,10 +157,20 @@ export const handler = async (event) => {
           return bad(400, 'an opening needs a number');
         }
         const musts = Array.isArray(body.must_haves) ? body.must_haves.slice(0, 8).map((s) => String(s).slice(0, 120)) : [];
+        // THREE numbers now, and only the opening is public: the anchor you start at, the GOAL you
+        // are driving for, and the floor you will not cross. David, 2026-08-14: "it's going to try
+        // to push for the goal and then maybe even a high goal price too, where you want it to
+        // start trying to get to it, and then the ultimate fallback."
+        const target = body.target === undefined || body.target === null || body.target === ''
+          ? null : Number(body.target);
+        if (target !== null && (!Number.isFinite(target) || target < 0)) {
+          return bad(400, 'a goal needs a number');
+        }
         const res = await open('tr_set_limit', {
           p_token: token, p_direction: body.direction, p_amount: amount,
-          p_must_haves: musts, p_opening: opening,
+          p_must_haves: musts, p_opening: opening, p_target: target,
         });
+        if (res && res.error) return bad(400, res.error);
         // Setting the second limit is what settles a deal, so this is the moment both people need
         // to hear about. It is deliberately AFTER the limit is stored and it never blocks the
         // answer: a mail outage must not cost somebody their settlement.
@@ -244,6 +255,77 @@ export const handler = async (event) => {
           }
         }
         return ok({ ok: true, sent: true, reply: answer.text, generated: !!answer.generated, settled });
+      }
+
+      // ── THE SETTLEMENT RAIL ────────────────────────────────────────────────
+      //
+      // David: "Not just a promise, not just a signature. Actually track it and get it." A sheet
+      // both people sign is a promise, and a fee that depends on somebody reporting their own
+      // outcome is a fee they will decline to report. So the money moves THROUGH us: the payer pays
+      // once, the payee's share lands in the payee's own Stripe account, and our cut is separated
+      // by Stripe in the same movement. Nobody is invoiced and nobody is trusted.
+      //
+      // The rail is optional and always will be. Two people who would rather meet with cash will,
+      // and we earn nothing from that deal. That is the honest trade: a fee we can actually collect
+      // on the deals we genuinely carried, instead of one we can only ask for.
+
+      // The party RECEIVING the money sets up somewhere for it to land.
+      case 'payout_setup': {
+        const v = await open('tr_view', { p_token: token });
+        if (!v || v.error) return bad(400, (v && v.error) || 'that link is not valid');
+        if (v.deal.status !== 'settled') return bad(400, 'there is nothing to pay yet: this deal has not settled');
+        try {
+          const acct = await createPayeeAccount({ dealId: v.deal.id });
+          const link = await onboardingLink({ accountId: acct.id, dealId: v.deal.id });
+          await open('tr_payee_account', { p_token: token, p_account: acct.id });
+          return ok({ ok: true, account: acct.id, onboarding_url: link.url });
+        } catch (e) {
+          console.error('truce payout_setup:', String(e && e.message).slice(0, 200));
+          return bad(502, 'we could not open a payout account just now. Nothing was charged.');
+        }
+      }
+
+      // Is that account actually able to receive money? Asked of Stripe, never assumed because
+      // somebody came back from an onboarding page.
+      case 'payout_status': {
+        const st = await open('tr_payee_state', { p_token: token });
+        if (!st || !st.account) return ok({ ok: true, ready: false, started: false });
+        try {
+          const r = await payeeReady(st.account);
+          if (r.ready !== st.ready) await open('tr_payee_ready', { p_token: token, p_ready: r.ready });
+          return ok({ ok: true, started: true, ...r });
+        } catch (e) {
+          return ok({ ok: true, started: true, ready: false, reason: 'we could not check with the payment processor just now' });
+        }
+      }
+
+      // The payer's checkout. Fee comes from the DEAL ROW, never from a number typed here.
+      case 'pay': {
+        const v = await open('tr_view', { p_token: token });
+        if (!v || v.error) return bad(400, (v && v.error) || 'that link is not valid');
+        if (v.deal.status !== 'settled') return bad(400, 'this deal has not settled, so there is nothing to pay');
+        const payee = await open('tr_payee_state', { p_token: token, p_other: true });
+        if (!payee || !payee.account || !payee.ready) {
+          return ok({ ok: false, waiting_on_payee: true, note: 'The other side has not finished setting up somewhere to receive the money.' });
+        }
+        const opened = await rpc('tr_payout_open', {
+          p_deal: v.deal.id, p_payer_side: v.me.side, p_fee_cents: Number(v.deal.fee_cents) || 0,
+        });
+        if (!opened || opened.ok !== true) return bad(400, (opened && opened.reason) || 'a payout could not be opened');
+        try {
+          const session = await checkoutForSettlement({
+            payoutId: opened.payout_id, dealId: v.deal.id, subject: v.deal.subject,
+            amountCents: opened.amount_cents, feeCents: opened.fee_cents, payeeAccount: payee.account,
+          });
+          await rpc('tr_payout_intent', {
+            p_payout: opened.payout_id, p_session: session.id, p_intent: session.payment_intent || null,
+            p_account: payee.account,
+          });
+          return ok({ ok: true, checkout_url: session.url, amount_cents: opened.amount_cents, fee_cents: opened.fee_cents });
+        } catch (e) {
+          console.error('truce pay:', String(e && e.message).slice(0, 200));
+          return bad(502, 'we could not open a checkout just now. Nothing was charged.');
+        }
       }
 
       case 'set_contact':
