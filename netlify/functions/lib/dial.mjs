@@ -78,6 +78,24 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
   return { verdict, lineType: lt, lookupOk: lo, context: ctx, contact };
 }
 
+/**
+ * The call's CLASS, written on the row at dial time because billing and compliance evidence both
+ * key on it, and because reconstructing it later from a transcript is guesswork.
+ *
+ * ★ `human_cold` IS DELIBERATELY NOT EMITTED YET, and that is the whole point of this function
+ * being explicit rather than a ternary. `human_cold` means a person dialled and a person spoke,
+ * with NO artificial voice on the call at all — that is what puts it outside 47 CFR
+ * 64.1200(a)(1) and unlocks mobile numbers. Today's `conference` mode still speaks the AI
+ * disclosure before joining, so an artificial voice IS on that call and labelling it human_cold
+ * would be a false compliance record: the exact class of lie that gets discovered in a deposition
+ * rather than in a code review. It becomes emittable when the silent-operator mode exists.
+ */
+export function classifyCall({ mode, hasConsent, operator }) {
+  if (operator === 'canary' || operator === 'smoke' || operator === 'e2e-verify') return 'demo';
+  if (hasConsent) return 'consented';
+  return 'ai_cold';
+}
+
 export async function placeCall(opts) {
   const { phone, mode, operator, campaignId, lineId, fromNumber, assertedState } = opts;
   let contact = opts.contact;
@@ -99,8 +117,12 @@ export async function placeCall(opts) {
     verdict.reasons = [...(verdict.reasons || []), `script "${mode}" does not carry: ${sat.missing.join(', ')}`];
   }
 
+  const hasConsent = Boolean(gated.context && gated.context.consent);
+  const callClass = classifyCall({ mode, hasConsent, operator });
+
   const gateRecord = {
     lane: verdict.lane, dialable: verdict.dialable, reasons: verdict.reasons,
+    call_class: callClass, has_consent: hasConsent,
     line_type: lineType, lookup_ok: lookupOk, obligations: verdict.obligations || [],
     script: mode, policy: DEFAULT_POLICY, decided_at: new Date().toISOString(),
     // Which state was used for the calling-hours check, and whether anybody actually knew it.
@@ -112,6 +134,7 @@ export async function placeCall(opts) {
     await db.recordCall({
       contact_id: contact?.id || null, campaign_id: campaignId || null, to_number: phone,
       from_number: fromNumber || null, status: 'refused', gate: gateRecord, operator,
+      call_class: callClass,
       placed: false, refused_reason: (verdict.reasons || []).join('; '),
     });
     return { placed: false, gate: gateRecord, retryAt: verdict.retryAt || null, contact };
@@ -141,7 +164,7 @@ export async function placeCall(opts) {
   await db.recordCall({
     call_sid: call.sid, contact_id: contact?.id || null, campaign_id: campaignId || null,
     line_id: lineId || null, to_number: phone, from_number: from, status: call.status,
-    gate: gateRecord, operator, placed: true,
+    gate: gateRecord, operator, call_class: callClass, placed: true,
   });
 
   return { placed: true, call_sid: call.sid, status: call.status, gate: gateRecord, contact };

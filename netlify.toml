@@ -173,3 +173,11 @@
   to = "/.netlify/functions/bill-meter"
   status = 200
   force = true
+
+# Mirrors the one-click consent store into the call spine (@ANSWERED-RESEARCH). Scheduled every
+# 5 minutes; this route exists so it can also be run on demand.
+[[redirects]]
+  from = "/api/consent-sync"
+  to = "/.netlify/functions/consent-sync"
+  status = 200
+  force = true
