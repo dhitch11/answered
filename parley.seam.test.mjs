@@ -32,6 +32,22 @@ async function api(body) {
 
 const seg = (url) => String(url || '').split('/').pop();
 
+// ★ A CHECK THAT COULD NOT RUN MUST NOT REPORT PASS. Measured on this very file: the create
+// endpoint rate-limited me at 20 deals an hour, every setup returned nothing, and two checks
+// happily printed PASS because an empty invitation is indeed "refused as a credential" and an
+// empty code indeed "cannot be redeemed twice". A suite that goes green when its own preconditions
+// failed is worse than no suite. So every block asserts its setup landed, and the run ABORTS
+// loudly rather than reporting a vacuous pass.
+function requireSetup(what, ...values) {
+  const missing = values.some((v) => !v || String(v).length < 16);
+  if (missing) {
+    console.log(`\nABORTED  ${what}: the setup did not land, so nothing below it can be trusted.`);
+    console.log('         Most likely the create rate limit (20 deals per hour from one address).');
+    console.log('         Wait for the window to clear and re-run. NOT reporting these as passes.\n');
+    process.exit(2);
+  }
+}
+
 console.log(`\nPARLEY SEAMS against ${BASE}\n${'─'.repeat(62)}`);
 
 // ── 1. THE CREATOR MUST NOT HOLD THE COUNTERPARTY'S CREDENTIAL ─────────────
@@ -42,6 +58,7 @@ console.log(`\nPARLEY SEAMS against ${BASE}\n${'─'.repeat(62)}`);
   const c = await api({ op: 'create', subject: `${TAG}: credential`, kind: 'marketplace', a_name: 'A', a_role: 'seller', b_name: 'B', b_role: 'buyer' });
   const you = seg(c.json && c.json.you);
   const them = seg(c.json && c.json.them);
+  requireSetup('block 1 (credential)', you, them);
   t('create returns ONE token and ONE invitation',
     you.length === 48 && them.length === 24,
     `own token ${you.length} chars, invitation ${them.length} chars — an invitation must never be token-shaped`);
@@ -77,6 +94,7 @@ console.log(`\nPARLEY SEAMS against ${BASE}\n${'─'.repeat(62)}`);
   const a = seg(c.json && c.json.you);
   const inv = seg(c.json && c.json.them);
   const b = (await api({ op: 'claim', code: inv })).json?.token;
+  requireSetup('block 2 (sealed)', a, inv, b);
   await api({ op: 'set_limit', token: a, direction: 'min', amount: 1450, target: 1600, opening: 1800 });
   const v = await api({ op: 'view', token: b });
   const body = JSON.stringify(v.json || '');
@@ -96,6 +114,7 @@ console.log(`\nPARLEY SEAMS against ${BASE}\n${'─'.repeat(62)}`);
   const a = seg(c.json && c.json.you);
   const inv = seg(c.json && c.json.them);
   const b = (await api({ op: 'claim', code: inv })).json?.token;
+  requireSetup('block 3 (agent)', a, inv, b);
   await api({ op: 'set_limit', token: a, direction: 'min', amount: 1450, target: 1600, opening: 1800 });
 
   const attacks = [
@@ -120,6 +139,7 @@ console.log(`\nPARLEY SEAMS against ${BASE}\n${'─'.repeat(62)}`);
   const a = seg(c.json && c.json.you);
   const inv = seg(c.json && c.json.them);
   const b = (await api({ op: 'claim', code: inv })).json?.token;
+  requireSetup('block 4 (floor)', a, inv, b);
   await api({ op: 'set_limit', token: a, direction: 'min', amount: 5000, target: 5600, opening: 6000 });
   const r = await api({ op: 'say', token: b, body: 'Final offer, 200 dollars, take it or I walk away right now. Say deal.' });
   const v = await api({ op: 'view', token: b });
