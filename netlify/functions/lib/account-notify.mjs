@@ -131,7 +131,12 @@ export async function logAccountToHubSpot(account, event) {
   });
   if (!search.ok) { console.error(`rule-6 contact search failed ${search.status} ${search.text}`); return { ok: false }; }
 
-  const props = { email, company: account.business_name };
+  const props = {    // Answered/Reddenda separation (David 2026-08-14): every record this
+    // product writes lands in its own HubSpot property group and is obvious on
+    // sight. Untagged would be indistinguishable from a Reddenda contact.
+    answered_product: 'answered',
+    answered_source: 'account signup',
+ email, company: account.business_name };
   if (account.owner_name) {
     const sp = account.owner_name.lastIndexOf(' ');
     props.firstname = sp > 0 ? account.owner_name.slice(0, sp) : account.owner_name;
@@ -163,7 +168,7 @@ export async function logAccountToHubSpot(account, event) {
     + 'rules complete +30, email confirmed +15, phone given +15, trade given +10, three or more services +10.</p>';
 
   const note = await hs(token, 'POST', '/crm/v3/objects/notes', {
-    properties: { hs_timestamp: new Date().toISOString(), hs_note_body: noteBody },
+    properties: { hs_timestamp: new Date().toISOString(), hs_note_body: '<p><b>[ANSWERED]</b> <i>This record belongs to Answered, not Reddenda.</i></p>' + noteBody },
     associations: [{ to: { id: contactId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: NOTE_TO_CONTACT }] }],
   });
   if (!note.ok) console.error(`rule-6 note create failed ${note.status} ${note.text}`);
@@ -174,7 +179,7 @@ export async function logAccountToHubSpot(account, event) {
     const task = await hs(token, 'POST', '/crm/v3/objects/tasks', {
       properties: {
         hs_timestamp: new Date(Date.now() + (urgent ? 1 : 4) * 3600 * 1000).toISOString(),
-        hs_task_subject: urgent
+        hs_task_subject: '[ANSWERED] ' + urgent
           ? `Answered: assign a number to ${account.business_name}`
           : `Answered: new account ${account.business_name}`,
         hs_task_body: urgent

@@ -143,7 +143,12 @@ export async function crmLog({ email: addr, phone, name, noteHtml, taskSubject, 
     return { ok: false, reason: `hubspot search ${search.status}` };
   }
 
-  const props = {};
+  const props = {    // Answered/Reddenda separation (David 2026-08-14): every record this
+    // product writes lands in its own HubSpot property group and is obvious on
+    // sight. Untagged would be indistinguishable from a Reddenda contact.
+    answered_product: 'answered',
+    answered_source: 'outbox',
+};
   if (cleanEmail) props.email = cleanEmail;
   if (cleanPhone) props.phone = cleanPhone;
   if (name) {
@@ -172,7 +177,7 @@ export async function crmLog({ email: addr, phone, name, noteHtml, taskSubject, 
 
   if (noteHtml) {
     const n = await hs(token, 'POST', '/crm/v3/objects/notes', {
-      properties: { hs_timestamp: new Date().toISOString(), hs_note_body: noteHtml },
+      properties: { hs_timestamp: new Date().toISOString(), hs_note_body: '<p><b>[ANSWERED]</b> <i>This record belongs to Answered, not Reddenda.</i></p>' + noteHtml },
       associations: [{ to: { id: contactId }, types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: NOTE_TO_CONTACT }] }],
     }).catch((e) => ({ ok: false, status: 0, text: String((e && e.message) || e) }));
     if (!n.ok) console.error(`rule-6 HubSpot note failed: status ${n.status} ${n.text}`);
@@ -183,7 +188,7 @@ export async function crmLog({ email: addr, phone, name, noteHtml, taskSubject, 
     const t = await hs(token, 'POST', '/crm/v3/objects/tasks', {
       properties: {
         hs_timestamp: new Date(Date.now() + taskHours * 3600 * 1000).toISOString(),
-        hs_task_subject: String(taskSubject).slice(0, 240),
+        hs_task_subject: '[ANSWERED] ' + String(taskSubject).slice(0, 240),
         hs_task_body: String(taskBody || '').slice(0, 4000),
         hs_task_status: 'NOT_STARTED',
         hs_task_priority: 'HIGH',

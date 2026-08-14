@@ -131,11 +131,16 @@ for (const [i, r] of todo.entries()) {
 
   const sources = ['business_website'];
   let owner = null; let email = null; let linkedin = null;
+  // ★ THE FOURTH STATE. Null here means we genuinely read the page and it publishes nothing.
+  // A set reason means we never got to read it, which is a different fact and the only one of the
+  // two where retrying is worthwhile.
+  let failed = null;
 
   try {
     if (!(await robotsAllows(url.origin, url.pathname || '/'))) {
       stat.blocked += 1;
       sources.push('robots_disallowed');
+      failed = 'robots_disallowed';
     } else {
       const res = await fetch(url.href, {
         headers: { 'User-Agent': UA, Accept: 'text/html' },
@@ -150,14 +155,22 @@ for (const [i, r] of todo.entries()) {
         owner = extractOwner(text);
         email = extractEmail(html, url.hostname);
         linkedin = extractLinkedIn(html);
+        // A page that is a JS shell has no readable content, so finding nothing in it is not
+        // evidence the business publishes nothing. Treat it as unread rather than as bare.
+        if (!owner && !email && !linkedin && text.replace(/\s/g, '').length < 400) {
+          failed = 'js_shell_no_readable_html';
+          sources.push('js_shell');
+        }
       } else {
         stat.unreachable += 1;
         sources.push(`http_${res.status}`);
+        failed = `http_${res.status}`;
       }
     }
-  } catch {
+  } catch (e) {
     stat.unreachable += 1;
     sources.push('unreachable');
+    failed = /timeout|abort/i.test(String(e && e.message)) ? 'timeout' : 'unreachable';
   }
 
   stat.looked += 1;
@@ -174,6 +187,8 @@ for (const [i, r] of todo.entries()) {
         contact_name: owner, contact_role: owner ? 'owner' : null,
         email, email_source: email ? 'business_website' : null,
         linkedin_url: linkedin, website: r.website, sources,
+        // cleared on a successful read, so a site that comes back up stops looking retryable
+        failed_reason: failed,
       },
     });
   } catch (e) {
@@ -189,7 +204,7 @@ console.log(`\n
   owner name     ${stat.name}   ${Math.round((stat.name / Math.max(stat.looked, 1)) * 100)}%
   email          ${stat.email}   ${Math.round((stat.email / Math.max(stat.looked, 1)) * 100)}%
   linkedin       ${stat.linkedin}   ${Math.round((stat.linkedin / Math.max(stat.looked, 1)) * 100)}%
-  unreachable    ${stat.unreachable}
+  unreachable    ${stat.unreachable}   (retryable: enrichment_failed_reason is set)
   robots blocked ${stat.blocked}
 
   Every row above has enriched_at set, including the ones that found nothing. A null field with a

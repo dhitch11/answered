@@ -56,7 +56,7 @@ export const handler = async (event) => {
 
   // Every token-authenticated op validates the shape first, so a malformed token never reaches
   // the database and a scan gets a 400 rather than a timing signal.
-  const needsToken = ['view', 'set_limit', 'sign', 'leak_check'];
+  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms'];
   if (needsToken.includes(op) && !TOKEN.test(token)) return bad(400, 'that link is not valid');
 
   try {
@@ -97,10 +97,35 @@ export const handler = async (event) => {
       case 'leak_check':
         return ok(await open('tr_leak_check', { p_token: token }));
 
+      // The terms half of the artifact. Sealed until the negotiation finishes, and any line whose
+      // digits contain its own author's sealed figure is withheld, so a free-text box cannot
+      // reopen the leak the public-opening fix closed.
+      case 'terms':
+        return ok(await open('tr_terms', { p_token: token }));
+
       // Creating a deal is the owner's action, so it keeps the operator secret.
       case 'create': {
         const subject = String(body.subject || '').trim();
         if (!subject) return bad(400, 'say what the deal is, in one line');
+
+        // ★ THIS DOOR HAS TO BE OPEN: the whole product is that a stranger can start a deal with
+        // no account, no app and no card. So it is rate limited rather than authenticated, and the
+        // limiter is DURABLE in Postgres rather than in module memory — an in-memory counter
+        // resets on every cold start, which is a control that looks real and fails open.
+        // It also fails CLOSED: an unattributable request, or a limiter we cannot read, is refused.
+        if (!ip) return bad(429, 'we could not attribute this request; try again');
+        let gate;
+        try {
+          gate = await rpc('sv_rate_take', {
+            p_bucket: 'truce_create', p_key: ip, p_limit: 8, p_window: '1 hour',
+          });
+        } catch (e) {
+          console.error('rate limiter unreadable; refusing rather than waving through:', String(e.message).slice(0, 120));
+          return bad(503, 'we cannot start a new deal right now. Try again shortly.');
+        }
+        if (!gate || gate.allowed !== true) {
+          return bad(429, 'that is a lot of deals from one place in an hour. Try again later, or email info@reddenda.com.');
+        }
         const r = await rpc('sv_truce_create', {
           p_subject: subject.slice(0, 200),
           p_kind: body.kind || 'other',

@@ -78,7 +78,14 @@ const logToHubSpot = async (token, { email, name, phone, product, note, source }
     return; // no contact id is reachable, nothing downstream can associate
   }
 
-  const props = { email };
+  const props = { email ,
+    // DAVID'S RULE 2026-08-14: Answered and Reddenda share one HubSpot portal,
+    // so every Answered record is stamped into its own property group and is
+    // obvious on sight. An untagged contact would be indistinguishable from a
+    // Reddenda one, which is the whole thing this prevents.
+    answered_product: 'answered',
+    answered_source: 'interest form, ' + source,
+  };
   if (name) {
     const sp = name.lastIndexOf(' ');
     props.firstname = sp > 0 ? name.slice(0, sp) : name;
@@ -108,7 +115,8 @@ const logToHubSpot = async (token, { email, name, phone, product, note, source }
   // 2. Note engagement: full payload + the code-computed lead score.
   const { score, parts } = scoreLead(product, phone, note);
   const noteBody =
-    '<p><b>Answered interest form submission</b></p>' +
+    '<p><b>[ANSWERED &middot; ANSWERED] interest form submission</b></p>' +
+    '<p><i>This record belongs to Answered (the AI phone product), not Reddenda.</i></p>' +
     '<p>Product: ' + esc(product || 'not chosen') + '<br>' +
     'Phone: ' + esc(phone || 'not given') + '<br>' +
     'Note: ' + esc(note || 'none') + '<br>' +
@@ -132,7 +140,7 @@ const logToHubSpot = async (token, { email, name, phone, product, note, source }
   const taskRes = await hubspotCall(token, 'POST', '/crm/v3/objects/tasks', {
     properties: {
       hs_timestamp: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
-      hs_task_subject: 'Answered interest: ' + (product || 'no product chosen') + ' - reply today',
+      hs_task_subject: '[ANSWERED] interest: ' + (product || 'no product chosen') + ' - reply today',
       hs_task_body: 'Reply personally today. One reply, not a sequence. Lead score ' + score +
         '. The note on this contact carries the full submission.',
       hs_task_status: 'NOT_STARTED',
