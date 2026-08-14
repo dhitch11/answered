@@ -199,6 +199,33 @@ export const DEFAULT_POLICY = {
   // geography it is closer to two and a half.
   subscribedAreaCodes: null,
 
+  // ★ THE HUMAN-DIALED LANE (David 2026-08-14: "still keep all mobile numbers. we will be calling
+  // them"). A PERSON presses dial and a PERSON speaks. No artificial voice anywhere on the call.
+  //
+  // WHY THIS OPENS MOBILE AND THE AI PATH DOES NOT. 47 U.S.C. 227(b)(1)(A)(iii) reaches a call made
+  // "using any automatic telephone dialing system or an artificial or prerecorded voice". A human
+  // manually dialling and speaking is neither, and *Facebook v. Duguid*, 592 U.S. 395 (2021) held an
+  // ATDS must use "a random or sequential number generator" — a curated list of contractors is not
+  // that. So the single provision that blocks every AI call to a mobile does not reach this lane.
+  //
+  // ★ WHAT MANUAL DIALLING BUYS NOTHING AGAINST, and this is the part that matters more:
+  //   - 47 CFR 64.1200(c)(2), the DO-NOT-CALL REGISTRY. 64.1200(e) applies the (c) and (d) rules to
+  //     wireless numbers, and *Chennette v. Porch.com*, 50 F.4th 1217 (9th Cir. 2022) held that cell
+  //     numbers used for BOTH business and personal purposes are presumptively "residential" and may
+  //     sue. A contractor's cell is the exact fact pattern of that case. Mobiles are also registered
+  //     on the DNC at far higher rates than landlines, so this lane needs the scrub MORE, not less.
+  //   - STATE law. Every licensing, artificial-voice and all-party-recording rule in this file has no
+  //     dialling-technology element. Arizona is stricter here than the TCPA: A.R.S. 44-1278(B)(3)
+  //     bars unsolicited sales calls to any mobile or paging device with NO consent exception at all.
+  //   - WIRETAP law. If the call is recorded or transcribed, the AI is still a listener on the line
+  //     even when it is not a speaker, and that was already the largest exposure in this program.
+  //
+  // So this flag relaxes exactly ONE thing — the line-type refusal — and nothing else. It is a
+  // separate named lane with its own audit trail rather than a quiet exemption, because the moment
+  // "a human is on it" silently unlocks a wider pool, autopilot has a loophole to drive through.
+  // It is FALSE by default and the dialler must assert it per call, never per campaign.
+  humanDialed: false,
+
   // ★ ADDED 2026-08-14 from the four-state primary-law verification (CA / NV / AZ / OR).
   //
   // A live human personally makes the Pub. Util. Code 2874 announcement before the AI speaks:
@@ -249,8 +276,21 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
     const type = LINE_TYPES[rec.lineType];
     if (!type) return deny(`line type "${rec.lineType || 'missing'}" is unknown to the gate`);
     if (type.tollFree) return deny('toll-free: the called party pays for the call');
-    if (type.personal) return deny(`${rec.lineType}: artificial voice to a mobile needs prior express consent, 47 CFR 64.1200(a)(1)`);
-    if (!type.fixed) return deny(`${rec.lineType}: not a verified fixed business line`);
+    // ★ The ONE thing policy.humanDialed relaxes: WHICH LINE TYPES ARE REACHABLE. A person dialling
+    // and speaking is neither an ATDS nor an artificial voice, so 227(b)(1)(A)(iii) does not reach
+    // the call. Every other refusal below still runs, because none of them turns on how it was dialled.
+    //
+    // Deliberately NOT widened to nonFixedVoip, even though the same 227(b) reasoning would carry:
+    // that is another 1,529 numbers and it is a scope decision for David, not one to take quietly
+    // on the back of a ruling about mobiles.
+    const reachable = policy.humanDialed
+      ? (type.fixed || type.personal)   // a human may call a business line or a mobile
+      : type.fixed;                     // an artificial voice may only call a verified fixed line
+    if (!reachable) {
+      return deny(type.personal
+        ? `${rec.lineType}: an artificial voice to a mobile needs prior express consent, 47 CFR 64.1200(a)(1). A human-dialled, human-voiced call to this number is a separate lane and is permitted there`
+        : `${rec.lineType}: not a verified fixed business line`);
+    }
   }
 
   if (policy.promotional && !(consentValid && consent.written)) {
@@ -336,10 +376,13 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
   }
 
   const lane = consentValid ? LANES.GREEN : LANES.AMBER;
+  const humanLane = policy.humanDialed && LINE_TYPES[rec.lineType]?.personal && !consentValid;
   reasons.push(
     consentValid
       ? `consent on file (${consent.source}, ${consent.grantedAt})`
-      : `${rec.lineType}: fixed business line, non-promotional script, inside window`,
+      : humanLane
+        ? `${rec.lineType}: HUMAN-DIALLED lane — a person dials and a person speaks, so 47 USC 227(b)(1)(A)(iii) does not reach it; registry, state law and window all still applied`
+        : `${rec.lineType}: fixed business line, non-promotional script, inside window`,
   );
 
   return {
@@ -353,7 +396,14 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
     obligations: [
       'identify_caller_at_open',      // 64.1200(b)(1)
       'state_callback_number',        // 64.1200(b)(2)
-      'disclose_ai_at_open',          // FCC 24-17 posture + Cal. AB 2905
+      // ★ On the human-dialled lane there is no artificial voice to disclose, and claiming one
+      // would be its own false statement. What REPLACES it is stricter, not looser: the call must
+      // carry no artificial voice at all, or the whole basis for reaching this mobile evaporates
+      // mid-call. The recording/transcription disclosure is unaffected — the AI is still a LISTENER
+      // even when it is not a speaker, and that was always the larger exposure.
+      ...(policy.humanDialed
+        ? ['no_artificial_voice_on_this_call', 'live_human_must_speak']
+        : ['disclose_ai_at_open']),   // FCC 24-17 posture + Cal. AB 2905
       'announce_recording_if_recorded',
       'honour_stop_immediately',
       // The free week is a statutory PREMIUM in three of our first four states. When the campaign

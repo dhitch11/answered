@@ -380,5 +380,57 @@ test('AN OVERLAY IS A SECOND SUBSCRIPTION, NOT THE SAME ONE', () => {
 });
 
 
+console.log('\nTHE HUMAN-DIALLED LANE (David 2026-08-14: keep the mobiles, we will be calling them)');
+const HUMAN = { ...READY, humanDialed: true, subscribedAreaCodes: new Set(['512', '503', '971', '541', '458']) };
+test('a mobile is REACHABLE when a person dials and a person speaks', () => {
+  const v = classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.equal(v.dialable, true, v.reasons.join(' '));
+  assert.match(v.reasons.join(' '), /HUMAN-DIALLED/);
+});
+test('the same mobile is still REFUSED to an artificial voice', () => {
+  const v = classify({ ...base, lineType: 'mobile' }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /64\.1200\(a\)\(1\)/);
+});
+test('the human lane must NOT claim an AI disclosure it will not make', () => {
+  const v = classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.ok(!v.obligations.includes('disclose_ai_at_open'), 'there is no AI to disclose on this call');
+  assert.ok(v.obligations.includes('no_artificial_voice_on_this_call'));
+  assert.ok(v.obligations.includes('live_human_must_speak'));
+  assert.ok(v.obligations.includes('announce_recording_if_recorded'), 'the AI still LISTENS; that disclosure never drops');
+});
+test('THE REGISTRY STILL BINDS ON A MOBILE — Chennette makes a contractor cell residential', () => {
+  const listed = classify({ ...base, lineType: 'mobile', dncListed: true }, HUMAN, new Set(), OPEN);
+  assert.equal(listed.lane, LANES.RED);
+  const unknown = classify({ ...base, lineType: 'mobile', dncListed: null }, HUMAN, new Set(), OPEN);
+  assert.equal(unknown.lane, LANES.RED, 'an unanswerable registry check is still a refusal');
+});
+test('STATE LAW STILL BINDS on the human lane — manual dialling cures none of it', () => {
+  for (const st of ['AZ', 'TX', 'WA', 'FL', 'IL', 'NV']) {
+    const v = classify({ ...base, state: st, lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+    assert.equal(v.lane, LANES.RED, `${st} must still refuse a human-dialled mobile`);
+  }
+  const ca = classify({ ...base, state: 'CA', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.equal(ca.lane, LANES.RED, 'CA still needs its opener');
+  const unread = classify({ ...base, state: 'NY', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.equal(unread.lane, LANES.RED, 'an unread state is still a refusal');
+});
+test('the window, the cap, suppression and the subscription fence all still bind', () => {
+  assert.equal(classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(), SHUT).lane, LANES.HOLD);
+  assert.equal(classify({ ...base, lineType: 'mobile', callCount30d: 1 }, HUMAN, new Set(), OPEN).lane, LANES.RED);
+  assert.equal(classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(['+15125550142']), OPEN).lane, LANES.RED);
+  const offNpa = classify({ ...base, phone: '+12125550142', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.equal(offNpa.lane, LANES.RED, '212 is not in the subscription');
+});
+test('the human lane does NOT quietly widen anything else', () => {
+  // nonFixedVoip, unknown, voicemail and a failed lookup stay refused. The lane relaxes line-type
+  // reachability for MOBILES and nothing more; a scope change beyond that is David's to make.
+  for (const lt of ['nonFixedVoip', 'unknown', 'voicemail']) {
+    assert.equal(classify({ ...base, lineType: lt }, HUMAN, new Set(), OPEN).dialable, false, `${lt} must stay refused`);
+  }
+  assert.equal(classify({ ...base, lineType: 'landline', lookupOk: false }, HUMAN, new Set(), OPEN).dialable, false);
+  assert.equal(classify({ ...base, lineType: 'tollFree' }, HUMAN, new Set(), OPEN).dialable, false);
+});
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
