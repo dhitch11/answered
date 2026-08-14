@@ -768,11 +768,57 @@ function toast(msg, tone) {
 // currently owns focus. A poll in this repo did exactly that, focus fell to BODY, a keyboard
 // guard stopped matching, and typing fired barge then hangup on a live call. If the region has
 // focus, we skip the paint and try again on the next tick instead of stealing the caret.
+// ★ THIRD VERSION, AND THE SECOND ONE WAS STILL WRONG — MEASURED ON LIVE PROD.
+//
+// Refusing the paint protects the caret, but the CRM search box LIVES INSIDE the region its own
+// results render into. So typing a query fired the request, the rows came back, and the guard then
+// refused the only paint that would have shown them. Measured on prod, character by character:
+//
+//   request  GET /api/admin/crm?q=zzqqxx-no-such-lead-9917...  -> fired, 200, real result
+//   DOM      50 rows, unchanged, for as long as the caret stayed in the box
+//   blur     still 50 rows: nothing re-runs on blur, so the refusal was permanent
+//   navigate away and back -> 0 rows and the correct empty state, which had been true all along
+//
+// The operator's experience is a search box that does nothing. No error, no console message, a
+// perfect 200 in the network panel, and the correct answer sitting in memory behind a guard written
+// to help them. This is the same shape as the version before it: a control whose click is a request
+// for a repaint, silently denied.
+//
+// THE FIX IS NOT TO WEAKEN THE GUARD. It is to stop treating "repaint" and "destroy the caret" as
+// the same event. We repaint, then put the operator back exactly where they were: same field, same
+// value, same selection. Their value wins over the rendered one, because a render is by definition
+// older than the keystrokes that raced it.
+//
+// The refusal survives as the fallback for the one case restoration cannot cover: a focused text
+// entry with no id, which we cannot find again after innerHTML. There, skipping is still correct.
 function paint(el, html) {
   if (!el) return false;
   const a = document.activeElement;
-  if (a && a !== document.body && el.contains(a) && isTextEntry(a)) return false;
+  const owned = a && a !== document.body && el.contains(a) && isTextEntry(a);
+
+  if (owned && !a.id) return false;          // unfindable after the paint: refuse, as before
+
+  const keep = owned
+    ? { id: a.id, value: a.value, start: a.selectionStart, end: a.selectionEnd, scroll: a.scrollLeft }
+    : null;
+
   el.innerHTML = html;
+
+  if (keep) {
+    const next = el.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(keep.id) : keep.id));
+    if (next) {
+      // The operator's keystrokes outrank the render. Only write when they differ, so we never
+      // reset a selection the browser already had right.
+      if (next.value !== keep.value) next.value = keep.value;
+      next.focus({ preventScroll: true });
+      // setSelectionRange throws on some input types (number, email) in some engines. A caret at
+      // the end is a far better outcome than an exception that kills the rest of the render.
+      try { next.setSelectionRange(keep.start, keep.end); } catch (e) { /* caret lands at the end */ }
+      next.scrollLeft = keep.scroll;
+    }
+    // If the field did not survive the render it was genuinely removed, and there is nothing to
+    // restore. That is a real state change, not a paint stealing focus.
+  }
   return true;
 }
 
