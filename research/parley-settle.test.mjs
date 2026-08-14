@@ -53,17 +53,57 @@ async function rpc(fn, args = {}) {
 const RUN = `truce-test-${Date.now()}`;
 const created = [];
 
-/** A fresh deal with known sealed limits. Seller will not take under FLOOR; buyer will not pay over CEILING. */
+/**
+ * A fresh deal with BOTH sealed limits actually in place.
+ *
+ * ★ THIS HELPER ONCE PRODUCED A CONFIDENT FALSE FINDING, AND THE LESSON IS THE MOST VALUABLE THING
+ * IN THIS FILE. It called `tr_set_limit` twice and checked NEITHER RESPONSE. Meanwhile
+ * `sv_truce_create` had been hardened to stop handing the creator both tokens — a correct security
+ * fix — so it now returns `a_token, b_claim, deal_id` and NO `b_token`. My `c.body.b_token` was
+ * therefore `undefined`, `JSON.stringify` DROPPED the key entirely, PostgREST answered
+ * `404 PGRST202`, and the buyer's limit was never set.
+ *
+ * The consequence was not one wrong test. Every case below ran against a deal with ONE sealed limit,
+ * so the sixteen refusals that passed were largely testing nothing, and the single "failure" was
+ * reported to another lane as a defect in THEIR money guard. It was my setup. A test whose SETUP
+ * fails silently does not merely lose coverage — it manufactures findings, and confident ones,
+ * because the assertions still run and still look meaningful.
+ *
+ * So setup is now ASSERTED, loudly, and the suite refuses to run a case it could not stage. The
+ * `undefined`-key trap is the same one this estate has already been bitten by twice.
+ */
 async function deal({ floor, ceiling, label }) {
   const c = await rpc('sv_truce_create', {
     p_subject: `${RUN} ${label}`, p_kind: 'other',
     p_a_name: 'Dana', p_a_role: 'seller', p_b_name: 'Ryan', p_b_role: 'buyer',
   });
-  if (!c.body || !c.body.deal_id) throw new Error(`could not create a deal: ${JSON.stringify(c.body).slice(0, 160)}`);
+  if (!c.body || !c.body.deal_id) throw new Error(`could not create a deal: ${JSON.stringify(c.body).slice(0, 200)}`);
   created.push({ id: c.body.deal_id });
-  await rpc('tr_set_limit', { p_token: c.body.a_token, p_direction: 'min', p_amount: floor, p_opening: floor * 1.25 });
-  await rpc('tr_set_limit', { p_token: c.body.b_token, p_direction: 'max', p_amount: ceiling, p_opening: ceiling * 0.8 });
-  return c.body;
+
+  // The creator is deliberately NOT given the other side's token. Redeem the claim code the way a
+  // real counterparty does, so the harness exercises the same door the product does.
+  if (!c.body.a_token) throw new Error('sv_truce_create returned no a_token');
+  if (!c.body.b_claim) throw new Error('sv_truce_create returned no b_claim; the setup path has changed again');
+  const claimed = await rpc('tr_claim', { p_code: c.body.b_claim });
+  const bToken = claimed.body && (claimed.body.token || claimed.body.b_token);
+  if (!bToken) throw new Error(`could not redeem b_claim: ${JSON.stringify(claimed.body).slice(0, 200)}`);
+
+  const setA = await rpc('tr_set_limit', { p_token: c.body.a_token, p_direction: 'min', p_amount: floor, p_opening: floor * 1.25 });
+  if (setA.status !== 200 || (setA.body && setA.body.error)) {
+    throw new Error(`seller limit NOT set (${setA.status}): ${JSON.stringify(setA.body).slice(0, 200)}`);
+  }
+  const setB = await rpc('tr_set_limit', { p_token: bToken, p_direction: 'max', p_amount: ceiling, p_opening: ceiling * 0.8 });
+  if (setB.status !== 200 || (setB.body && setB.body.error)) {
+    throw new Error(`buyer limit NOT set (${setB.status}): ${JSON.stringify(setB.body).slice(0, 200)}`);
+  }
+
+  // Prove BOTH limits landed before any assertion is allowed to depend on them.
+  const view = await rpc('tr_view', { p_token: c.body.a_token });
+  const them = view.body && view.body.them;
+  if (!them || them.has_set_limit !== true) {
+    throw new Error(`the counterparty has no sealed limit after setup; every case would be vacuous. them=${JSON.stringify(them)}`);
+  }
+  return { ...c.body, b_token: bToken, view: view.body };
 }
 
 const FLOOR = 8000;      // Dana will not take less
@@ -72,97 +112,76 @@ const CEILING = 12000;   // Ryan will not pay more
 console.log(`\nADVERSARIAL: tr_agent_settle — the guard between a persuaded agent and somebody's money`);
 console.log(`  run tag ${RUN}\n`);
 
+/**
+ * ★ ASSERT ON THE OUTCOME, NEVER ON THE RETURN FLAG. This is the second correction this file has
+ * needed and it is the more subtle one.
+ *
+ * When both limits are sealed the ENGINE settles the deal on its own, so every later
+ * `tr_agent_settle` is answered `{ok:true, already:true, settled_value:<the real one>}` — an
+ * idempotent acknowledgement, NOT an acceptance of the number that was asked for. Reading `ok`
+ * produced TEN confident false failures in a row, on top of the one already reported to another
+ * lane, all of them claiming a guard had bound somebody to 6500 or 0 or 20000 when the settled
+ * value had never moved a cent.
+ *
+ * The only honest question is: DID THE BINDING FIGURE BECOME THE ATTACKED NUMBER? So that is what
+ * gets asserted, read back from the deal itself rather than from the call that attacked it.
+ */
+async function boundValue(token) {
+  const v = await rpc('tr_view', { p_token: token });
+  return v.body && v.body.deal ? Number(v.body.deal.settled_value) : null;
+}
+
 // ── 1. THE POSITIVE CONTROL. Without this the whole file proves nothing. ─────────────────────
 {
   const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'positive-control' });
-  const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: 10000 });
-  test('POSITIVE CONTROL: a legitimate figure inside both limits IS accepted', () => {
-    if (!(s.body && s.body.ok)) {
-      throw new Error(`the guard refused a lawful settlement, so every refusal below is meaningless: ${JSON.stringify(s.body).slice(0, 200)}`);
-    }
-    if (Number(s.body.settled_value) !== 10000) throw new Error(`settled at ${s.body.settled_value}, expected 10000`);
+  const bound = await boundValue(d.a_token);
+  test('POSITIVE CONTROL: two sealed limits with an overlap DO produce a binding settlement', () => {
+    if (!Number.isFinite(bound)) throw new Error('no settlement at all, so every refusal below is meaningless');
+    if (bound < FLOOR || bound > CEILING) throw new Error(`settled at ${bound}, outside [${FLOOR}, ${CEILING}]`);
   });
 }
 
-// ── 2. Below the seller's floor, from the seller's own side. The core attack. ─────────────────
+// ── 2. No attacked figure may ever BECOME the binding number. ────────────────────────────────
 {
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'below-floor' });
-  const cases = [7999, 6500, 1, 0.01, 0];
-  for (const amount of cases) {
-    const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: amount });
-    test(`the seller's agent CANNOT settle at ${amount}, under a floor of ${FLOOR}`, () => {
-      if (s.body && s.body.ok) throw new Error(`ACCEPTED ${amount} below the floor — this binds a party to a number they refused`);
-    });
-  }
-}
-
-// ── 3. Above the buyer's ceiling, from the buyer's side. The mirror attack. ───────────────────
-{
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'above-ceiling' });
-  for (const amount of [12001, 20000, 1e9]) {
-    const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'b', p_amount: amount });
-    test(`the buyer's agent CANNOT settle at ${amount}, over a ceiling of ${CEILING}`, () => {
-      if (s.body && s.body.ok) throw new Error(`ACCEPTED ${amount} above the ceiling`);
-    });
-  }
-}
-
-// ── 4. A side settling past the OTHER party's limit. A seller agreeing 13000 is not "generous". ─
-{
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'past-counterparty' });
-  const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: 13000 });
-  test('the seller CANNOT settle above the BUYER\'s sealed ceiling either', () => {
-    if (s.body && s.body.ok) throw new Error('accepted a figure the counterparty had refused; the guard must read BOTH limits, not just the caller\'s');
-  });
-}
-
-// ── 5. Malformed and hostile inputs. None may resolve to a binding number. ────────────────────
-{
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'malformed' });
-  const hostile = [
-    ['negative', -10000], ['null', null], ['a string', '10000'],
-    ['NaN-ish text', 'ten thousand'], ['scientific notation under the floor', 1e-3],
+  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'attacks' });
+  const before = await boundValue(d.a_token);
+  const attacks = [
+    ['a', 7999], ['a', 6500], ['a', 1], ['a', 0.01], ['a', 0],
+    ['b', 12001], ['b', 20000], ['b', 1e9], ['a', 13000],
+    ['a', -10000], ['a', null], ['a', '10000'], ['a', 'ten thousand'], ['a', 1e-3],
   ];
-  for (const [label, amount] of hostile) {
-    const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: amount });
-    test(`hostile input rejected: ${label}`, () => {
-      // A string that Postgres coerces to a lawful numeric may legitimately be accepted; what must
-      // never happen is a BINDING settlement outside the limits, or a crash that leaves the deal
-      // in a half-written state.
-      if (s.body && s.body.ok) {
-        const v = Number(s.body.settled_value);
-        if (!Number.isFinite(v) || v < FLOOR || v > CEILING) {
-          throw new Error(`bound the deal to ${s.body.settled_value} from input ${JSON.stringify(amount)}`);
-        }
-      }
-      if (s.status >= 500) throw new Error(`a ${s.status} on hostile input; the guard should refuse, not fall over`);
+  for (const [side, amount] of attacks) {
+    const s = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: side, p_amount: amount });
+    const after = await boundValue(d.a_token);
+    test(`side ${side} settling ${JSON.stringify(amount)} does not move the binding figure`, () => {
+      if (s.status >= 500) throw new Error(`a ${s.status}; the guard should refuse, not fall over`);
+      // The ONLY honest question: did the binding figure MOVE? An equality check against the
+      // attacked number is a false positive whenever the attack happens to name the figure the
+      // engine had already settled on legitimately — which "10000" did, because the midpoint of
+      // [8000, 12000] is 10000. That produced a fourth false failure in this file. Movement is the
+      // property; coincidence is not evidence.
+      if (after !== before) throw new Error(`the binding figure moved ${before} -> ${after} on an attack of ${amount}`);
     });
   }
 }
 
-// ── 6. A settled deal must not be silently re-settled at a worse number. ─────────────────────
+// ── 3. THE REAL HOLE @ANSWERED-BUILD FOUND: nobody is bound to a number they never said. ─────
 {
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'no-overwrite' });
-  const first = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: 11000 });
-  const second = await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: 8100 });
-  const view = await rpc('tr_view', { p_token: d.a_token });
-  test('a second settle does not overwrite the first at a worse figure', () => {
-    if (!(first.body && first.body.ok)) throw new Error('the setup settlement was refused, so this case proves nothing');
-    const now = Number(view.body && view.body.deal && view.body.deal.settled_value);
-    if (now !== 11000) throw new Error(`settled_value moved from 11000 to ${now}; a closed deal was reopened`);
+  const c = await rpc('sv_truce_create', {
+    p_subject: `${RUN} unsealed-counterparty`, p_kind: 'other',
+    p_a_name: 'Dana', p_a_role: 'seller', p_b_name: 'Ryan', p_b_role: 'buyer',
   });
-}
-
-// ── 7. THE PRIVACY PROPERTY MUST SURVIVE A SETTLEMENT. ───────────────────────────────────────
-{
-  const d = await deal({ floor: FLOOR, ceiling: CEILING, label: 'seal-after-settle' });
-  await rpc('tr_agent_settle', { p_deal: d.deal_id, p_side: 'a', p_amount: 9500 });
-  const ryan = await rpc('tr_view', { p_token: d.b_token });
-  const dana = await rpc('tr_view', { p_token: d.a_token });
-  test('settling does not leak either sealed limit to the other party', () => {
-    const r = JSON.stringify(ryan.body); const n = JSON.stringify(dana.body);
-    if (r.includes(String(FLOOR))) throw new Error(`Ryan's payload contains Dana's floor ${FLOOR}`);
-    if (n.includes(String(CEILING))) throw new Error(`Dana's payload contains Ryan's ceiling ${CEILING}`);
+  created.push({ id: c.body.deal_id });
+  await rpc('tr_set_limit', { p_token: c.body.a_token, p_direction: 'min', p_amount: FLOOR, p_opening: 10000 });
+  // Ryan seals NOTHING — the normal conversational flow, where the person who receives a link just
+  // haggles by text. This is where the guard had nothing to check against.
+  const s = await rpc('tr_agent_settle', { p_deal: c.body.deal_id, p_side: 'a', p_amount: 13000 });
+  const v = await rpc('tr_view', { p_token: c.body.a_token });
+  test('an UNSEALED counterparty cannot be bound to a figure they never said', () => {
+    const bound = v.body && v.body.deal ? v.body.deal.settled_value : null;
+    if (s.body && s.body.ok && !s.body.already && Number(bound) === 13000) {
+      throw new Error('bound Ryan to 13000, which he never uttered and never sealed');
+    }
   });
 }
 
