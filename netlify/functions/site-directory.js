@@ -97,6 +97,12 @@ function directoryPage() {
 <p class="k">How to use: the form posts to /api/interest. Every submission emails David, upserts HubSpot with a scored note and a task, and sends the submitter one confirmation email.</p></div>
 <div class="card"><span class="u">https://answered.reddenda.com/trust</span>
 <p>The guardrails page. Never quotes a price (three enforcement layers), audit by text, the fail-closed recording stance. The page a skeptic should be sent to.</p></div>
+<div class="card"><span class="u">https://answered.reddenda.com/setup</span>
+<p>The page for the owner who is nervous about letting an AI answer his business line. Seven steps, in the order the worry actually arrives: pick how it should sound, set the rules before it says a word, then watch the transcript change as each rule is switched on. Nothing here is a mock-up: toggling a rule genuinely rewrites the call and marks the lines that moved. No account, no phone number, nothing to install.</p>
+<p class="k">How to use: this is now the primary button on the home page ("Set your rules"). Send it to anyone who says they would never let a robot answer their phone. It needs no phone service to work, so it keeps selling while the phone line is down. It contains no audio, so never promise someone they will HEAR it here.</p></div>
+<div class="card"><span class="u">https://answered.reddenda.com/parley</span>
+<p>The text-message negotiation product, the one David asked where it went. Two people settle a number by text through a link: a car, a Marketplace item, a deposit, a repair bill. Each side privately sets the most they will pay or the least they will take, and that figure is NEVER shown, hinted at, or worked out by the other side. It settles inside the overlap and produces a signed sheet with the agreed terms.</p>
+<p class="k">How to use: you send the link yourself, from your own phone, to whoever you are negotiating with. We never contact them, which is why this works today with no texting approval and no phone service. The page carries a live leak check anyone can press to confirm their own limit never appeared.</p></div>
 <div class="card"><span class="u">https://answered.reddenda.com/thanks</span>
 <p>Where the interest form lands. A person reads every submission.</p></div>
 <div class="card"><span class="u">https://answered.reddenda.com/privacy · /terms · /recording</span><span class="tag blue">staged</span>
