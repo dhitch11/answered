@@ -360,6 +360,47 @@ ${runbookBlock()}
 </script>`);
 }
 
+// ── the post-deploy report ───────────────────────────────────────────────────
+//
+// The house rule is that every deploy is followed by an email to David. Until now the only send
+// path in this codebase was the hardcoded test alert above, so a lane with a real report had no
+// way to send one: RESEND_API_KEY is scoped to the production context, which means it is readable
+// ONLY from inside a running function — `netlify env:list` cannot see it, and `env:get` returns it
+// masked because it is marked secret. Discovering that twice in one day is what this op is for.
+//
+// ★ THE RECIPIENT IS HARDCODED AND THERE IS NO PARAMETER FOR IT. This endpoint sits behind the ops
+// PIN, but a PIN plus a caller-supplied `to` is an authenticated open relay one credential leak
+// away from sending mail as info@reddenda.com to anyone. A fixed recipient means the worst a stolen
+// PIN buys is the ability to email David, which is a nuisance rather than a reputational incident.
+async function sendReport(body) {
+  const key = (process.env.RESEND_API_KEY || '').trim();
+  if (!key) return { statusCode: 503, body: { error: 'RESEND_API_KEY is not set, so nothing can be sent.' } };
+  const subject = String(body.subject || '').trim();
+  const html = String(body.html || '').trim();
+  if (!subject) return { statusCode: 400, body: { error: 'a report needs a subject' } };
+  if (!html) return { statusCode: 400, body: { error: 'a report needs a body' } };
+  if (html.length > 200000) return { statusCode: 413, body: { error: 'report body is too large' } };
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Reddenda Estate <info@reddenda.com>',
+        to: ['David@Reddenda.com'],
+        subject: subject.slice(0, 200),
+        html,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const j = await r.json().catch(() => ({}));
+    // Report the real upstream outcome. A send that failed must never read as sent.
+    if (!r.ok) return { statusCode: 502, body: { error: 'Resend refused it', status: r.status, detail: j } };
+    return { statusCode: 200, body: { sent: true, id: j.id } };
+  } catch (e) {
+    return { statusCode: 502, body: { error: 'the send failed', detail: String(e.message).slice(0, 200) } };
+  }
+}
+
 // ── the test alert. Real send, real reported failure ────────────────────────
 async function sendTestAlert(base) {
   const key = (process.env.RESEND_API_KEY || '').trim();
@@ -428,6 +469,10 @@ export const handler = async (event) => {
     const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
     if (body.op === 'testalert') {
       const r = await sendTestAlert(siteOf(event));
+      return { statusCode: r.statusCode, headers: jsonHeaders, body: JSON.stringify(r.body) };
+    }
+    if (body.op === 'report') {
+      const r = await sendReport(body);
       return { statusCode: r.statusCode, headers: jsonHeaders, body: JSON.stringify(r.body) };
     }
     return { statusCode: 400, headers: jsonHeaders, body: JSON.stringify({ error: 'unknown op' }) };
