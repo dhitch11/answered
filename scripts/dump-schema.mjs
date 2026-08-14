@@ -66,8 +66,31 @@ const migrations = await rpc('sv_admin_migrations');
 let migBytes = 0;
 const migDir = path.join(ROOT, 'supabase/migrations');
 fs.mkdirSync(migDir, { recursive: true });
-// Remove only files this script owns, so a stale export cannot masquerade as current.
-for (const f of fs.readdirSync(migDir)) if (f.endsWith('.sql')) fs.unlinkSync(path.join(migDir, f));
+// ★ THIS COMMENT USED TO SAY "remove only files this script owns" WHILE THE CODE REMOVED EVERY
+// .sql IN THE DIRECTORY, AND IT DELETED 308 LINES OF ANOTHER LANE'S WORK.
+//
+// The parley engine had been applied to production by hand rather than through the migration
+// ledger, so its six functions were live in the database while the ledger had never heard of it.
+// Its author wrote the migration into the repo themselves, which was the right thing to do. This
+// script then mirrored the ledger, saw no such row, and unlinked the file. No error, no conflict:
+// a `git add supabase/migrations` afterwards simply staged the deletion as though it were intended.
+//
+// So the deletion is now scoped by OWNERSHIP, established by reading each file's own header, not
+// by extension. A file this script did not write is never touched.
+//
+// AND THE ORPHANS ARE REPORTED RATHER THAN SWALLOWED, because an unowned migration file is a real
+// signal and usually an important one: it means something is live in the database that the ledger
+// cannot account for, so a rebuild from the ledger alone would come back missing it.
+const OWNED_MARK = 'Exported verbatim by scripts/dump-schema.mjs.';
+const orphans = [];
+for (const f of fs.readdirSync(migDir)) {
+  if (!f.endsWith('.sql')) continue;
+  const full = path.join(migDir, f);
+  let head = '';
+  try { head = fs.readFileSync(full, 'utf8').slice(0, 400); } catch { /* unreadable: treat as not ours */ }
+  if (head.includes(OWNED_MARK)) fs.unlinkSync(full);
+  else orphans.push(f);
+}
 
 for (const m of migrations) {
   const safe = String(m.name || 'migration').replace(/[^a-z0-9_]+/gi, '_').slice(0, 80);
@@ -254,6 +277,13 @@ function body change.
 const c = write('supabase/RESTORE.md', restore);
 
 console.log(`migrations : ${migrations.length} files, ${(migBytes / 1024).toFixed(1)} KB`);
+if (orphans.length) {
+  console.log('');
+  console.log(`★ ${orphans.length} migration file(s) in this directory were NOT written by this script and were LEFT ALONE:`);
+  for (const f of orphans) console.log(`    ${f}`);
+  console.log('  Each one describes something applied to the database outside the migration ledger.');
+  console.log('  That is worth resolving: a rebuild from the ledger alone would come back without it.');
+}
 console.log(`schema.sql : ${(a.bytes / 1024).toFixed(1)} KB`);
 console.log(`objects.json: ${(b.bytes / 1024).toFixed(1)} KB`);
 console.log(`RESTORE.md : ${(c.bytes / 1024).toFixed(1)} KB`);

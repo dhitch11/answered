@@ -7843,7 +7843,7 @@
  ],
  "policies": [],
  "postgres": "17.6",
- "taken_at": "2026-08-14T23:07:43.880271+00:00",
+ "taken_at": "2026-08-14T23:08:50.593217+00:00",
  "triggers": [
   {
    "name": "admin_audit_no_mutate",

@@ -1,5 +1,5 @@
 -- answered-prod, current database definition.
--- Exported 2026-08-14T23:07:43.880271+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
+-- Exported 2026-08-14T23:08:50.593217+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
 --
 -- STRUCTURE ONLY. This file contains no row data of any kind.
 -- This is what the database IS. supabase/migrations/ is how it got here. Both are kept
