@@ -171,7 +171,7 @@ async function opStart(req, body, url) {
       p_phone: requester,
       p_source: 'hold_start_form',
       p_evidence: { consent_text: text, page: '/hold/start', target, target_label: targetLabel, agreed_at: new Date().toISOString(), ua },
-      p_scope: 'hold_bridge',
+      p_scope: policy.HOLD_CONSENT_SCOPE,
       p_written: true,
       p_expires_at: null,
       p_ip: ip,
@@ -423,6 +423,10 @@ function shell(title, body, { head = '' } = {}) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>${esc(title)}</title>
+<!-- The site mark, inline as a data URI. A missing favicon is a console error at every
+     viewport, and a console error on a page a customer is watching a live call on is not
+     something to leave for later. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>${CSS}</style>${head}</head>
 <body><main class="wrap">${body}
 <p class="foot">Answered. It answers, it waits, it follows the money. Priced per outcome, never per minute.

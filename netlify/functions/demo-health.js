@@ -124,11 +124,28 @@ async function probeTwilioNumber() {
   const clean = num.replace(/[^+\d]/g, '');
   if (!/^\+\d{10,15}$/.test(clean)) return probeFail('ANSWERED_DEMO_NUMBER is not E.164');
   try {
+    // Do not ask a provider that told us to stop asking.
+    const pd0 = await import('./lib/provider-down.mjs');
+    const down0 = await pd0.isDown('twilio', event);
+    if (down0) {
+      return { landed: true, ok: false, reason: 'Twilio has been refusing every request for ' + down0.minutes + ' minutes. Not retrying until the window clears.' };
+    }
     const r = await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(clean), {
       headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
       signal: AbortSignal.timeout(5000),
     });
-    if (!r.ok) return { landed: true, ok: false, reason: 'lookup returned ' + r.status };
+    if (!r.ok) {
+      // A suspended Twilio account answers exactly like a bad key, so back off
+      // rather than asking again in 60 seconds forever. The capability is not
+      // dropped: the first probe past the window clears the marker.
+      const body = await r.text().catch(() => '');
+      const pd = await import('./lib/provider-down.mjs');
+      if (pd.isHardRefusal(r.status, body)) {
+        await pd.markDown('twilio', 'lookup ' + r.status, event);
+        return { landed: true, ok: false, reason: 'Twilio is refusing every request (' + r.status + '). Backing off rather than retrying.' };
+      }
+      return { landed: true, ok: false, reason: 'lookup returned ' + r.status };
+    }
     const j = await r.json();
     if (j.valid !== true) return { landed: true, ok: false, reason: 'lookup says the number is not valid' };
     return { landed: true, ok: true, reason: '' };
@@ -230,11 +247,19 @@ async function probeOutbound(event, el) {
     parts.caller_id = probeFail('the caller ID number is not E.164');
   } else {
     try {
-      const r = await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(from), {
+      const pd1 = await import('./lib/provider-down.mjs');
+      const down1 = await pd1.isDown('twilio', event);
+      // NOTE: this must never `return`. Three more checks (el, onboard_agent,
+      // consent_store) are computed after this block, and returning early
+      // would silently drop them from the report while the report still
+      // looked complete. Skip the FETCH, not the function.
+      const r = down1 ? null : await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(from), {
         headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
         signal: AbortSignal.timeout(5000),
       });
-      if (!r.ok) {
+      if (down1) {
+        parts.caller_id = { landed: true, ok: false, reason: 'Twilio has been refusing every request for ' + down1.minutes + ' minutes; not retrying until the window clears' };
+      } else if (!r.ok) {
         parts.caller_id = { landed: true, ok: false, reason: 'caller ID lookup returned ' + r.status };
       } else {
         const j = await r.json();

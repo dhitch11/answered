@@ -40,6 +40,8 @@ import {
 import { rpc } from './lib/db.mjs';
 import { loginPage, consolePage } from './lib/admin-ui.mjs';
 import { CATALOG } from './lib/meter.mjs';
+import * as outreach from './lib/outreach.mjs';
+import * as ai from './lib/anthropic.mjs';
 
 export const config = {
   path: [
@@ -59,6 +61,23 @@ export const config = {
     '/api/admin/audit',
     '/api/admin/system',
     '/api/admin/compliance',
+    '/api/admin/crm',
+    '/api/admin/crm/facets',
+    '/api/admin/crm/contact',
+    '/api/admin/crm/update',
+    '/api/admin/crm/bulk',
+    '/api/admin/crm/note',
+    '/api/admin/crm/task',
+    '/api/admin/crm/tasks',
+    '/api/admin/crm/timeline',
+    '/api/admin/crm/preflight',
+    '/api/admin/crm/email',
+    '/api/admin/crm/sms',
+    '/api/admin/crm/call',
+    '/api/admin/crm/draft',
+    '/api/admin/views',
+    '/api/admin/jobs',
+    '/api/admin/ai/status',
     '/api/admin/recording',
     '/api/admin/refund',
     '/api/admin/attribute-backfill',
@@ -257,7 +276,11 @@ async function getConsole(req, url) {
 
 // ── the API ──────────────────────────────────────────────────────────────────────────────────
 
-const MUTATING = new Set(['account-status', 'refund', 'attribute-backfill', 'log']);
+const MUTATING = new Set([
+  'account-status', 'refund', 'attribute-backfill', 'log',
+  'crm/update', 'crm/bulk', 'crm/note', 'crm/task', 'crm/email', 'crm/sms', 'crm/call',
+  'crm/draft', 'views',
+]);
 
 async function apiRoute(req, url, name) {
   const me = await currentAdmin(req);
@@ -378,6 +401,156 @@ async function apiRoute(req, url, name) {
       });
       return json(200, { ok: true });
     }
+
+    // ── CRM ────────────────────────────────────────────────────────────────────────────────
+    case 'crm':
+      return json(200, await rpc('sv_admin_contacts', {
+        p_q: nz(q.get('q')), p_lane: nz(q.get('lane')), p_disposition: nz(q.get('disposition')),
+        p_state: nz(q.get('state')), p_trade: nz(q.get('trade')), p_line_type: nz(q.get('line_type')),
+        p_owner: nz(q.get('owner')), p_tag: nz(q.get('tag')),
+        p_suppressed: tri(q.get('suppressed')), p_dialable: tri(q.get('dialable')),
+        p_sort: nz(q.get('sort')) || 'recent',
+        p_limit: num(q.get('limit'), 50), p_offset: num(q.get('offset'), 0),
+      }));
+
+    case 'crm/facets':
+      return json(200, await rpc('sv_admin_contact_facets'));
+
+    case 'crm/contact': {
+      const id = nz(q.get('id'));
+      if (!id) return json(400, { error: 'a contact id is required' });
+      const row = await rpc('sv_admin_contact', { p_id: id });
+      if (!row) return json(404, { error: 'no such contact' });
+      await audit(admin, req, 'contact.view', { targetKind: 'contact', targetId: id });
+      return json(200, row);
+    }
+
+    case 'crm/update': {
+      const b = await readJson(req);
+      if (!b.id) return json(400, { error: 'a contact id is required' });
+      const r = await rpc('sv_admin_contact_update', { p_id: b.id, p_patch: b.patch || {}, p_actor: admin.email });
+      await audit(admin, req, 'contact.update', {
+        targetKind: 'contact', targetId: b.id, payload: b.patch || {},
+        result: r && r.ok ? 'ok' : 'refused',
+      });
+      return json(r && r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/bulk': {
+      const b = await readJson(req);
+      const r = await rpc('sv_admin_contacts_bulk', {
+        p_ids: b.ids || [], p_action: b.action, p_value: b.value == null ? null : String(b.value),
+        p_actor: admin.email,
+      });
+      await audit(admin, req, 'contact.bulk', {
+        targetKind: 'contact', targetId: `${(b.ids || []).length} selected`,
+        payload: { action: b.action, value: b.value, result: r },
+        result: r && r.ok ? 'ok' : 'refused',
+      });
+      return json(r && r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/note': {
+      const b = await readJson(req);
+      const r = await rpc('sv_admin_note_add', {
+        p_contact_id: b.contact_id || null, p_call_sid: b.call_sid || null,
+        p_body: b.body || '', p_author: admin.email, p_pinned: Boolean(b.pinned),
+      });
+      await audit(admin, req, 'contact.note', { targetKind: 'contact', targetId: b.contact_id });
+      return json(r && r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/task': {
+      const b = await readJson(req);
+      const r = b.id
+        ? await rpc('sv_admin_task_set', { p_id: b.id, p_status: b.status, p_actor: admin.email })
+        : await rpc('sv_admin_task_add', { p_row: { ...b, created_by: admin.email } });
+      await audit(admin, req, b.id ? 'task.set' : 'task.add', {
+        targetKind: 'task', targetId: b.id || null, payload: b,
+      });
+      return json(r && r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/tasks':
+      return json(200, await rpc('sv_admin_tasks', {
+        p_status: nz(q.get('status')), p_assignee: nz(q.get('assignee')),
+        p_limit: num(q.get('limit'), 200),
+      }));
+
+    case 'crm/timeline':
+      return json(200, await rpc('sv_crm_timeline', {
+        p_contact_id: nz(q.get('contact')), p_account_id: nz(q.get('account')),
+        p_limit: num(q.get('limit'), 100), p_before: nz(q.get('before')),
+      }));
+
+    case 'crm/preflight': {
+      const id = nz(q.get('id'));
+      if (!id) return json(400, { error: 'a contact id is required' });
+      const pre = await outreach.preflight(id);
+      if (!pre) return json(404, { error: 'no such contact' });
+      return json(200, pre);
+    }
+
+    case 'crm/email': {
+      const b = await readJson(req);
+      const r = await outreach.sendEmail({
+        contactId: b.contact_id, to: b.to, subject: b.subject, body: b.body,
+        template: b.template || null, actor: admin.email,
+        aiAssisted: Boolean(b.ai_assisted), aiModel: b.ai_model || null,
+      });
+      await audit(admin, req, 'outreach.email', {
+        targetKind: 'contact', targetId: b.contact_id,
+        payload: { to: b.to, subject: b.subject, ai_assisted: Boolean(b.ai_assisted) },
+        result: r.ok ? 'ok' : (r.blocked ? 'blocked' : 'failed'),
+      });
+      return json(r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/sms': {
+      const b = await readJson(req);
+      const r = await outreach.sendSms({ contactId: b.contact_id, to: b.to, body: b.body, actor: admin.email });
+      await audit(admin, req, 'outreach.sms', {
+        targetKind: 'contact', targetId: b.contact_id, payload: { to: b.to },
+        result: r.ok ? 'ok' : (r.blocked ? 'blocked' : 'failed'),
+      });
+      return json(r.ok ? 200 : 400, r);
+    }
+
+    case 'crm/call': {
+      const b = await readJson(req);
+      const r = await outreach.callIntent({ contactId: b.contact_id, to: b.to, actor: admin.email, note: b.note });
+      await audit(admin, req, 'outreach.call', {
+        targetKind: 'contact', targetId: b.contact_id, payload: { to: b.to },
+        result: r.ok ? 'ok' : 'blocked',
+      });
+      return json(200, r);
+    }
+
+    case 'crm/draft':
+      return await draftMessage(req, admin);
+
+    case 'views': {
+      if (req.method === 'POST') {
+        const b = await readJson(req);
+        const r = b.delete
+          ? await rpc('sv_admin_view_delete', { p_owner: admin.admin_id, p_id: b.id })
+          : await rpc('sv_admin_view_save', {
+              p_owner: admin.admin_id, p_scope: b.scope, p_name: b.name,
+              p_filters: b.filters || {}, p_shared: Boolean(b.shared),
+            });
+        return json(r && r.ok ? 200 : 400, r);
+      }
+      return json(200, await rpc('sv_admin_views', { p_owner: admin.admin_id, p_scope: nz(q.get('scope')) }));
+    }
+
+    case 'jobs':
+      return json(200, await rpc('sv_admin_jobs', {
+        p_q: nz(q.get('q')), p_status: nz(q.get('status')), p_account: nz(q.get('account')),
+        p_limit: num(q.get('limit'), 50), p_offset: num(q.get('offset'), 0),
+      }));
+
+    case 'ai/status':
+      return json(200, { ...ai.status(), probe: q.get('probe') === '1' ? await ai.probe() : null });
 
     default:
       return json(404, { error: 'no such endpoint' });
@@ -651,6 +824,116 @@ async function doRefund(req, admin) {
       payload: { amount_cents: amount, error: String(e.message).slice(0, 200) },
     });
     return json(502, { error: 'Stripe refused that refund: ' + String(e.message).slice(0, 200) });
+  }
+}
+
+/**
+ * AI DRAFTING — the language layer, and only the language layer.
+ *
+ * ★ THE MODEL IS HANDED FACTS AND ASKED TO PHRASE THEM. It is never asked to recall, infer or
+ * supply one. Everything in the prompt below is read out of the database first, and the system
+ * prompt forbids inventing anything not in it, because the failure mode of a drafting tool is not
+ * bad prose, it is a confident sentence about a business that is not true — sent, in our name, to
+ * that business.
+ *
+ * Nothing is ever auto-sent. The draft lands in an editable box and a human presses send. That is
+ * a product decision, not a limitation: an operator who edits a draft has read it, and an operator
+ * who approves a queue has not.
+ */
+async function draftMessage(req, admin) {
+  const b = await readJson(req);
+  if (!b.contact_id) return json(400, { error: 'a contact is required' });
+  if (!ai.configured()) {
+    return json(503, { error: 'ANTHROPIC_API_KEY_LIVE is not set on this deploy, so no draft can be written.' });
+  }
+  if (ai.KILLED()) return json(503, { error: 'The AI kill switch is set.' });
+
+  const rec = await rpc('sv_admin_contact', { p_id: b.contact_id });
+  if (!rec) return json(404, { error: 'no such contact' });
+  const c = rec.contact;
+
+  // Only what we actually hold. A null stays null and is labelled as unknown rather than omitted,
+  // so the model cannot mistake absence for something it may fill in.
+  const facts = {
+    business_name: c.name || null,
+    trade: c.trade || null,
+    city: c.city || null,
+    state: c.state || null,
+    website: c.website || null,
+    person_name: c.contact_name || null,
+    person_role: c.contact_role || null,
+    line_type: c.line_type || null,
+    times_we_have_called: c.call_count || 0,
+    last_contacted_at: c.last_contacted_at || null,
+    disposition: c.disposition,
+    notes: (rec.notes || []).slice(0, 5).map((n) => n.body),
+    previous_calls: (rec.calls || []).slice(0, 3).map((x) => ({
+      when: x.created_at, outcome: x.disposition || x.status, summary: x.summary || null,
+    })),
+  };
+
+  const system = [
+    'You draft a short outreach email for an operator at Answered, an AI phone receptionist for',
+    'trades and small businesses. The operator edits and sends it. You never send anything.',
+    '',
+    'ABSOLUTE RULES:',
+    '1. Use ONLY the facts in the FACTS object. If a field is null, you do not know it, and you must',
+    '   not guess it, infer it from the business name, or write around it with a vague claim.',
+    '2. Never invent a statistic, a customer count, a price, a case study, a mutual connection, or a',
+    '   claim about their business you were not given. If you have little to work with, write a',
+    '   shorter email. A short honest email is the correct output; a longer invented one is a defect.',
+    '3. Never promise a text message. Never state a price.',
+    '4. Address a person by name only if person_name is present. Otherwise address the business.',
+    '5. Plain, direct, human. No marketing voice, no exclamation marks, no em dashes. Sixth to',
+    '   eighth grade reading level. Under 120 words unless the operator asked for more.',
+    '6. The product truth you may use: Answered picks up the phone when they cannot, takes the job',
+    '   details, and texts or emails them the message. It exists because trades people are on a roof',
+    '   or under a sink when the phone rings, and a missed call is a lost job.',
+  ].join('\n');
+
+  const intent = String(b.intent || 'a first, brief outreach email').slice(0, 400);
+
+  try {
+    const out = await ai.askJson({
+      // Judgement slot: this is customer-facing text going out under our name.
+      slot: b.slot === 'fast' ? 'quality' : 'deep',
+      system,
+      messages: [{ role: 'user', content:
+        `INTENT: ${intent}\n\nFACTS (the only things you know):\n${JSON.stringify(facts, null, 1)}` }],
+      name: 'draft',
+      description: 'The drafted email, plus an honest account of what you could not say.',
+      schema: {
+        type: 'object', additionalProperties: false,
+        required: ['subject', 'body', 'facts_used', 'could_not_say'],
+        properties: {
+          subject: { type: 'string' },
+          body: { type: 'string' },
+          facts_used: { type: 'array', items: { type: 'string' },
+            description: 'Which FACTS fields you actually used.' },
+          could_not_say: { type: 'array', items: { type: 'string' },
+            description: 'Anything you would normally include but had no fact for. Be specific.' },
+        },
+      },
+      max_tokens: 1200,
+    });
+
+    await audit(admin, req, 'ai.draft', {
+      targetKind: 'contact', targetId: b.contact_id,
+      payload: { model: out.model, slot: out.slot, usage: out.usage, cost_usd: out.cost_usd },
+    });
+
+    return json(200, {
+      ok: true, draft: out.data,
+      // Every AI output is labelled with the model that ACTUALLY served it and its real usage.
+      ai: { model: out.model, slot: out.slot, usage: out.usage, cost_usd: out.cost_usd,
+            cost_label: 'ESTIMATED from a local rate table; the token counts are measured' },
+    });
+  } catch (e) {
+    await audit(admin, req, 'ai.draft', {
+      targetKind: 'contact', targetId: b.contact_id, result: 'failed',
+      payload: { error: String(e.message).slice(0, 200) },
+    });
+    return json(502, { error: String(e.message).slice(0, 300) });
   }
 }
 

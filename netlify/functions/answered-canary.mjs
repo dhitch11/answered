@@ -149,6 +149,21 @@ function e164(raw) {
 }
 
 async function runCanary() {
+
+  // Do not place a call against a provider that is refusing everything. The
+  // Twilio account ran out of credits on 2026-08-14 and a retry storm aimed at
+  // an account with a payment problem is the one thing that can make a payment
+  // problem worse. The canary is NOT deleted: the first run past the backoff
+  // window tries again, and the moment the account is funded it simply passes.
+  try {
+    const pd = await import('./lib/provider-down.mjs');
+    const down = await pd.isDown('twilio');
+    if (down) {
+      const msg = 'canary skipped: Twilio has been refusing every request for ' + down.minutes + ' minutes (' + (down.reason || 'hard refusal') + '). Not placing a call.';
+      console.error(msg);
+      return { ok: false, at: new Date().toISOString(), reason: msg, skipped: true };
+    }
+  } catch (e) { /* if the marker cannot be read, run normally */ }
   const startedAt = new Date();
   const record = {
     ok: false,

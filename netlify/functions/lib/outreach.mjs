@@ -73,9 +73,25 @@ function twilioAuthFailure(status, bodyText) {
   };
 }
 
+/**
+ * ★ WHEN THE PROVIDER IS DOWN, BACK OFF HARD. DO NOT KEEP ASKING.
+ *
+ * The Twilio account is currently unfunded and answers 401 to everything. A console that polls a
+ * suspended provider every two minutes produces nothing but noise, and a retry storm against an
+ * account with a billing problem is the one thing that could make it worse. So a provider-level
+ * failure is cached for far longer than a normal answer.
+ *
+ * It is still a CACHE and not a switch: the moment the window lapses it asks again, so the day the
+ * account is funded the text controls turn themselves back on with no deploy and nobody having to
+ * remember. A capability behind a named, temporary gate is still a real capability.
+ */
+const PROVIDER_DOWN_BACKOFF_MS = 15 * 60_000;
+
 let a2pCache = { at: 0, value: null };
 export async function smsReadiness({ maxAgeMs = 120_000 } = {}) {
-  if (a2pCache.value && Date.now() - a2pCache.at < maxAgeMs) return a2pCache.value;
+  const ttl = (a2pCache.value && a2pCache.value.state === 'provider_unavailable')
+    ? PROVIDER_DOWN_BACKOFF_MS : maxAgeMs;
+  if (a2pCache.value && Date.now() - a2pCache.at < ttl) return a2pCache.value;
   const auth = twilioAuth();
   if (!auth) {
     return (a2pCache = { at: Date.now(), value: {

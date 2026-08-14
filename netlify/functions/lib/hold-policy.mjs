@@ -73,6 +73,13 @@ const CHARGED_PARTY = new Set(['tollFree', 'sharedCost', 'premium']);
 
 export const E164 = /^\+1\d{10}$/;
 
+/**
+ * The scope every Hold consent is recorded under, and the ONLY scope this gate will accept.
+ * Named once, here, because a permission granted for one purpose is not permission for another,
+ * and a string typed twice is a string that will differ once.
+ */
+export const HOLD_CONSENT_SCOPE = 'hold_bridge';
+
 export const knownState = (s) => Object.prototype.hasOwnProperty.call(STATE_ZONES, String(s || '').toUpperCase());
 
 /** The allowlist of targets that may be dialled with no human in the loop. */
@@ -171,10 +178,23 @@ export async function gateLeg(phone, o = {}) {
 
   // ── our own customer's leg ─────────────────────────────────────────────────────────────────
   // The one place consent is not optional and has no environment variable.
-  const consent = ctx.consent || null;
+  //
+  // ★ IT IS NOT READ FROM ctx.consent, AND THAT COST A FULL PRODUCT OUTAGE IN TESTING.
+  // sv_dial_context's consent subquery is hardcoded to `scope = 'research_call'`, correctly, for
+  // the cold dialler it serves. Hold records its permission under `hold_bridge`, so ctx.consent is
+  // ALWAYS null here and this gate refused every customer who had just agreed in writing, with a
+  // reason that read entirely plausibly. The scope has to be named by whoever is relying on it.
+  let consent = null;
+  try {
+    const r = await db.rpc('sv_consent_for', { p_phone: phone, p_scope: HOLD_CONSENT_SCOPE });
+    if (r && r.suppressed) return refuse('this number is on our do-not-call list', { state, leg });
+    consent = (r && r.consent) || null;
+  } catch (e) {
+    return refuse(`could not read the consent record (${String(e.message).slice(0, 80)}); refusing rather than guessing`, { state, leg });
+  }
   const valid = consent && consent.granted_at
     && (!consent.expires_at || new Date(consent.expires_at) > at)
-    && String(consent.scope || '').startsWith('hold');
+    && consent.scope === HOLD_CONSENT_SCOPE;
   if (!valid) {
     return refuse('we have no recorded consent from this number for a Hold call back, so we will not ring it',
       { state, leg, consent_scope: consent ? consent.scope : null });
