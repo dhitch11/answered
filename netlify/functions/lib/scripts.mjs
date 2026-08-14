@@ -17,6 +17,9 @@
 //                                                 because we do not check where you are
 
 const CALLBACK = () => process.env.ANSWERED_DEMO_NUMBER || '';
+// The registered legal entity responsible for initiating the call, for 47 CFR 64.1200(b)(1).
+// Unset is a KNOWN GAP, reported by dncReadiness(), not a silent default.
+const LEGAL_ENTITY = () => (process.env.ANSWERED_LEGAL_ENTITY || '').trim();
 
 /** Speak a US number as digits a human can write down, not as a quantity. */
 export function spokenNumber(e164) {
@@ -44,7 +47,21 @@ export function spokenNumber(e164) {
 export function opening() {
   const cb = spokenNumber(CALLBACK());
   return [
-    'Hi, this is Answered.',
+    // ★ 47 CFR 64.1200(b)(1) requires the message to state, at the BEGINNING, "the identity of the
+    // business, individual, or other entity that is responsible for initiating the call" — and the
+    // (b) chapeau reads "All artificial or prerecorded voice telephone messages shall", with NO
+    // line-type limitation, so it binds on business landlines exactly as it does on residences.
+    //
+    // "Answered" is a product name. Whether it is also the responsible entity depends on which
+    // company actually places the call, and that is a fact about the corporate structure that I am
+    // not entitled to assume. So the legal entity is env-driven: set ANSWERED_LEGAL_ENTITY and the
+    // opening names it; leave it unset and the script keeps today's wording rather than inventing
+    // a company name into a legally operative sentence.
+    //
+    // Deliberately NOT wired into the gate as a refusal: doing that would silently stop every call
+    // over a config value, and the honest failure here is a flagged decision for David, not an
+    // outage. It is surfaced by dncReadiness() instead.
+    LEGAL_ENTITY() ? `Hi, this is Answered, a service of ${LEGAL_ENTITY()}.` : 'Hi, this is Answered.',
     // ★ THE THIRD PARTY IS NAMED, not just the recording.
     // Six adversarial lenses found the largest exposure in this whole program is the AI that
     // LISTENS and never speaks, and that a wiretap claim is the class-certifiable one because the

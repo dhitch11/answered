@@ -64,6 +64,17 @@ export async function dncReadiness() {
   if (Date.now() - _readiness.at < 60000 && _readiness.value) return _readiness.value;
   try {
     const r = await db.rpc('sv_dnc_readiness');
+    // ★ 47 CFR 64.1200(b)(1) needs "the identity of the business ... responsible for initiating the
+    // call" spoken at the BEGINNING, and the (b) chapeau has no line-type limitation, so it binds on
+    // business landlines too. Our opening says "this is Answered", which is a PRODUCT name; whether
+    // that is also the responsible entity is a fact about the corporate structure, not something
+    // this code may assume. Surfaced as a named readiness gap so it reaches an operator screen
+    // rather than dying in a comment. It does NOT refuse calls — an unset config value should not
+    // silently become an outage, and the honest failure mode here is a decision David has to make.
+    r.legal_entity_named = Boolean((process.env.ANSWERED_LEGAL_ENTITY || '').trim());
+    if (!r.legal_entity_named) {
+      r.legal_entity_note = 'ANSWERED_LEGAL_ENTITY is unset, so the opening identifies the caller only as "Answered". Confirm whether that satisfies 64.1200(b)(1) for the entity actually placing the call.';
+    }
     _readiness = { at: Date.now(), value: r };
     return r;
   } catch (e) {
