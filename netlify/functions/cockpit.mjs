@@ -73,10 +73,14 @@ async function run(op, body, operator) {
 
     // ── listen, whisper, barge. All three are the same Twilio primitive with different flags. ──
     case 'monitor': case 'whisper': case 'barge': {
-      const to = body.to || OPERATOR_NUMBER();
-      if (!to) return { error: 'no operator number set (ANSWERED_OPERATOR_NUMBER)' };
+      // ★ The destination is the OPERATOR NUMBER FROM THE ENVIRONMENT, never a number in the
+      // request body. `body.to || OPERATOR_NUMBER()` turned these three operations into an
+      // ungated dialler: any authenticated session could dial an arbitrary number, with no lane
+      // check, no suppression check and no row in the call log.
+      const to = OPERATOR_NUMBER();
+      if (!to) return { error: 'ANSWERED_OPERATOR_NUMBER is not set, so there is nowhere to send the operator leg. Set it to your mobile.' };
       const conf = body.conference_name;
-      if (!conf) return { error: 'this call is not in a conference. Take it over first.' };
+      if (!conf) return { error: 'this call is not in a conference yet. Take it over first, then listen or barge.' };
       const params = {
         From: process.env.CANARY_FROM_NUMBER || process.env.ANSWERED_DEMO_NUMBER,
         To: to,
@@ -86,10 +90,22 @@ async function run(op, body, operator) {
         Label: `operator-${op}`,
       };
       if (op === 'monitor') params.Muted = 'true';
-      if (op === 'whisper') { params.Coaching = 'true'; params.CallSidToCoach = body.call_sid; params.Muted = 'false'; }
       if (op === 'barge') params.Muted = 'false';
+      if (op === 'whisper') {
+        // Coaching means the coached participant is the ONLY one who can hear the coach. Pointing
+        // CallSidToCoach at the prospect's leg meant "whisper" was heard by the prospect and by
+        // nobody else, which is the exact opposite of what the button says. On an AI call there
+        // is no colleague leg to coach, so this refuses rather than doing something surprising.
+        const coach = body.coach_call_sid;
+        if (!coach || coach === body.call_sid) {
+          return { error: 'whisper needs a colleague already in the conference to whisper to. On an AI call there is nobody to coach, so take the call over or barge in instead.' };
+        }
+        params.Coaching = 'true';
+        params.CallSidToCoach = coach;
+        params.Muted = 'false';
+      }
       const participant = await tw.addParticipant(conf, params);
-      await db.addEvent(body.call_sid, `operator_${op}`, { operator, participant: participant.call_sid });
+      await db.addEvent(body.call_sid, `operator_${op}`, { operator, participant: participant.call_sid, to_last4: String(to).slice(-4) });
       return { ok: true, participant_sid: participant.call_sid };
     }
 
@@ -99,13 +115,13 @@ async function run(op, body, operator) {
     case 'takeover': {
       const conf = body.conference_name || `ans-${body.call_sid}`;
       await tw.updateCall(body.call_sid, {
-        Url: `${site()}/api/call-voice?mode=conference&conf=${encodeURIComponent(conf)}`,
+        Url: `${site()}/api/call-voice?mode=conference&disclosed=1&conf=${encodeURIComponent(conf)}`,
         Method: 'POST',
       });
       await db.updateCall(body.call_sid, { conference_name: conf });
       await db.addEvent(body.call_sid, 'operator_takeover', { operator, conference: conf });
 
-      const to = body.to || OPERATOR_NUMBER();
+      const to = OPERATOR_NUMBER();
       let participant = null;
       if (to) {
         // A moment for the redirect to land before the operator leg arrives at the conference.
@@ -163,8 +179,15 @@ async function run(op, body, operator) {
       return { ok: true, line };
     }
 
-    case 'lineupdate':
+    case 'lineupdate': {
+      // A quarantined number is quarantined because a carrier flagged it. A label edit must not
+      // put it back into rotation as a side effect.
+      const current = ((await db.board()).lines || []).find((l) => l.phone === body.phone);
+      if (current && current.status === 'quarantined' && body.status && body.status !== 'quarantined' && !body.unquarantine) {
+        return { error: `${body.phone} is quarantined. Reactivating it needs an explicit unquarantine, not a label edit.` };
+      }
       return { line: await db.exec('lines', body) };
+    }
 
     case 'syncnumbers': {
       // Adopt every number the Twilio account already owns, so the board is the truth rather
@@ -185,8 +208,20 @@ async function run(op, body, operator) {
     case 'campaign':
       return { campaign: await db.exec('campaigns', body) };
 
-    case 'autopilot':
-      return { campaign: await db.exec('campaigns', { id: body.id, name: body.name, autopilot: body.on, status: body.on ? 'running' : 'paused', mode: body.mode, pacing_per_min: body.pacing_per_min, max_concurrent: body.max_concurrent }) };
+    case 'autopilot': {
+      // ★ This used to go through the same upsert as campaign creation, whose ON CONFLICT set
+      // policy, script and line_ids from the incoming row with no coalesce. Arming a campaign
+      // therefore wiped its policy and its disclosure script to '{}', and it silently un-halted a
+      // campaign the safety checks had stopped. Arming is now a narrow patch that cannot resurrect
+      // a halt without an explicit, deliberate resume.
+      const res = await db.rpc('sv_set_autopilot', {
+        p_id: body.id,
+        p_on: Boolean(body.on),
+        p_resume: Boolean(body.resume),
+      });
+      if (res && res.refused) return { error: res.refused };
+      return { campaign: res };
+    }
 
     case 'nextbatch':
       return { rows: await db.nextBatch(body.limit || 25, body.lane || null) };

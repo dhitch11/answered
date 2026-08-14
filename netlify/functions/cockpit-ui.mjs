@@ -317,7 +317,7 @@ export const PAGE = () => `<!doctype html><html lang="en"><head><meta charset="u
   </aside>
 </div>
 
-<div class="drawer" id="drawer"><div class="dh"><div style="flex:1"><h2 id="drTitle"></h2>
+<div class="drawer" id="drawer" inert aria-hidden="true" role="dialog" aria-modal="true" aria-label="Contact"><div class="dh"><div style="flex:1"><h2 id="drTitle"></h2>
   <div id="drSub" style="color:var(--mute);font-size:12.5px"></div></div>
   <button class="btn ghost" id="drClose">Close</button></div>
   <div class="db" id="drBody"></div></div>
@@ -327,7 +327,7 @@ export const PAGE = () => `<!doctype html><html lang="en"><head><meta charset="u
 <script>
 "use strict";
 var S = {
-  view: "board", board: null, sel: null, since: 0, utts: [],
+  view: "board", board: null, sel: null, since: 0, utts: [], busy: false,
   contacts: {rows:[],total:0}, calls: [], filters: {}, drawer: null,
   dialNum: "", dialMode: "measure", dialState: "", verdict: null, checking: false, err: 0
 };
@@ -863,10 +863,23 @@ function openContact(id){
     });
     b.appendChild(ch);
 
-    $("drawer").classList.add("open");
+    var dr = $("drawer");
+    dr.removeAttribute("inert");
+    dr.removeAttribute("aria-hidden");
+    dr.classList.add("open");
   }).catch(function(e){ toast(e.message,"err"); });
 }
-function closeDrawer(){ $("drawer").classList.remove("open"); S.drawer=null; }
+function closeDrawer(){
+  var d = $("drawer");
+  d.classList.remove("open");
+  // ★ MEASURED: removing the class only slid it off-screen. Computed display stayed flex and
+  // visibility stayed visible, so one Tab landed on "Call this shop" and the next on "Never call
+  // again" — both live, both destructive, both invisible.
+  d.setAttribute("inert","");
+  d.setAttribute("aria-hidden","true");
+  $("drBody").innerHTML = "";
+  S.drawer = null;
+}
 
 /* ── the active call rail ──────────────────────────────────────────────────── */
 function select(c){
@@ -970,7 +983,11 @@ function tick(){
       if(found){ S.sel = found; $("srMeta").textContent = [fmtPhone(found.to),(found.status||"").replace("-"," "),found.answered_by||""].filter(Boolean).join(" \\u00b7 "); }
       renderCtrls();
     }
-    if(S.view==="board"||S.view==="lines"||S.view==="campaigns") renderView();
+    // Rebuilding main blows away a focused input, which is how the keyboard handler above ended
+    // up receiving a campaign name as commands. If the operator is typing in this view, leave it.
+    var a = document.activeElement;
+    var typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && $("main").contains(a);
+    if(!typing && (S.view==="board"||S.view==="lines"||S.view==="campaigns")) renderView();
     var m = (r.campaigns||[]).some(function(c){ return c.autopilot; });
     $("master").setAttribute("aria-pressed", m ? "true":"false");
   }).catch(function(e){
@@ -987,9 +1004,27 @@ function clocks(){
 }
 
 document.addEventListener("keydown", function(e){
+  // ★ MEASURED. Three separate ways this handler fired destructive call controls by accident:
+  //   1. the 2.5s refresh rebuilt the view, destroying a focused input, so activeElement fell
+  //      back to BODY and typing "box" into a campaign name fired barge then hangup on a live
+  //      call. Real names that do it: "Bay Area", "Bronx", "Roofing batch".
+  //   2. no modifier was ever inspected, so Cmd+S wrote a permanent do-not-call and Cmd+X hung up.
+  //   3. holding a key repeated the action, stacking four barge legs onto one call.
+  // A command key now has to be a bare keypress, on the body, not repeating.
+  if(e.metaKey || e.ctrlKey || e.altKey) return;
+  if(e.repeat) return;
+  var t = e.target;
+  if(t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)){
+    if(e.key==="Escape") t.blur();
+    return;
+  }
   if(/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)){
     if(e.key==="Escape") document.activeElement.blur();
     return;
+  }
+  if(t !== document.body && !(t && t.id === "shell")) {
+    // focus is on a real control; let that control own the key
+    if(e.key !== "Escape") return;
   }
   var k = e.key.toLowerCase();
   var idx = "123456".indexOf(k);
@@ -1002,8 +1037,20 @@ document.addEventListener("keydown", function(e){
   if(k==="w") callOp("whisper");
   if(k==="b") callOp("barge");
   if(k==="t") callOp("takeover");
-  if(k==="x") api("hangup",{call_sid:S.sel.call_sid}).then(function(){toast("Ended","ok");tick();}).catch(function(e){toast(e.message,"err");});
-  if(k==="s") api("suppress",{phone:S.sel.to,reason:"suppressed from the console by "+operator()}).then(function(){toast("Suppressed","ok");});
+  if(k==="x"){
+    if(S.busy) return; S.busy = true;
+    api("hangup",{call_sid:S.sel.call_sid})
+      .then(function(){toast("Ended","ok");tick();})
+      .catch(function(e){toast(e.message,"err");})
+      .then(function(){ S.busy = false; });
+  }
+  if(k==="s"){
+    // Permanent and irreversible. It asks.
+    if(!window.confirm("Never call " + fmtPhone(S.sel.to) + " again? This cannot be undone.")) return;
+    api("suppress",{phone:S.sel.to,reason:"suppressed from the console by "+operator()})
+      .then(function(){toast("Suppressed. This number will never be dialled again.","ok");})
+      .catch(function(e){toast("SUPPRESSION FAILED: "+e.message+" — this number is NOT on the do-not-call list.","err");});
+  }
 });
 
 $("drClose").onclick = closeDrawer;
@@ -1012,7 +1059,15 @@ $("master").onclick = function(){
   var cs = (S.board && S.board.campaigns) || [];
   var anyOn = cs.some(function(c){ return c.autopilot; });
   if(!cs.length){ toast("No campaigns to arm. Create one in Autopilot.","err"); return; }
-  Promise.all(cs.map(function(c){
+  // ★ This is a fan-out across every campaign, not a mirror of one. It used to arm drafts and
+  // silently resume safety-halted campaigns on a single unconfirmed click.
+  var targets = cs.filter(function(c){ return c.status !== "halted"; });
+  var halted = cs.length - targets.length;
+  if(!targets.length){ toast("Every campaign is halted. Read the halt reason before resuming one.","err"); return; }
+  if(!anyOn && !window.confirm(
+      "Arm " + targets.length + " campaign" + (targets.length>1?"s":"") + "? This starts placing real calls to real people."
+      + (halted ? "\n\n" + halted + " halted campaign(s) will be left alone." : ""))) return;
+  Promise.all(targets.map(function(c){
     return api("autopilot",{id:c.id,name:c.name,mode:c.mode,on:!anyOn,pacing_per_min:c.pacing_per_min,max_concurrent:c.max_concurrent});
   })).then(function(){ toast(anyOn?"All campaigns paused":"All campaigns armed","ok"); tick(); })
     .catch(function(e){ toast(e.message,"err"); });

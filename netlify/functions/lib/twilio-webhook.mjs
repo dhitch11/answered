@@ -52,7 +52,12 @@ function safeEqual(a, b) {
 export function validSignature(event, params, publicPath) {
   const token = AUTH_TOKEN();
   if (!token) {
-    console.error(`${publicPath}: TWILIO_AUTH_TOKEN not set; HMAC skipped, AccountSid gate still enforced.`);
+    // ★ The AccountSid is an integrity cross-check, not an authenticator: it is the Basic-auth
+    // username half, it is printed in every console and support thread, and it is never rotated.
+    // Returning true here left every webhook open to anyone who has ever seen it. The only reason
+    // this is not a hard 403 today is that it would take the live demo line down with it, so it
+    // is loud, it is scoped, and TWILIO_AUTH_TOKEN closes it permanently.
+    console.error(`${publicPath}: TWILIO_AUTH_TOKEN NOT SET — this webhook is authenticated only by a non-secret AccountSid. Set TWILIO_AUTH_TOKEN.`);
     return true;
   }
   const headers = lower(event.headers);
@@ -108,8 +113,14 @@ export const origin = (event) => {
  * TwiML document that some other system generated, which is how a bridged AI call still produces
  * a live transcript in the cockpit.
  */
-export function transcriptionStart(base, { callSid, mode }) {
-  const cb = `${base}/api/call-transcription?sid=${encodeURIComponent(callSid || '')}&mode=${encodeURIComponent(mode || '')}`;
+export function transcriptionStart(base, { callSid, mode, to }) {
+  // ★ Twilio's transcription-content callback carries AccountSid, CallSid, TranscriptionSid,
+  // Timestamp, SequenceId, TranscriptionEvent, LanguageCode, Track, TranscriptionData, Stability
+  // and Final. It does NOT carry To or From. The stop tripwire read p.To and p.From, got
+  // undefined for both, and suppressed nothing while logging a clean opt-out. The number has to
+  // travel on the callback URL, because it is not in the body and never was.
+  const cb = `${base}/api/call-transcription?sid=${encodeURIComponent(callSid || '')}`
+    + `&mode=${encodeURIComponent(mode || '')}&to=${encodeURIComponent(to || '')}`;
   return `<Start><Transcription statusCallbackUrl="${esc(cb)}" track="both_tracks" partialResults="true" `
     + `inboundTrackLabel="them" outboundTrackLabel="us" languageCode="en-US" speechModel="telephony" name="live"/></Start>`;
 }

@@ -51,10 +51,20 @@ export async function read(ledger) {
   }).filter(Boolean);
 }
 
+/**
+ * ★ The writer appends "+15125550142  # caller said stop on call CA123 <timestamp>", and this
+ * reader used to put the WHOLE annotated line into the Set. So `suppress.has('+15125550142')`
+ * was false for every number ever suppressed: the file recorded the opt-out perfectly and the
+ * gate could never match it. Strip the comment, keep only the number.
+ */
 export async function suppression() {
   await ensure();
   const text = await readFile(paths.suppression, 'utf8');
-  return new Set(text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')));
+  return new Set(
+    text.split('\n')
+      .map((l) => l.split('#')[0].trim())
+      .filter(Boolean),
+  );
 }
 
 export async function suppress(phone, why) {

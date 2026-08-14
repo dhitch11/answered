@@ -31,9 +31,28 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
     };
   }
 
+  // ★ CHECK THE FIELD'S PRESENCE, NEVER ITS TRUTHINESS, for a control whose absence means
+  // permission. `ctx.suppressed ? ... : []` produced an EMPTY suppression set for any payload
+  // where the key was missing, null, or spelled differently, and `Number(ctx.calls_30d || 0)`
+  // turned a missing frequency count into a free dial. Both failed OPEN, silently, on the two
+  // checks that exist to stop us calling someone who asked us not to.
+  if (typeof ctx.suppressed !== 'boolean' || !Number.isFinite(Number(ctx.calls_30d))) {
+    return {
+      verdict: {
+        lane: LANES.RED,
+        dialable: false,
+        reasons: [`dial context is malformed (suppressed=${JSON.stringify(ctx.suppressed)}, calls_30d=${JSON.stringify(ctx.calls_30d)}); refusing rather than assuming`],
+      },
+      lineType: null, lookupOk: false, context: ctx, contact: ctx.contact || null,
+    };
+  }
+
   const contact = ctx.contact || null;
   let lt = lineType ?? contact?.line_type ?? null;
   let lo = lookupOk ?? contact?.lookup_ok ?? null;
+  // A stored line type with no recorded successful lookup is not evidence. `lookup_ok` null means
+  // nobody ever classified this number, and null is not false.
+  if (lt != null && lo !== true) { lt = null; lo = null; }
   if (lt == null) {
     const res = await tw.lineType(phone);
     lt = res.lineType; lo = res.lookupOk;
@@ -42,7 +61,9 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
   const verdict = classify(
     {
       phone,
-      state: state ?? contact?.state ?? null,
+      // The number's OWN state wins. A caller-supplied state is only a fallback for a number we
+      // have never seen, never an override that could move a shop into a friendlier timezone.
+      state: contact?.state ?? state ?? null,
       lineType: lt,
       lookupOk: lo,
       consent: ctx.consent

@@ -42,7 +42,18 @@ export const recordCall     = (row) => rpc('sv_record_call', { p_row: row });
 export const updateCall     = (callSid, patch) => rpc('sv_update_call', { p_call_sid: callSid, p_patch: patch });
 export const addTranscript  = (callSid, rows) => rpc('sv_add_transcript', { p_call_sid: callSid, p_rows: rows });
 export const addEvent       = (callSid, kind, payload) => rpc('sv_add_event', { p_call_sid: callSid, p_kind: kind, p_payload: payload || {} });
-export const suppress       = (phone, reason, source) => rpc('sv_suppress', { p_phone: phone, p_reason: reason, p_source: source || 'system' });
+/**
+ * ★ A falsy phone here is a THROW, never a quiet write. JSON.stringify drops undefined keys, so
+ * suppress(undefined) previously posted a body with no p_phone at all: the RPC ran, nothing was
+ * suppressed, and every caller's try/catch saw success. The one write that must never fail
+ * silently was the one that did.
+ */
+export const suppress = (phone, reason, source) => {
+  if (!phone || !/^\+\d{8,15}$/.test(String(phone))) {
+    return Promise.reject(new Error(`refusing to write a suppression with no usable number (got ${JSON.stringify(phone)})`));
+  }
+  return rpc('sv_suppress', { p_phone: phone, p_reason: reason, p_source: source || 'system' });
+};
 export const exec           = (table, row) => rpc('sv_exec', { p_table: table, p_row: row });
 
 // ── reads ────────────────────────────────────────────────────────────────────────────────────

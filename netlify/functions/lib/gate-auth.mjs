@@ -11,7 +11,17 @@
 import crypto from 'node:crypto';
 
 const PIN = () => (process.env.ANSWERED_DIRECTORY_PIN || '').trim();
-const KEY = () => process.env.ANSWERED_BRAIN_SECRET || '';
+// ★ The cookie key must NOT be a credential handed to a third party. It was
+// ANSWERED_BRAIN_SECRET, which is the bearer token pasted into the ElevenLabs custom-LLM config
+// and transmitted by them on every conversational turn: anyone holding it could mint an operator
+// session that places calls. ANSWERED_COCKPIT_KEY is ours alone. Falls back only so an existing
+// deploy does not lock itself out, and says so loudly when it does.
+const KEY = () => {
+  const own = (process.env.ANSWERED_COCKPIT_KEY || '').trim();
+  if (own) return own;
+  console.error('gate-auth: ANSWERED_COCKPIT_KEY is not set; falling back to a secret a third party holds. Set it.');
+  return process.env.ANSWERED_BRAIN_SECRET || '';
+};
 const TTL_HOURS = 12;
 
 export const BASE_HEADERS = {

@@ -120,8 +120,13 @@ export default async () => {
           if (res.retryAt) await db.rpc('sv_release', { p_id: contact.id });
         }
       } catch (e) {
+        // ★ DO NOT RELEASE ON AN UNKNOWN FAILURE. createCall can succeed (the phone is already
+        // ringing) and the row write can then throw on an RPC timeout. Releasing here put the
+        // contact back in the claimable queue, and the next minute's tick redialled someone who
+        // was mid-conversation. A contact left claimed costs one missed call; a contact released
+        // wrongly costs a redial loop against a real person.
         console.error(`campaign-runner: dial failed for ${contact.phone}:`, String(e.message).slice(0, 160));
-        await db.rpc('sv_release', { p_id: contact.id }).catch(() => {});
+        await db.addEvent(null, 'dial_failed_left_claimed', { phone: contact.phone, contact: contact.id, error: String(e.message).slice(0, 200) }).catch(() => {});
       }
     }
     report.campaigns.push(line);

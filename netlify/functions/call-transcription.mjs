@@ -31,7 +31,14 @@ export const handler = async (event) => {
   if (!gate.ok) return gate.reject;
 
   const p = gate.params;
-  const sid = (event.queryStringParameters || {}).sid || p.CallSid;
+  const q = event.queryStringParameters || {};
+  const sid = q.sid || p.CallSid;
+  // A call sid reaches twilio.updateCall(), which builds a REST path carrying the account's API
+  // credentials. Anything that is not a well-formed CallSid does not get to travel there.
+  if (!/^CA[0-9a-f]{32}$/i.test(String(sid || ''))) {
+    console.error('call-transcription: refusing a malformed call sid');
+    return OK;
+  }
   const kind = String(p.TranscriptionEvent || '');
 
   if (kind !== 'transcription-content') {
@@ -64,11 +71,27 @@ export const handler = async (event) => {
   // Only what THEY said can opt them out. Our own track saying the word "stop" must never
   // suppress the person we are talking to.
   if (speaker === 'them' && isStop(text)) {
-    const number = p.To && p.To !== process.env.ANSWERED_DEMO_NUMBER ? p.To : p.From;
-    console.error(`STOP heard on ${sid}: "${text.slice(0, 80)}" — suppressing ${number}`);
-    try {
-      await db.suppress(number, `said "${text.slice(0, 120)}" during call ${sid}`, 'transcription-tripwire');
-    } catch (e) { console.error('suppression write FAILED:', String(e.message).slice(0, 140)); }
+    // ★ Twilio's transcription-content payload carries NO To and NO From. This block used to read
+    // p.To and p.From, got undefined for both, and called db.suppress(undefined) — which
+    // JSON.stringify silently dropped, so the RPC ran without a phone number and the do-not-call
+    // list stayed empty. The hangup still happened, the event still logged, the call row still
+    // read do_not_call, so the console showed a clean opt-out while the next batch redialled the
+    // person who asked us to stop. The number travels on the callback URL now, with a live lookup
+    // as the fallback, and a missing number is a loud failure rather than a quiet no-op.
+    let number = q.to && q.to !== process.env.ANSWERED_DEMO_NUMBER ? q.to : null;
+    if (!number) {
+      try { const c = await twilio.getCall(sid); number = c.to || c.from || null; }
+      catch (e) { console.error('could not resolve the number to suppress:', String(e.message).slice(0, 120)); }
+    }
+    if (!number) {
+      console.error(`STOP heard on ${sid} but NO NUMBER could be resolved. Not suppressed. This needs a human.`);
+      try { await db.addEvent(sid, 'stop_unresolved', { text, speaker }); } catch { /* noop */ }
+    } else {
+      console.error(`STOP heard on ${sid}: "${text.slice(0, 80)}" — suppressing ${number}`);
+      try {
+        await db.suppress(number, `said "${text.slice(0, 120)}" during call ${sid}`, 'transcription-tripwire');
+      } catch (e) { console.error('suppression write FAILED:', String(e.message).slice(0, 140)); }
+    }
     try { await db.addEvent(sid, 'stop_detected', { text, speaker }); } catch { /* noop */ }
     try {
       await twilio.updateCall(sid, { Status: 'completed' });

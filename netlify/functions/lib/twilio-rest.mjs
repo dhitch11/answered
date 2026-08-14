@@ -1,5 +1,8 @@
 // twilio-rest.mjs — Twilio REST for the functions runtime. API-key auth, no SDK dependency.
 
+// Every path segment built from a caller-supplied value is encodeURIComponent'd. An unencoded
+// sid reaching a REST path that already carries the account's API credentials lets dot segments
+// in a query string retarget the request.
 const BASE = 'https://api.twilio.com/2010-04-01';
 const LOOKUP = 'https://lookups.twilio.com/v2';
 
@@ -48,7 +51,7 @@ export async function createCall(params) {
 
 export async function updateCall(sid, params) {
   const { account } = auth();
-  return req(`${BASE}/Accounts/${account}/Calls/${sid}.json`, {
+  return req(`${BASE}/Accounts/${account}/Calls/${encodeURIComponent(sid)}.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form(params),
@@ -57,7 +60,7 @@ export async function updateCall(sid, params) {
 
 export async function getCall(sid) {
   const { account } = auth();
-  return req(`${BASE}/Accounts/${account}/Calls/${sid}.json`);
+  return req(`${BASE}/Accounts/${account}/Calls/${encodeURIComponent(sid)}.json`);
 }
 
 /** Add a participant to a conference. This is how monitor, whisper and barge all work. */
@@ -72,7 +75,7 @@ export async function addParticipant(conferenceName, params) {
 
 export async function updateParticipant(conferenceName, callSid, params) {
   const { account } = auth();
-  return req(`${BASE}/Accounts/${account}/Conferences/${encodeURIComponent(conferenceName)}/Participants/${callSid}.json`, {
+  return req(`${BASE}/Accounts/${account}/Conferences/${encodeURIComponent(conferenceName)}/Participants/${encodeURIComponent(callSid)}.json`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form(params),
@@ -127,7 +130,7 @@ export async function buyNumber({ phoneNumber, friendlyName, voiceUrl, statusCal
 export async function releaseNumber(sid) {
   const { account } = auth();
   const { header } = auth();
-  const res = await fetch(`${BASE}/Accounts/${account}/IncomingPhoneNumbers/${sid}.json`, {
+  const res = await fetch(`${BASE}/Accounts/${account}/IncomingPhoneNumbers/${encodeURIComponent(sid)}.json`, {
     method: 'DELETE', headers: { Authorization: header },
   });
   if (!res.ok && res.status !== 204) throw new Error(`twilio release ${res.status}`);
@@ -142,13 +145,13 @@ export async function ownedNumbers() {
 
 export async function recordingUrl(sid) {
   const { account } = auth();
-  return `${BASE}/Accounts/${account}/Recordings/${sid}.mp3`;
+  return `${BASE}/Accounts/${account}/Recordings/${encodeURIComponent(sid)}.mp3`;
 }
 
 /** A short-lived signed URL for a recording, so the cockpit can play it without leaking creds. */
 export async function fetchRecording(sid) {
   const { account, header } = auth();
-  const res = await fetch(`${BASE}/Accounts/${account}/Recordings/${sid}.mp3`, { headers: { Authorization: header } });
+  const res = await fetch(`${BASE}/Accounts/${account}/Recordings/${encodeURIComponent(sid)}.mp3`, { headers: { Authorization: header } });
   if (!res.ok) throw new Error(`recording ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }

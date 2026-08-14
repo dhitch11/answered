@@ -46,7 +46,14 @@ async function elBridge(base, p, mode) {
     });
     const twiml = await r.text();
     if (!r.ok || !/<Response/i.test(twiml)) throw new Error(`register-call ${r.status}`);
-    return injectIntoResponse(twiml, transcriptionStart(base, { callSid: p.CallSid, mode }));
+    // ★ On the bridge, EVERY spoken word comes from a remote agent's document, so the locked
+    // disclosure in scripts.mjs is never reached. It is injected here as a bare <Say> ahead of
+    // their <Connect>: the only position where a vendor cannot skip it and speech cannot
+    // interrupt it.
+    return injectIntoResponse(
+      twiml,
+      transcriptionStart(base, { callSid: p.CallSid, mode, to: p.To }) + SAY(SCRIPTS.discovery.disclosure()),
+    );
   } catch (e) {
     console.error('call-voice: EL bridge failed, falling back to the local turn loop:', String(e.message).slice(0, 140));
     return null;
@@ -65,6 +72,16 @@ export const handler = async (event) => {
 
   await log(p.CallSid, 'twiml_requested', { mode, answeredBy, to: p.To, from: p.From });
 
+  // ★ AMD lands HERE and nowhere else. Twilio returns AnsweredBy on the webhook issued to the
+  // `Url` of the outbound call, not on the call-progress StatusCallback, so the only writer of
+  // calls.answered_by used to be a branch that never received the field. Every call in the
+  // answer-rate study would have read `unknown` forever, which is the one column that study is
+  // for. Never overwrite a decided value with 'unknown'.
+  if (answeredBy && answeredBy !== 'unknown') {
+    try { await db.updateCall(p.CallSid, { answered_by: answeredBy }); }
+    catch (e) { console.error('answered_by write failed:', String(e.message).slice(0, 140)); }
+  }
+
   // ── machine ────────────────────────────────────────────────────────────────────────────────
   if (answeredBy.startsWith('machine')) {
     // Only speak after a detected end-of-greeting. Talking over someone's outgoing message
@@ -79,9 +96,15 @@ export const handler = async (event) => {
   // ── conference: operator dial, and the takeover destination ────────────────────────────────
   if (mode === 'conference') {
     const name = q.conf || `ans-${p.CallSid}`;
+    // A takeover redirects a call that has ALREADY heard the disclosure, so it carries
+    // disclosed=1 and stays quiet. A conference dialled cold has not heard it, and every
+    // obligation still applies: this branch used to join a stranger to a conference having said
+    // nothing at all, on a script whose obligations list claimed all four.
+    const alreadyDisclosed = String(q.disclosed || '') === '1';
     return XML(
       `<Response>`
-      + transcriptionStart(base, { callSid: p.CallSid, mode })
+      + transcriptionStart(base, { callSid: p.CallSid, mode, to: p.To })
+      + (alreadyDisclosed ? '' : SAY(SCRIPTS.conference.disclosure()))
       + `<Dial><Conference beep="false" startConferenceOnEnter="true" endConferenceOnExit="false" `
       + `statusCallbackEvent="start end join leave" statusCallback="${esc(`${base}/api/call-status?kind=conference`)}" `
       + `statusCallbackMethod="POST" record="record-from-start" `
@@ -99,7 +122,7 @@ export const handler = async (event) => {
     const s = SCRIPTS.discovery;
     return XML(
       `<Response>`
-      + transcriptionStart(base, { callSid: p.CallSid, mode })
+      + transcriptionStart(base, { callSid: p.CallSid, mode, to: p.To })
       // The disclosure sits OUTSIDE the <Gather> so that speech cannot cut it off. Nested
       // inside, it was measured being silenced by the callee's own "hello" on the very first
       // real call. See the comment on opening() in lib/scripts.mjs.
@@ -116,7 +139,7 @@ export const handler = async (event) => {
   const s = SCRIPTS.measure;
   return XML(
     `<Response>`
-    + transcriptionStart(base, { callSid: p.CallSid, mode })
+    + transcriptionStart(base, { callSid: p.CallSid, mode, to: p.To })
     + SAY(s.disclosure())
     + `<Gather input="speech" speechTimeout="auto" timeout="${s.listenSeconds}" `
     + `action="${esc(`${base}/api/call-turn?mode=measure&turn=1`)}" method="POST" `

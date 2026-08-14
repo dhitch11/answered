@@ -9,6 +9,8 @@
 import assert from 'node:assert/strict';
 import { classify, DEFAULT_POLICY, LANES } from './lib/lane.mjs';
 import { withinWindow, STATE_ZONES, MULTI_ZONE_STATES } from './lib/geo.mjs';
+import { suppress, suppression, paths } from './lib/store.mjs';
+import { readFile, writeFile } from 'node:fs/promises';
 
 let pass = 0; let fail = 0;
 const test = (name, fn) => {
@@ -166,6 +168,37 @@ test('a dialable call always carries the four legal obligations', () => {
     assert.ok(v.obligations.includes(o), `missing ${o}`);
   }
 });
+
+// ── THE ROUND TRIP ───────────────────────────────────────────────────────────────────────────
+// ★ This class of test is the only one that could have caught the real bug: the writer appended
+// "+1512…  # caller said stop <timestamp>" and the reader put the WHOLE annotated line into the
+// Set, so has('+1512…') was false for every number ever suppressed. A suppression test that
+// builds the Set by hand passes happily while the file and the gate disagree forever.
+console.log('\nSUPPRESSION ROUND TRIP (write it, then read it back through the gate)');
+{
+  const backup = await readFile(paths.suppression, 'utf8').catch(() => null);
+  try {
+    const num = '+15125550999';
+    await suppress(num, 'said stop on call CA00000000000000000000000000000000');
+    const set = await suppression();
+
+    await (async () => test('the reader can find what the writer wrote', () => {
+      assert.ok(set.has(num), `suppression() returned ${[...set].slice(0, 3).join(', ')} — the annotated line, not the number`);
+    }))();
+
+    await (async () => test('a suppressed number is RED through the real gate', () => {
+      const v = classify({ ...base, phone: num, lineType: 'landline' }, DEFAULT_POLICY, set, OPEN);
+      assert.equal(v.lane, LANES.RED);
+      assert.match(v.reasons.join(' '), /suppression/);
+    }))();
+
+    await (async () => test('comments and blank lines never become members', () => {
+      assert.ok(![...set].some((x) => x.startsWith('#') || x === ''));
+    }))();
+  } finally {
+    if (backup !== null) await writeFile(paths.suppression, backup, 'utf8');
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
