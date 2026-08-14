@@ -54,7 +54,13 @@ rsync -a \
 
 # ── functions and their imports, LAYOUT PRESERVED ────────────────────────────
 mkdir -p "$STAGE/netlify"
-rsync -a --exclude 'node_modules' "$REPO/netlify/functions" "$STAGE/netlify"/
+# ★ *.test.mjs IS EXCLUDED FROM THE FUNCTIONS TREE TOO, NOT ONLY FROM THE SITE.
+# Netlify makes every top-level file in netlify/functions/ a function, and a function named
+# "recover.test" has a dot in it, which the deploy API rejects: 422 "Incorrect function names."
+# That fails the WHOLE build for every lane, and the error names no file. Measured 2026-08-14 by
+# @LANE-RECOVER, who lost a deploy to it. Subdirectory tests (lib/*.test.mjs) were never
+# functions and are unaffected; this makes the top level safe as well.
+rsync -a --exclude 'node_modules' --exclude '*.test.mjs' "$REPO/netlify/functions" "$STAGE/netlify"/
 # research/lib only. research/data is real business contact data and is never
 # deployed; the .gitignore says so and this says so again, in the one place
 # where forgetting it would publish it.

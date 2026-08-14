@@ -195,6 +195,15 @@
       or the demo was a different product. NOTHING here uses .rv, because .rv
       rests at opacity:0 under html.js and only the load-time IntersectionObserver
       ever adds .in. Injected .rv content would rest invisible forever. */
+/* ★ MEASURED, NOT ASSUMED. `hero.hidden = true` set the attribute and changed
+   NOTHING: the UA rule [hidden]{display:none} is element specificity, and
+   `.hero{display:flex}` in the shared sheet beats it. A stranger opening a live
+   deal link got the deal AND a 748px marketing hero with a second h1 under it,
+   while every check that asked "is the attribute set" said yes. Only the
+   screenshot said no. These two are the only elements this page hides that
+   carry a display of their own. */
+#hero[hidden], #deal[hidden] { display: none !important; }
+
 .pd-card { border: 1px solid var(--line2); border-radius: 16px; background: var(--ink-900); padding: clamp(18px,2.4vw,26px); }
 .pd-card + .pd-card { margin-top: 16px; }
 .pd-k { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--bronze); }
@@ -226,6 +235,8 @@
 .pd-dir:hover { border-color: var(--bronze); }
 .pd-dir[aria-pressed="true"] { border-color: var(--bronze); background: rgba(227,255,79,.07); }
 .pd-dir[aria-pressed="true"] span { color: var(--t2); }
+.pd-dir[disabled] { opacity: .5; cursor: not-allowed; }
+.pd-dir[disabled]:hover { border-color: var(--line2); }
 @media (prefers-reduced-motion: reduce) { .pd-dir { transition: none; } }
 
 /* the two numbers. they are never styled the same, because they are not the
@@ -239,6 +250,22 @@
 .pd-in { margin-top: 13px; display: flex; align-items: center; gap: 10px; }
 .pd-in span { font-family: var(--mono); font-size: 19px; color: var(--t2); flex: none; }
 .pd-in input { flex: 1; min-width: 0; padding: 13px 15px; border-radius: 11px; border: 1px solid rgba(11,12,14,.2); background: rgba(255,255,255,.65); color: var(--paper-ink); font-size: 16px; font-family: var(--mono); }
+/* ★ OPAQUE, NOT TRANSLUCENT. The house .ifield input paints rgba(255,255,255,.65)
+   because every other form on this site sits on a .paper section, where 65%
+   white over bone still reads as white. These two sections are OBSIDIAN, and the
+   same rule composited to a flat mid grey with dark placeholder text on it: a
+   form that looked disabled, and a placeholder measured at a contrast ratio no
+   assertion in this repo was checking. Bone at full opacity is the ground this
+   design system already uses for "write here", so the fields are bone. */
+#pd-new input, #pd-new select, .pd-in input, .pd-terms input, .pd-sign input {
+  background: var(--bone); border-color: rgba(11,12,14,.28);
+}
+#pd-new input::placeholder, .pd-in input::placeholder, .pd-terms input::placeholder, .pd-sign input::placeholder {
+  color: rgba(11,12,14,.52);
+}
+#pd-new input:focus, #pd-new select:focus, .pd-in input:focus, .pd-terms input:focus, .pd-sign input:focus {
+  background: #fff; border-color: var(--dialtone-day);
+}
 .pd-in input:focus { outline: none; border-color: var(--dialtone-day); background: #fff; }
 .pd-terms { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
 .pd-terms input { padding: 12px 14px; border-radius: 11px; border: 1px solid rgba(11,12,14,.2); background: rgba(255,255,255,.65); color: var(--paper-ink); font-size: 16px; }
@@ -257,6 +284,7 @@
 .pd-rail { margin-top: 18px; border: 1px solid var(--line2); border-radius: 16px; background: var(--ink-950); padding: 16px; max-height: 460px; overflow-y: auto; overflow-x: hidden; }
 .pd-sum { margin-top: 16px; padding: 16px 18px; border-radius: 13px; border: 1px solid rgba(227,255,79,.42); background: rgba(227,255,79,.07); }
 .pd-sum.dead { border-color: var(--line2); background: rgba(242,244,240,.04); }
+.pd-sum.dead .pl-outk { color: var(--static); }
 .pd-sumv { margin-top: 8px; font-family: var(--display); font-weight: 700; font-size: clamp(34px,5vw,54px); line-height: 1; letter-spacing: -.03em; color: var(--t1); }
 
 /* the sign box */
@@ -1340,10 +1368,10 @@
       : 'NOBODY HAS SET A NUMBER';
     var bits = [badge(st === 'settled' ? 'done' : (st === 'negotiating' ? 'on' : ''), stateLabel)];
     bits.push(badge(me.limit != null ? 'done' : '', me.limit != null ? 'YOUR NUMBER IS IN' : 'YOUR NUMBER IS NOT SET'));
-    bits.push(badge(them.has_set_limit ? 'done' : '', them.has_set_limit ? esc(them.name).toUpperCase() + ' IS IN' : 'WAITING ON ' + esc(them.name).toUpperCase()));
+    bits.push(badge(them.has_set_limit ? 'done' : '', them.has_set_limit ? esc(them.name.toUpperCase()) + ' IS IN' : 'WAITING ON ' + esc(them.name.toUpperCase())));
     if (st === 'settled') {
       bits.push(badge(me.signed_at ? 'done' : '', me.signed_at ? 'YOU SIGNED' : 'YOU HAVE NOT SIGNED'));
-      bits.push(badge(them.signed_at ? 'done' : '', them.signed_at ? esc(them.name).toUpperCase() + ' SIGNED' : esc(them.name).toUpperCase() + ' HAS NOT SIGNED'));
+      bits.push(badge(them.signed_at ? 'done' : '', them.signed_at ? esc(them.name.toUpperCase()) + ' SIGNED' : esc(them.name.toUpperCase()) + ' HAS NOT SIGNED'));
     }
     elStrip.innerHTML = bits.join('');
 
@@ -1365,7 +1393,7 @@
       var m = v.thread[i];
       var isMine = m.speaker === meAgent;
       var whoName = m.speaker === 'system' ? 'PARLEY'
-        : (isMine ? esc(v.me.name).toUpperCase() + "'S AGENT" : esc(v.them.name).toUpperCase() + "'S AGENT");
+        : (isMine ? esc(v.me.name.toUpperCase()) + "'S AGENT" : esc(v.them.name.toUpperCase()) + "'S AGENT");
       var t = new Date(m.at);
       var clock = isNaN(t.getTime()) ? '' : (t.getHours() + ':' + (t.getMinutes() < 10 ? '0' : '') + t.getMinutes());
       out.push('<div class="pl-msg ' + (isMine ? 'lo' : 'hi') + '">'
@@ -1511,7 +1539,7 @@
             + '</div>'
           : '')
       + (theirLink
-          ? '<div style="margin-top:20px"><div class="pd-k">SEND ' + esc(them.name).toUpperCase() + ' THEIR LINK AGAIN</div>'
+          ? '<div style="margin-top:20px"><div class="pd-k">SEND ' + esc(them.name.toUpperCase()) + ' THEIR LINK AGAIN</div>'
             + linksHtml(location.href, theirLink, v.deal.subject)
             + '<p class="pd-say" id="pd-copysay2" role="status"></p></div>'
           : '<p class="pd-fine" style="margin-top:20px">You opened this from your own link, so their link is not on this device. Whoever started the deal has it.</p>')
@@ -1663,6 +1691,19 @@
         + '<div class="pd-actions"><a class="pl-btn go" href="/parley#start">START ONE</a></div></div>';
       return;
     }
+    /* ★ THE CONTRACT MOVED UNDER US, MEASURED AT 19:52 THROUGH THE SERVING PATH.
+       The shape this page was written against is me{side,role,name,limit,
+       opening,direction,must_haves,signed_at}. Live tr_view now returns that
+       same sealed figure as me.AMOUNT. The failure was silent and it looked
+       like a product bug rather than a rename: the deal wrote correctly, the
+       status strip read "ONE SIDE IS IN" and "WAITING ON RYAN" off the deal
+       row, and beside them "YOUR NUMBER IS NOT SET" off the missing key, and
+       the page put the setter form back up under a deal that was already
+       negotiating. Nothing threw. Nothing 500ed. Every other field was right.
+       So this page reads BOTH names and takes whichever one is there. It costs
+       one line and it means a rename upstream can never again put a filled in
+       form back in front of somebody who has already committed a number. */
+    if (v.me && v.me.limit == null && v.me.amount != null) v.me.limit = v.me.amount;
     VIEW = v;
     drawHead(v);
     var st = v.deal.status;

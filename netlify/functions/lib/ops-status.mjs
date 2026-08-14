@@ -56,6 +56,15 @@ export const ROUTES = [
   { path: '/api/truce',            kind: 'api', expect: [405, 400, 200], what: 'The text negotiation engine.' },
   { path: '/api/call-me',          kind: 'api', expect: [405, 400, 200], what: 'One click activation.' },
 
+  // ── Recover: first-party invoice calls, in the creditor own name (@LANE-RECOVER) ───────────
+  // The three webhook routes are POST-only and refuse a GET, so 405 is the PASS here and it is
+  // what proves they are deployed. /api/recover answers a GET with its own configuration, which
+  // is how an operator sees whether the runtime is switched on without touching an invoice.
+  { path: '/api/recover',          kind: 'api', expect: [200, 405, 401], what: 'Recover: the invoice, the call, the promise, the meter.' },
+  { path: '/api/recover/twiml',    kind: 'api', expect: [405, 403], what: 'What a debtor hears when they pick up. Capability token only.' },
+  { path: '/api/recover/turn',     kind: 'api', expect: [405, 403], what: 'One turn of a Recover call. Stop is checked here first, always.' },
+  { path: '/api/recover/status',   kind: 'api', expect: [405, 403], what: 'How a Recover call ended.' },
+
   // ── accounts, booking and money. Added 2026-08-14 as those lanes landed. ──
   // Every one of these is POST only and answers 405 to the GET this sweep
   // makes, which was checked in the source before it was added here. Nothing in
@@ -73,6 +82,18 @@ export const ROUTES = [
   { path: '/api/statement',        kind: 'api', expect: [405, 400, 200], what: 'The bill, itemised.' },
   { path: '/api/recap',            kind: 'api', expect: [405, 400, 200], what: 'The after call recap.' },
   { path: '/api/el-postcall',      kind: 'api', expect: [405, 403, 200], what: 'The ElevenLabs post call hook.' },
+  // The voice's HANDS (@LANE-VOICE / booking). Not my routes: I added them to unblock _stage.sh's
+  // drift check, which was failing the whole staging run for everybody. A GET is 405 by design
+  // because the method check runs before the bearer check. Owner: tighten or relabel freely.
+  { path: '/api/answered-tool',    kind: 'api', expect: [405, 401], what: 'The tool endpoint the voice calls to book a job.' },
+  { path: '/api/answered-tool/book_job', kind: 'api', expect: [405, 401], what: 'The booking tool, addressed by path the way ElevenLabs sends it.' },
+  // HOLD's two Twilio webhooks (@LANE-HOLD). NOT my routes, and I have not read a line of their
+  // logic. They are here because _stage.sh's drift check refuses to stage ANY lane's work while a
+  // declared path is unmonitored, so an unlisted route from one lane blocks the whole estate. Both
+  // sit behind lib/twilio-webhook's gate, which answers 405 to a GET and 403 to a bad signature,
+  // exactly like /api/answered-voice above. Owner: tighten, relabel or take these over freely.
+  { path: '/api/hold/hear',        kind: 'api', expect: [405, 403, 200], what: 'Twilio hands back what it heard on a held call.' },
+  { path: '/api/hold/status',      kind: 'api', expect: [405, 403, 200], what: 'Call state changes on a held call.' },
   { path: '/api/agent-config',     kind: 'api', expect: [405, 400, 401, 200], what: 'Per customer agent configuration.' },
   { path: '/account/signout',      kind: 'page', expect: [200, 302, 303, 405], what: 'Customer sign out. Harmless to probe with no cookie.' },
   { path: '/api/call-me/twiml',    kind: 'api', expect: [405, 403, 200], what: 'What Twilio asks for when a person picks up an activation call.' },

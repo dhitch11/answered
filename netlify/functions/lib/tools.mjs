@@ -341,6 +341,17 @@ export const RESULTS = {
   ].join(' '),
 };
 
+/**
+ * Did a tool answer already say the visit is on the schedule?
+ *
+ * The bridge asks this to decide whether to offer the booking tool again on a later turn. It reads
+ * the FIRST WORDS of the answer rather than searching for "booked" anywhere in it, because every
+ * failure sentence above also contains that word ("NOT BOOKED", "Do not say it is booked"), and a
+ * substring test would read every one of them as a success. That inversion would have offered no
+ * second attempt to a caller whose first attempt failed.
+ */
+export const wasBooked = (text) => /^\s*(?:ALREADY BOOKED|BOOKED)\./.test(String(text || ''));
+
 /** "their name, the address and a callback number" — plain, no serial comma drama. */
 export function listOf(items) {
   const a = items.filter(Boolean);

@@ -13,6 +13,9 @@ export const getInvoice    = (id) => rpc('sv_recover_get', { p_id: id });
 export const gateFacts     = (id) => rpc('sv_recover_gate_facts', { p_id: id });
 export const logCall       = (row) => rpc('sv_recover_log_call', { p_row: row });
 export const bindCall      = (id, patch) => rpc('sv_recover_bind_call', { p_id: id, p_patch: patch });
+/** Keyed on OUR row id. This is what the conversation uses, on every turn. */
+export const touchCall     = (id, patch) => rpc('sv_recover_update_call_by_id', { p_id: id, p_patch: patch });
+/** Keyed on the vendor's id. Only the status webhook, which is handed nothing else. */
 export const updateCall    = (callSid, patch) => rpc('sv_recover_update_call', { p_call_sid: callSid, p_patch: patch });
 export const callContext   = (id, tokenSha) => rpc('sv_recover_call_context', { p_id: id, p_token_sha256: tokenSha });
 export const promise       = (row) => rpc('sv_recover_promise', { p_row: row });

@@ -58,11 +58,16 @@ import {
   nextBoundary, trimToSentence,
 } from './lib/personas.mjs';
 import * as db from './lib/db.mjs';
+import { BOOK_TOOL, anthropicTool, wasBooked } from './lib/tools.mjs';
 
 const GEN_BUDGET_MS = 8400; // inside Netlify's 10s stream ceiling, closes at the last clean clause
 const MODEL_PRIMARY = 'claude-haiku-4-5-20251001';
 const MODEL_BACKUP = 'claude-sonnet-5';
 const SUPPRESS_TIMEOUT_MS = 2500; // a caller must not sit in silence while a row is written
+// The orphan-tool recovery below runs INSIDE the same ten second ceiling as the spoken turn, so it
+// gets a hard, small budget and the generation budget is measured from the top of the request
+// rather than from the top of the stream.
+const TOOL_RECOVER_MS = 4000;
 
 function contentText(c) {
   if (typeof c === 'string') return c;
@@ -70,13 +75,38 @@ function contentText(c) {
   return '';
 }
 
+/**
+ * ★ THIS FUNCTION USED TO DROP EVERY ROLE IT DID NOT RECOGNISE, SILENTLY, AND THAT WAS FINE UNTIL
+ * THE VOICE GREW HANDS. When ElevenLabs runs a server tool it hands the answer back as a `tool`
+ * role message. Under the old loop that message was discarded, which would have left the model
+ * narrating a booking it could not see: exactly the shape of fabrication the rest of this file
+ * exists to prevent. So a tool answer is now folded in as a labelled note, and the assistant turn
+ * that called the tool leaves a trace even when it carried no words.
+ *
+ * Same-role turns are merged rather than dropped, because a folded tool note can otherwise land
+ * next to the caller's own turn and Anthropic wants a clean alternation.
+ */
 function toAnthropicMessages(inMsgs) {
   const msgs = [];
+  const push = (role, text) => {
+    if (!text) return;
+    const last = msgs[msgs.length - 1];
+    if (last && last.role === role) last.content += '\n' + text;
+    else msgs.push({ role, content: text });
+  };
   for (const m of inMsgs) {
-    if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
+    if (!m) continue;
+    if (m.role === 'tool' || m.role === 'function') {
+      const t = contentText(m.content).trim();
+      if (t) push('user', TOOL_NOTE + ' ' + t.slice(0, 900));
+      continue;
+    }
+    if (m.role !== 'user' && m.role !== 'assistant') continue;
     const text = contentText(m.content).trim();
-    if (!text) continue;
-    msgs.push({ role: m.role, content: text });
+    if (text) { push(m.role, text); continue; }
+    if (m.role === 'assistant' && Array.isArray(m.tool_calls) && m.tool_calls.length) {
+      push('assistant', '(used ' + m.tool_calls.map(toolName).filter(Boolean).join(', ') + ')');
+    }
   }
   // Anthropic requires the first message to be a user turn; ElevenLabs sends
   // the agent's own first line as an assistant turn, so seed one when needed.
@@ -84,6 +114,105 @@ function toAnthropicMessages(inMsgs) {
     msgs.unshift({ role: 'user', content: '(the call just connected)' });
   }
   return msgs;
+}
+
+// ── the hands ────────────────────────────────────────────────────────────────
+// Everything below is about ACTIONS, which are a different kind of risk from
+// words. A sentence that goes wrong is embarrassing. A tool call that goes
+// wrong sends a van to an address nobody said. So: a persona may only call a
+// tool on its own allowlist, only when the vendor declared that tool on this
+// request, only once per turn, and never with arguments this bridge could not
+// parse. Everything the model produces is treated as a claim, not an
+// instruction, right up until lib/tools.mjs has checked it.
+
+const TOOL_NOTE = '[the booking system answered]';
+const toolName = (tc) => (tc && ((tc.function && tc.function.name) || tc.name)) || '';
+
+/**
+ * Which tools this turn offers. BOTH halves must agree, and the second half is
+ * the one that matters: if the vendor did not declare the tool, the model must
+ * not be able to emit a call to it, because a call nobody runs looks to the
+ * caller exactly like a booking and is nothing at all.
+ */
+function offeredTools(persona, body, inMsgs) {
+  const allow = persona.tools || [];
+  if (!allow.length) return { names: [], anthropic: [] };
+  const declared = (Array.isArray(body && body.tools) ? body.tools : []).map(toolName).filter(Boolean);
+  let names = allow.filter((n) => declared.includes(n));
+  // A visit already on the schedule is not offered again. The tool endpoint is
+  // idempotent and would refuse a second one, but the cleanest way to not book
+  // twice is to not ask twice.
+  if (names.includes(BOOK_TOOL) && bookedAlready(inMsgs)) names = names.filter((n) => n !== BOOK_TOOL);
+  return { names, anthropic: names.includes(BOOK_TOOL) ? [anthropicTool()] : [] };
+}
+
+/** Has a tool answer in this conversation already said the visit is on the schedule? */
+function bookedAlready(inMsgs) {
+  for (const m of inMsgs) {
+    if (!m || (m.role !== 'tool' && m.role !== 'function')) continue;
+    if (wasBooked(contentText(m.content))) return true;
+  }
+  return false;
+}
+
+/**
+ * A tool call sitting in the history with no answer after it. The vendor is
+ * supposed to run a server tool and hand back what it said; if it did not, the
+ * model is about to narrate a booking that never happened.
+ */
+function orphanToolCall(inMsgs) {
+  let call = null;
+  let at = -1;
+  inMsgs.forEach((m, i) => {
+    if (!m || m.role !== 'assistant' || !Array.isArray(m.tool_calls)) return;
+    for (const tc of m.tool_calls) if (toolName(tc) === BOOK_TOOL) { call = tc; at = i; }
+  });
+  if (!call) return null;
+  for (let i = at + 1; i < inMsgs.length; i += 1) {
+    const m = inMsgs[i];
+    if (m && (m.role === 'tool' || m.role === 'function')) return null;
+  }
+  return call;
+}
+
+const toolOrigin = () =>
+  String(process.env.ANSWERED_SITE_URL || process.env.URL || 'https://answered.reddenda.com').trim().replace(/\/+$/, '');
+
+/**
+ * Run the tool ourselves, on the same authenticated, idempotent endpoint the
+ * vendor would have called. Safe to run even if the vendor DID call it: the
+ * idempotency key is derived from the facts of the job, so the second attempt
+ * replays the first one's answer instead of booking a second van.
+ */
+async function runToolInline(tc, conversationId) {
+  const secret = String(process.env.ANSWERED_BRAIN_SECRET || '').trim();
+  const name = toolName(tc);
+  let args = {};
+  try { args = JSON.parse((tc.function && tc.function.arguments) || '{}'); } catch (e) { args = {}; }
+  if (conversationId) args.conversation_id = conversationId;
+  const r = await fetch(toolOrigin() + '/api/answered-tool?tool=' + encodeURIComponent(name), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+    signal: AbortSignal.timeout(TOOL_RECOVER_MS),
+  });
+  const j = await r.json().catch(() => null);
+  return j && typeof j.result === 'string' ? j.result : null;
+}
+
+/** The model's tool_use, in the shape ElevenLabs expects back on the wire. */
+function toOpenAiToolCall(tu, conversationId, t0) {
+  const args = { ...tu.input };
+  // The conversation id is OURS to set and never the model's to invent: it is
+  // half of the idempotency key that stops a retry booking a second visit.
+  if (conversationId) args.conversation_id = conversationId;
+  else delete args.conversation_id;
+  return {
+    index: 0,
+    id: String(tu.id || 'call_' + tu.name + '_' + Math.floor(t0 / 1000)).slice(0, 64),
+    type: 'function',
+    function: { name: tu.name, arguments: JSON.stringify(args) },
+  };
 }
 
 // ── who are we talking to ───────────────────────────────────────────────────
@@ -111,8 +240,9 @@ function calleeNumber(body, systemText) {
 }
 
 // ── direct Anthropic caller, streaming and buffered ─────────────────────────
-async function askAnthropic({ apiKey, model, system, messages, maxTokens, temperature, disableThinking, stream, signal, onDelta }) {
+async function askAnthropic({ apiKey, model, system, messages, maxTokens, temperature, disableThinking, stream, signal, onDelta, tools, onTool }) {
   const reqBody = { model, system, messages, max_tokens: maxTokens, stream: !!stream };
+  if (tools && tools.length) reqBody.tools = tools;
   if (temperature !== undefined) reqBody.temperature = temperature;
   if (disableThinking) reqBody.thinking = { type: 'disabled' };
   const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -128,16 +258,19 @@ async function askAnthropic({ apiKey, model, system, messages, maxTokens, temper
   }
   if (!stream) {
     const j = await r.json();
-    const text = (Array.isArray(j.content) ? j.content : [])
+    const blocks = Array.isArray(j.content) ? j.content : [];
+    const text = blocks
       .filter((b) => b && b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text)
       .join(' ')
       .trim();
-    return { text };
+    const tu = blocks.find((b) => b && b.type === 'tool_use');
+    return { text, tool: tu ? { id: tu.id, name: tu.name, input: tu.input } : null };
   }
   const reader = r.body.getReader();
   const dec = new TextDecoder();
   let acc = '';
+  let pendingTool = null;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -151,8 +284,20 @@ async function askAnthropic({ apiKey, model, system, messages, maxTokens, temper
       if (!payload || payload === '[DONE]') continue;
       let ev;
       try { ev = JSON.parse(payload); } catch (e) { continue; }
-      if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && ev.delta.text) {
-        onDelta(ev.delta.text);
+      // A tool call arrives as its own content block: one start, a run of
+      // partial JSON, one stop. The JSON is only parsed at the stop, because
+      // half an arguments object is not a smaller booking, it is not a booking.
+      if (ev.type === 'content_block_start' && ev.content_block && ev.content_block.type === 'tool_use') {
+        pendingTool = { id: ev.content_block.id, name: ev.content_block.name, json: '' };
+      } else if (ev.type === 'content_block_delta' && ev.delta) {
+        if (ev.delta.type === 'text_delta' && ev.delta.text) onDelta(ev.delta.text);
+        else if (ev.delta.type === 'input_json_delta' && pendingTool) pendingTool.json += ev.delta.partial_json || '';
+      } else if (ev.type === 'content_block_stop' && pendingTool) {
+        const done = pendingTool;
+        pendingTool = null;
+        let input = null;
+        try { input = JSON.parse(done.json || '{}'); } catch (e) { input = null; }
+        if (onTool) onTool({ id: done.id, name: done.name, input });
       }
     }
   }
@@ -273,6 +418,7 @@ export default async (req) => {
 
   const elTools = Array.isArray(body && body.tools) ? body.tools : [];
   const hasEndCall = elTools.some((t) => t && ((t.function && t.function.name === 'end_call') || t.name === 'end_call'));
+  const conversationId = String((body && (body.conversation_id || body.conversationId)) || '').trim().slice(0, 120);
   const endCallTC = [{ index: 0, id: 'call_end_' + Math.floor(T0 / 1000), type: 'function', function: { name: 'end_call', arguments: '{}' } }];
 
   // deterministic branches first: stop, crisis, payment refusal, AI honesty,
@@ -331,23 +477,61 @@ export default async (req) => {
   if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + incomingSystem.slice(0, 4000);
   if (assistantTurns >= persona.softCloseAt) system += '\n\n' + persona.softCloseNote;
 
+  const offered = offeredTools(persona, body, inMsgs);
+
   const messages = toAnthropicMessages(inMsgs);
-  const shared = { apiKey, system, messages, maxTokens: persona.maxTokens };
+
+  // ★ THE VENDOR DECLARED A TOOL AND THEN DID NOT RUN IT. This is the failure that would make the
+  // voice lie: a book_job call sits in the history, nothing answered it, and the model is one turn
+  // away from telling somebody their visit is on the schedule. So the bridge runs it, on the same
+  // authenticated idempotent endpoint the vendor would have used, and the answer goes into the
+  // conversation where the model can read it. Running it twice is safe by construction: the
+  // idempotency key is built from the facts of the job, so a second attempt replays the first.
+  const orphan = orphanToolCall(inMsgs);
+  if (orphan) {
+    let note = null;
+    try {
+      note = await runToolInline(orphan, conversationId);
+      console.error('answered-brain: the vendor left a ' + toolName(orphan) + ' call unanswered; this bridge ran it. conversation=' + (conversationId || 'unknown'));
+    } catch (e) {
+      console.error('answered-brain: could not recover an unanswered ' + toolName(orphan) + ' call: ' + String(e && e.message).slice(0, 160));
+    }
+    // Either way the model is told the truth. An unknown outcome is spoken as an unknown outcome,
+    // never as a booking, because "we could not check" and "it worked" are different facts.
+    messages.push({
+      role: 'user',
+      content: TOOL_NOTE + ' ' + (note || 'NOT CONFIRMED. Nothing came back from the scheduling system, so do not tell the caller the visit is booked. Say you could not confirm it and offer to take it again.'),
+    });
+  }
+
+  const maxTokens = offered.anthropic.length ? (persona.toolMaxTokens || persona.maxTokens) : persona.maxTokens;
+  const shared = { apiKey, system, messages, maxTokens, tools: offered.anthropic };
   const primaryReq = { ...shared, model: MODEL_PRIMARY, temperature: persona.temperature };
   const backupReq = { ...shared, model: MODEL_BACKUP, disableThinking: true };
 
   // ── buffered path (gate probes, diagnostics) ──
   if (!wantsStream) {
     let text = '';
+    let tool = null;
     try {
-      text = (await askAnthropic({ ...primaryReq, stream: false })).text;
+      const got = await askAnthropic({ ...primaryReq, stream: false });
+      text = got.text; tool = got.tool;
     } catch (e) {
       console.error('answered-brain primary failed (buffered):', String(e && e.message).slice(0, 160));
       try {
-        text = (await askAnthropic({ ...backupReq, stream: false })).text;
+        const got = await askAnthropic({ ...backupReq, stream: false });
+        text = got.text; tool = got.tool;
       } catch (e2) {
         console.error('answered-brain backup failed too (buffered):', String(e2 && e2.message).slice(0, 160));
       }
+    }
+    if (tool && offered.names.includes(tool.name)) {
+      if (!tool.input || typeof tool.input !== 'object' || Array.isArray(tool.input)) {
+        console.error('answered-brain: ' + persona.id + ' produced ' + tool.name + ' arguments this bridge could not parse; nothing was sent');
+        return jsonCompletion(id, outModel, persona.toolFail, null);
+      }
+      const spokenNow = guardWhole(persona, text, ctxDigits) || persona.toolHold;
+      return jsonCompletion(id, outModel, spokenNow, [toOpenAiToolCall(tool, conversationId, T0)]);
     }
     const finalText = guardWhole(persona, text, ctxDigits) || persona.breaker;
     return jsonCompletion(id, outModel, finalText, null);
@@ -369,13 +553,15 @@ export default async (req) => {
       let buf = '';
       let sentences = 0;
       let modelChars = 0;
+      let toolCall = null;   // the one action this turn is allowed to take
+      let toolBroken = false; // the model asked for an action we could not parse
 
       const chunk = (delta, finish) => {
         if (!closed) controller.enqueue(encoder.encode(mk(delta, finish)));
       };
-      const finish = () => {
+      const finish = (reason) => {
         if (closed) return;
-        chunk({}, 'stop');
+        chunk({}, reason || 'stop');
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         closed = true;
         controller.close();
@@ -401,7 +587,9 @@ export default async (req) => {
           say(ackText);
         }
       }, 900);
-      const budget = setTimeout(() => upstream.abort(), GEN_BUDGET_MS);
+      // Measured from the top of the REQUEST, not the top of the stream, because an orphan-tool
+      // recovery above may already have spent some of the ten second ceiling.
+      const budget = setTimeout(() => upstream.abort(), Math.max(2500, GEN_BUDGET_MS - (Date.now() - T0)));
 
       const release = (flushAll) => {
         for (;;) {
@@ -449,13 +637,30 @@ export default async (req) => {
         release(false);
       };
 
+      // ONE action per turn, on the allowlist, with arguments that parsed. Anything else is logged
+      // loudly and dropped: a dropped action is a caller who has to repeat themselves, and a
+      // half-understood action is a van at the wrong house.
+      const onTool = (tu) => {
+        if (toolCall || toolBroken || dead) return;
+        if (!offered.names.includes(tu.name)) {
+          console.error('answered-brain: ' + persona.id + ' tried to call ' + tu.name + ', which is not offered on this turn');
+          return;
+        }
+        if (!tu.input || typeof tu.input !== 'object' || Array.isArray(tu.input)) {
+          console.error('answered-brain: ' + persona.id + ' produced ' + tu.name + ' arguments this bridge could not parse; nothing was sent');
+          toolBroken = true;
+          return;
+        }
+        toolCall = [toOpenAiToolCall(tu, conversationId, T0)];
+      };
+
       try {
-        await askAnthropic({ ...primaryReq, stream: true, signal: upstream.signal, onDelta });
+        await askAnthropic({ ...primaryReq, stream: true, signal: upstream.signal, onDelta, onTool });
       } catch (e) {
-        if (!dead && modelChars === 0) {
+        if (!dead && modelChars === 0 && !toolCall && !toolBroken) {
           console.error('answered-brain primary failed, trying backup:', String(e && e.message).slice(0, 160));
           try {
-            await askAnthropic({ ...backupReq, stream: true, signal: upstream.signal, onDelta });
+            await askAnthropic({ ...backupReq, stream: true, signal: upstream.signal, onDelta, onTool });
           } catch (e2) {
             console.error('answered-brain backup failed too:', String(e2 && e2.message).slice(0, 160));
           }
@@ -464,6 +669,25 @@ export default async (req) => {
       clearTimeout(primer);
       clearTimeout(budget);
       if (!dead && buf.trim()) release(true);
+
+      if (toolCall) {
+        // Nothing said yet means the model went straight for the tool. The caller must not sit in
+        // silence while a booking is written, and the holding line is the one sentence that covers
+        // this moment without claiming anything: it says a thing is being done, not that it is done.
+        if (!spoken.trim() || spoken.trim() === ackText.trim()) say(persona.toolHold);
+        chunk({ tool_calls: toolCall });
+        console.log('answered-brain: ' + persona.id + ' called ' + toolCall[0].function.name + ' (conversation ' + (conversationId || 'unknown') + ')');
+        finish('tool_calls');
+        return;
+      }
+      if (toolBroken) {
+        // The model asked to book and this bridge could not read the request. Nothing was sent, so
+        // the turn ends on the sentence that says exactly that, whatever else was said first.
+        say(persona.toolFail);
+        finish();
+        return;
+      }
+
       const substantive = spoken.trim() && spoken.trim() !== ackText.trim();
       if (!substantive) say(persona.breaker); // chain exhausted: honest, never silent
       finish();

@@ -17,8 +17,9 @@ import { readFileSync } from 'node:fs';
 import {
   PERSONAS, personaFor, routeTable, describe,
   guardClause, guardWhole, deterministicLine, contextDigits, isAbusive,
-  noteHeader, DEFAULT_NOTE_HEADER,
+  noteHeader, DEFAULT_NOTE_HEADER, RILEY_SPEC_FROZEN, RILEY_BOOKING,
 } from './personas.mjs';
+import { BOOK_TOOL, WINDOWS, WINDOW_KEYS } from './tools.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -40,9 +41,73 @@ t('riley spec is the exact text the live line has been serving', () => {
   // The digest of the RILEY_SPEC that was inside answered-brain.mjs at commit
   // b18062b, which is what +1 916 350 4869 has been answering with. Measured,
   // not asserted from memory. Change this line only with a real call behind it.
-  assert.equal(createHash('sha256').update(riley.spec).digest('hex'),
+  //
+  // ★ THIS DIGEST DID NOT MOVE WHEN THE LINE LEARNED TO BOOK (2026-08-14). The
+  // booking rules were APPENDED as their own constant, so the 1,597 characters
+  // the live line has been answering with are still exactly these bytes and
+  // are still asserted here. The test below is the other half: it checks that
+  // the frozen text is where the model actually reads it, at the top of the
+  // spec, and not merely sitting unused in a variable.
+  assert.equal(createHash('sha256').update(RILEY_SPEC_FROZEN).digest('hex'),
     '61b6d62f935243e27c49ce5d7366a47543e80b8ed86e9491cf472a5351d3af02');
-  assert.equal(riley.spec.length, 1597);
+  assert.equal(RILEY_SPEC_FROZEN.length, 1597);
+});
+
+t('the frozen text is what riley actually leads with, not a museum piece', () => {
+  assert.ok(riley.spec.startsWith(RILEY_SPEC_FROZEN),
+    'the frozen spec must be the LIVE prefix; a preserved copy nobody serves proves nothing');
+  assert.ok(riley.spec.includes(RILEY_BOOKING), 'the booking rules must be in the served spec');
+  // Nothing was inserted between them, and nothing was dropped from the end.
+  assert.equal(riley.spec, RILEY_SPEC_FROZEN + '\n\n' + RILEY_BOOKING);
+});
+
+// ── 1b. THE HANDS ───────────────────────────────────────────────────────────
+// A voice that can act needs a floor under the act, not just under the words.
+
+t('riley may call exactly one tool, and it is the booking one', () => {
+  assert.deepEqual(riley.tools, [BOOK_TOOL]);
+  for (const p of [scout, onboard, customer]) {
+    assert.ok(!(p.tools || []).length, p.id + ' has no hands and must not grow any by accident');
+  }
+});
+
+t('the booking rules tell riley the tool is the only thing that books', () => {
+  assert.ok(RILEY_BOOKING.includes(BOOK_TOOL), 'the tool is named so the model can find it');
+  assert.match(RILEY_BOOKING, /Nothing is on the schedule until/);
+  assert.match(RILEY_BOOKING, /never fill anything in yourself/i);
+  assert.match(RILEY_BOOKING, /Only after it tells you the visit is booked/);
+  assert.match(RILEY_BOOKING, /Never tell somebody a visit is on the schedule when it is not/);
+});
+
+t('riley speaks the three windows the tool can actually book, and no others', () => {
+  // If somebody edits one list and not the other, the voice offers a time the
+  // tool cannot take, and the caller hears a pivot instead of a booking.
+  assert.deepEqual(WINDOW_KEYS, ['tuesday_8am', 'tuesday_130pm', 'wednesday_9am']);
+  assert.match(RILEY_SPEC_FROZEN, /Tuesday 8:00 in the morning, Tuesday 1:30 in the afternoon, and Wednesday 9:00 in the morning/);
+  for (const w of Object.values(WINDOWS)) {
+    assert.ok([2, 3].includes(w.day), 'a window on a day riley is not allowed to say: ' + w.spoken);
+  }
+});
+
+t('the tool lines survive riley OWN floors, which is not obvious and is the point', () => {
+  // These strings are read by the model and spoken in its own words, but the
+  // holding line and the failure line are spoken verbatim. A holding line that
+  // trips the numeral or contact floor would come out as a pivot mid booking.
+  for (const line of [riley.toolHold, riley.toolFail]) {
+    const g = guardClause(riley, line, contextDigits(riley, [], ''));
+    assert.ok(g.ok, 'blocked by ' + g.by + ': ' + line);
+    assert.ok(!/[0-9]/.test(line), 'no digits: ' + line);
+  }
+  // and neither of them claims a booking that has not happened
+  assert.ok(!/booked|on the schedule/i.test(riley.toolHold), riley.toolHold);
+  assert.match(riley.toolFail, /nothing is booked/i);
+});
+
+t('a tool turn gets its own token budget, and an ordinary turn does not', () => {
+  // Five booking fields do not fit in 120 tokens beside a spoken sentence, and
+  // a truncated arguments object is not a smaller booking, it is none.
+  assert.ok(riley.toolMaxTokens > riley.maxTokens);
+  assert.equal(riley.maxTokens, 120, 'the ordinary cadence budget must not have moved');
 });
 
 t('riley caps are unchanged', () => {
@@ -467,6 +532,8 @@ t('describe() names every persona, leaks no prompt and no secret', () => {
   assert.equal(d[1].agent_env, 'ANSWERED_RESEARCH_AGENT_ID');
   assert.equal(d[2].agent_env, 'ANSWERED_ONBOARD_AGENT_ID');
   assert.equal(d[3].agent_env, 'ANSWERED_CUSTOMER_AGENT_ID');
+  assert.deepEqual(d[0].tools, [BOOK_TOOL], 'the registry tells the truth about what a voice can DO');
+  assert.deepEqual(d[1].tools, []);
   assert.ok(d[1].input_branches.includes('stop'));
   assert.ok(!d[3].input_branches.includes('stop'), 'an inbound line has no stop branch');
 });
@@ -481,8 +548,11 @@ delete process.env.ANSWERED_DB_ANON;
 delete process.env.ANSWERED_DB_SECRET;
 
 let MODEL_REPLY = '';
+let MODEL_TOOL = null;      // { name, json } -> streamed as a real tool_use content block
 let LAST_SYSTEM = '';
 let LAST_MAX_TOKENS = 0;
+let LAST_TOOLS = null;
+let LAST_MESSAGES = null;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
   const u = String(url);
@@ -490,8 +560,16 @@ globalThis.fetch = async (url, init) => {
   const b = JSON.parse(init.body);
   LAST_SYSTEM = b.system;
   LAST_MAX_TOKENS = b.max_tokens;
+  LAST_TOOLS = b.tools || null;
+  LAST_MESSAGES = b.messages;
   if (!b.stream) {
-    return new Response(JSON.stringify({ content: [{ type: 'text', text: MODEL_REPLY }] }), {
+    const content = [{ type: 'text', text: MODEL_REPLY }];
+    if (MODEL_TOOL) {
+      let input = null;
+      try { input = JSON.parse(MODEL_TOOL.json); } catch (e) { input = MODEL_TOOL.json; }
+      content.push({ type: 'tool_use', id: 'toolu_test', name: MODEL_TOOL.name, input });
+    }
+    return new Response(JSON.stringify({ content }), {
       status: 200, headers: { 'content-type': 'application/json' },
     });
   }
@@ -502,6 +580,22 @@ globalThis.fetch = async (url, init) => {
         c.enqueue(enc.encode('data: ' + JSON.stringify({
           type: 'content_block_delta', delta: { type: 'text_delta', text: MODEL_REPLY.slice(i, i + 5) },
         }) + '\n\n'));
+      }
+      if (MODEL_TOOL) {
+        // exactly the shape Anthropic streams: one start, a run of partial json, one stop.
+        // Chunked mid token on purpose, because a parser that only works on whole json is a
+        // parser that works in a test and fails on a phone.
+        c.enqueue(enc.encode('data: ' + JSON.stringify({
+          type: 'content_block_start', index: 1,
+          content_block: { type: 'tool_use', id: 'toolu_test', name: MODEL_TOOL.name, input: {} },
+        }) + '\n\n'));
+        for (let i = 0; i < MODEL_TOOL.json.length; i += 7) {
+          c.enqueue(enc.encode('data: ' + JSON.stringify({
+            type: 'content_block_delta', index: 1,
+            delta: { type: 'input_json_delta', partial_json: MODEL_TOOL.json.slice(i, i + 7) },
+          }) + '\n\n'));
+        }
+        c.enqueue(enc.encode('data: ' + JSON.stringify({ type: 'content_block_stop', index: 1 }) + '\n\n'));
       }
       c.enqueue(enc.encode('data: [DONE]\n\n'));
       c.close();
@@ -686,6 +780,182 @@ await at('a missing bridge secret is a loud 500 on every route, never an open do
       assert.equal((await post(p, { warm: true }, 'anything')).status, 500, p);
     }
   } finally { process.env.ANSWERED_BRAIN_SECRET = s; }
+});
+
+// ── 8. THE HANDS, THROUGH THE REAL BRIDGE ───────────────────────────────────
+// The registry saying riley may book is not the same as a booking leaving the
+// wire. Everything below drives the real default export and reads the SSE.
+
+const GOOD_ARGS = JSON.stringify({
+  customer_name: 'Dana Whitfield',
+  address: '4412 Fair Oaks Boulevard, Sacramento',
+  callback_number: '916 866 3918',
+  service: 'water heater is leaking',
+  window: 'tuesday_8am',
+});
+const EL_DECLARES = [{ type: 'function', function: { name: 'book_job', description: 'book it', parameters: { type: 'object' } } }];
+const toolCallsIn = (sse) => (sse.match(/"tool_calls":\[[^\]]*\]/g) || []);
+
+await at('a tool call actually leaves the bridge, in the shape the vendor reads', async () => {
+  MODEL_REPLY = '';
+  MODEL_TOOL = { name: 'book_job', json: GOOD_ARGS };
+  const sse = await (await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES, conversation_id: 'conv_abc123',
+    messages: [{ role: 'user', content: 'Dana Whitfield, forty four twelve Fair Oaks, nine one six eight six six three nine one eight, Tuesday at eight' }],
+  })).text();
+  MODEL_TOOL = null;
+  const calls = toolCallsIn(sse);
+  assert.equal(calls.length, 1, 'exactly one tool call on the wire');
+  assert.ok(/"finish_reason":"tool_calls"/.test(sse), 'the turn must end as a tool call, not as a stop');
+  const emitted = JSON.parse('{' + calls[0] + '}').tool_calls[0];
+  assert.equal(emitted.function.name, 'book_job');
+  assert.equal(emitted.type, 'function');
+  const args = JSON.parse(emitted.function.arguments);
+  assert.equal(args.customer_name, 'Dana Whitfield');
+  assert.equal(args.window, 'tuesday_8am');
+  // The bridge sets this, never the model: it is half of the idempotency key.
+  assert.equal(args.conversation_id, 'conv_abc123');
+  // and the caller is not left in silence while the booking is written
+  assert.ok(spoken(sse).includes(riley.toolHold), spoken(sse));
+});
+
+await at('the model is only handed the tool when the VENDOR declared it', async () => {
+  LAST_TOOLS = null;
+  MODEL_REPLY = 'Okay, what is the address?';
+  await post('/api/answered-brain', { stream: true, messages: [{ role: 'user', content: 'my heater is out' }] });
+  assert.equal(LAST_TOOLS, null, 'no declaration, no tool: a call nobody can run is worse than no call');
+  assert.equal(LAST_MAX_TOKENS, 120, 'and an ordinary turn keeps the ordinary budget');
+
+  await post('/api/answered-brain', { stream: true, tools: EL_DECLARES, messages: [{ role: 'user', content: 'my heater is out' }] });
+  assert.equal(LAST_TOOLS.length, 1);
+  assert.equal(LAST_TOOLS[0].name, 'book_job');
+  assert.ok(LAST_TOOLS[0].input_schema.properties.window.enum.length === 3, 'the model can only express the three real windows');
+  assert.equal(LAST_MAX_TOKENS, riley.toolMaxTokens);
+});
+
+await at('a voice with no hands cannot grow them from a vendor console', async () => {
+  LAST_TOOLS = null;
+  MODEL_REPLY = 'Understood, thanks.';
+  await post('/api/answered-brain/scout', { stream: true, tools: EL_DECLARES, messages: [{ role: 'user', content: 'voicemail' }] });
+  assert.equal(LAST_TOOLS, null, 'scout is not on the allowlist, so declaring the tool changes nothing');
+});
+
+await at('arguments the bridge cannot parse book NOTHING and say so out loud', async () => {
+  MODEL_REPLY = '';
+  MODEL_TOOL = { name: 'book_job', json: '{"customer_name": "Dana", "addre' };  // truncated by max_tokens
+  const sse = await (await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES, messages: [{ role: 'user', content: 'book it' }],
+  })).text();
+  MODEL_TOOL = null;
+  assert.equal(toolCallsIn(sse).length, 0, 'half an arguments object must never reach the vendor');
+  assert.ok(spoken(sse).includes(riley.toolFail), spoken(sse));
+  assert.ok(!/"finish_reason":"tool_calls"/.test(sse));
+});
+
+await at('a tool answer reaches the model instead of being silently dropped', async () => {
+  MODEL_REPLY = 'You are on the schedule for Tuesday morning.';
+  await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES,
+    messages: [
+      { role: 'user', content: 'Tuesday at eight works' },
+      { role: 'assistant', content: '', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'book_job', arguments: GOOD_ARGS } }] },
+      { role: 'tool', tool_call_id: 'call_1', content: 'BOOKED. It is written down and the shop has it, for Tuesday at eight in the morning.' },
+    ],
+  });
+  const blob = JSON.stringify(LAST_MESSAGES);
+  assert.ok(blob.includes('[the booking system answered]'), 'the answer must be in the conversation the model reads');
+  assert.ok(blob.includes('BOOKED.'), blob.slice(0, 200));
+  // and the tool is NOT offered again, because the visit is already on the schedule
+  assert.equal(LAST_TOOLS, null, 'one visit, one booking');
+});
+
+await at('a FAILED tool answer leaves the tool on the table for another try', async () => {
+  MODEL_REPLY = 'I could not get that down. What is the address again?';
+  await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES,
+    messages: [
+      { role: 'user', content: 'book it' },
+      { role: 'tool', tool_call_id: 'call_1', content: 'NOT BOOKED, because something is still missing: the address. Ask the caller for it.' },
+    ],
+  });
+  assert.ok(LAST_TOOLS && LAST_TOOLS.length === 1,
+    'a failure that reads as a success would leave the caller with no second attempt');
+});
+
+await at('an unanswered tool call is RUN by the bridge rather than narrated', async () => {
+  // The vendor declared the tool, emitted the call and never came back with an
+  // answer. Left alone the model would tell somebody their visit is booked.
+  let hit = null;
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('/api/answered-tool')) {
+      hit = { url: String(url), body: JSON.parse(init.body), auth: init.headers.Authorization };
+      return new Response(JSON.stringify({ ok: true, booked: true, result: 'BOOKED. It is written down.' }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      });
+    }
+    return prev(url, init);
+  };
+  try {
+    MODEL_REPLY = 'You are all set for Tuesday morning.';
+    await post('/api/answered-brain', {
+      stream: true, tools: EL_DECLARES, conversation_id: 'conv_orphan',
+      messages: [
+        { role: 'user', content: 'yes book it' },
+        { role: 'assistant', content: '', tool_calls: [{ id: 'call_9', type: 'function', function: { name: 'book_job', arguments: GOOD_ARGS } }] },
+        { role: 'user', content: 'are we good?' },
+      ],
+    });
+  } finally { globalThis.fetch = prev; }
+  assert.ok(hit, 'the bridge must run the tool the vendor abandoned');
+  assert.ok(hit.url.includes('tool=book_job'), hit.url);
+  assert.equal(hit.body.conversation_id, 'conv_orphan');
+  assert.ok(/^Bearer /.test(hit.auth), 'the recovery hop is authenticated like every other one');
+  assert.ok(JSON.stringify(LAST_MESSAGES).includes('BOOKED. It is written down.'));
+});
+
+await at('a recovery that fails is spoken as unknown, never as booked', async () => {
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('/api/answered-tool')) throw new Error('network down');
+    return prev(url, init);
+  };
+  try {
+    MODEL_REPLY = 'Let me check on that.';
+    await post('/api/answered-brain', {
+      stream: true, tools: EL_DECLARES,
+      messages: [
+        { role: 'assistant', content: '', tool_calls: [{ id: 'call_9', type: 'function', function: { name: 'book_job', arguments: GOOD_ARGS } }] },
+        { role: 'user', content: 'are we good?' },
+      ],
+    });
+  } finally { globalThis.fetch = prev; }
+  const blob = JSON.stringify(LAST_MESSAGES);
+  assert.ok(blob.includes('NOT CONFIRMED'), blob.slice(-300));
+  assert.ok(!/\[the booking system answered\] BOOKED/.test(blob));
+});
+
+await at('the buffered path books too, because demo-health drives it', async () => {
+  MODEL_REPLY = 'Getting that down now.';
+  MODEL_TOOL = { name: 'book_job', json: GOOD_ARGS };
+  const j = await (await post('/api/answered-brain', {
+    tools: EL_DECLARES, conversation_id: 'conv_buffered',
+    messages: [{ role: 'user', content: 'book it for Tuesday at eight' }],
+  })).json();
+  MODEL_TOOL = null;
+  assert.equal(j.choices[0].finish_reason, 'tool_calls');
+  const args = JSON.parse(j.choices[0].message.tool_calls[0].function.arguments);
+  assert.equal(args.conversation_id, 'conv_buffered');
+});
+
+await at('every existing floor still runs on a turn that has tools on it', async () => {
+  // The tool must not become a hole in the guard: a priced sentence is still
+  // pivoted even when the model is mid booking.
+  MODEL_REPLY = 'That will be $200 for the visit.';
+  const sse = await (await post('/api/answered-brain', {
+    stream: true, tools: EL_DECLARES, messages: [{ role: 'user', content: 'how much' }],
+  })).text();
+  assert.ok(spoken(sse).includes('The office quotes prices'), spoken(sse));
 });
 
 // ── report ──────────────────────────────────────────────────────────────────

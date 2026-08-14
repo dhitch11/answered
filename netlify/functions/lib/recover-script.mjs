@@ -145,7 +145,11 @@ export const BROKEN = (businessName, callbackNumber) => {
 // we have no idea whether our customer intends to. So the honest rule is that this voice never says
 // any of it. Not softened, not conditional, not "eventually". Never.
 const FORBIDDEN = [
-  { re: /\b(sue|suing|lawsuit|litigat|take you to court|legal action|court order|judgment|judgement)\b/i, why: 'threat of legal action' },
+  // ★ `court` IS MATCHED BARE, not only in "take you to court". The test suite caught "This could
+  // end up in court" walking straight through a list that already had four different court phrases
+  // in it, which is exactly how a filter built from examples fails: it catches the sentences
+  // somebody thought of and misses the one a model actually writes.
+  { re: /\b(sue|suing|lawsuit|litigat|court|legal action|judgment|judgement|small claims)\b/i, why: 'threat of legal action' },
   { re: /\b(lien|garnish|garnishment|levy|repossess|seiz(e|ure)|foreclos)/i, why: 'threat of seizure or attachment' },
   { re: /\b(arrest|jail|prison|police|warrant|criminal charges|fraud charges)\b/i, why: 'threat of arrest or criminal process' },
   { re: /\b(credit (report|bureau|score|rating)|equifax|experian|transunion|ding your credit|hurt your credit)\b/i, why: 'threat about credit reporting' },
@@ -193,8 +197,10 @@ export const isStop = (t) => STOP_PATTERNS.some((re) => re.test(String(t || ''))
 const DISPUTE_PATTERNS = [
   /\b(i )?(dispute|disputing)\b/i,
   /\b(i )?(already|alread[iy]) paid\b/i, /\bi paid (that|this|it|you)\b/i,
-  /\bthat'?s? (not|isn'?t) (right|correct|mine|my bill)\b/i,
-  /\b(i )?(don'?t|do not) owe\b/i, /\bnever (hired|used|ordered)\b/i,
+  // "that's not" and "that is not" are the same sentence and people say both. A contraction-only
+  // pattern reads as thorough and misses half of every real transcript.
+  /\bthat('?s| is| was)? ?(not|isn'?t|ain'?t) (right|correct|mine|my bill|my invoice)\b/i,
+  /\b(i )?(don'?t|do not|never) owe\b/i, /\bnever (hired|used|ordered)\b/i,
   /\bwrong (person|number|account|amount|invoice)\b/i,
   /\bwork (was )?(never|not) (done|finished|completed)\b/i,
   /\b(my|an?) (lawyer|attorney)\b/i,
@@ -212,7 +218,9 @@ export const askedIfAI = (t) => ASKED_AI.some((re) => re.test(String(t || '')));
 export const AI_ANSWER = "Yes, I'm an A I assistant. Happy to keep this short.";
 
 const YES = /\b(yes|yeah|yep|yup|speaking|this is (he|she|him|her|me)|that'?s me|uh huh|correct|sure|it is)\b/i;
-const NO = /\b(no|nope|nah|wrong number|not me|he'?s not|she'?s not|isn'?t here|does ?n'?t live here|never heard)\b/i;
+// Same lesson as the dispute list: "doesn't live here" and "does not live here" are one sentence
+// spoken two ways, and only one of them was in the pattern until a test said so out loud.
+const NO = /\b(no|nope|nah|wrong number|not me|he'?s not|she'?s not|isn'?t here|is not here|(does ?n'?t|does not) live here|never heard)\b/i;
 export const saidYes = (t) => YES.test(String(t || '')) && !NO.test(String(t || ''));
 export const saidNo = (t) => NO.test(String(t || ''));
 
@@ -406,9 +414,15 @@ export function extractPromise(text, { balanceCents, timezone, now = new Date() 
   }
 
   const amount = parseAmountCents(heard, balanceCents);
+  // ★ NO AMOUNT NAMED MEANS THE WHOLE BALANCE, AND IT IS RESOLVED HERE, NOT LEFT AS null FOR A
+  // CALLER TO GUESS AT. A promise row carrying amount_cents: null is a row where the operator sees
+  // a blank, the follow-up says nothing, and every reader has to know an unwritten convention. The
+  // number is knowable at this point, so it gets written down at this point.
+  const resolved = Number.isFinite(amount.cents) ? amount.cents
+    : (Number.isFinite(balanceCents) ? balanceCents : null);
   return {
     promise: {
-      amount_cents: amount.cents,
+      amount_cents: resolved,
       promised_for: date.iso,
       spoken_text: heard.slice(0, 1000),
       method: 'spoken_on_call',
