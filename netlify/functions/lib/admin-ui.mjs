@@ -566,7 +566,13 @@ VIEWS.overview = async () => {
       '<div class="tile-v">' + n(c.attributed) + ' <span class="muted" style="font-size:15px">of ' + n(c.total) + '</span></div>' +
       '<div class="tile-s">Calls tied to a paying customer. The rest are research, demo and canary ' +
         'traffic, which belong to no customer and bill nobody.' +
-        (c.total > c.attributed ? '<br><button class="btn ghost sm" style="margin-top:9px" data-act="backfill">Repair attribution</button>' : '') +
+        (c.total > c.attributed
+          ? ((S.overview && S.overview.accounts && S.overview.accounts.total === 0)
+              ? '<br><span class="muted" style="display:inline-block;margin-top:9px">Repair is ' +
+                'available but would attribute nothing: it matches on numbers we provisioned to a ' +
+                'customer, and there are no customers and no provisioned numbers yet.</span>'
+              : '<br><button class="btn ghost sm" style="margin-top:9px" data-act="backfill">Repair attribution</button>')
+          : '') +
       '</div></div>' +
   '</div>';
 };
@@ -799,12 +805,32 @@ VIEWS.events = async () => {
   const f = S.filters.events;
   const d = await api('events?' + new URLSearchParams({ name: f.name || '', limit: 100, offset: f.offset }));
   S.lastMeasuredAt = new Date().toISOString(); freshness();
-  return '<div class="card"><div class="tile-k">Where this comes from</div>' +
+
+  // ★ THIS PANEL SHIPPED A LIE FOR ABOUT AN HOUR AND IT WAS MINE.
+  // It rendered "This is a measured zero, not a loading state and not a failure. The query ran and
+  // returned nothing." True of the query, false of the world: app_events has ZERO WRITERS anywhere
+  // in this repository and nothing calls sv_admin_event. The table is an unwired pipe, and calling
+  // that a measured zero is the exact failure this console exists to prevent, wearing the language
+  // of honesty. An empty table and an unconnected table look identical and mean opposite things.
+  //
+  // The banner is conditional on total === 0, so it removes itself the moment a real event lands
+  // rather than needing anyone to remember.
+  const unwired = (d.total === 0) ? '<div class="card" style="border-color:var(--warn)">' +
+    '<div class="tile-k" style="color:var(--warn)">Nothing writes to this table yet</div>' +
+    '<div class="tile-s" style="font-size:13.5px;margin-top:4px">This is <strong>not</strong> a measured ' +
+    'zero. It is an unwired pipe. The public site posts funnel events to Netlify Blobs, and no ' +
+    'collector writes them into the queryable table this panel reads, so <strong>this panel would ' +
+    'show zero whether or not anybody visited the site</strong>. Behaviour analytics are not ' +
+    'available yet and nothing below is evidence about customer activity. Verified 2026-08-14: ' +
+    'zero writers in the repository, against a search that finds 54 matches for the Blobs client in ' +
+    'the same pass, so the instrument works.</div></div>' : '';
+
+  return unwired +
+    '<div class="card"><div class="tile-k">Where this comes from</div>' +
     '<div class="tile-s" style="font-size:13.5px;margin-top:4px">The public site posts anonymous funnel ' +
     'events to Netlify Blobs, which is durable object storage and cannot be grouped or joined. This ' +
     'table is the queryable copy of the same stream. <strong>Nothing has been migrated out of Blobs</strong>, ' +
-    'so no history was destroyed to make this page work, and a low number here means the queryable ' +
-    'layer is new rather than that nobody visited.</div></div>' +
+    'so no history was destroyed to make this page work.</div></div>' +
   '<div class="grid g2">' +
   '<div class="card pad0"><div class="card-h"><h2>By event, last 30 days</h2></div>' +
     (d.by_name.length ? '<div class="tw"><table><thead><tr><th>Event</th><th class="num">Count</th>' +
@@ -812,7 +838,9 @@ VIEWS.events = async () => {
       d.by_name.map((g) => '<tr class="click" data-event="' + esc(g.name) + '"><td class="mono">' + esc(g.name) + '</td>' +
         '<td class="num">' + n(g.n) + '</td><td class="num">' + n(g.accounts) + '</td>' +
         '<td class="muted">' + esc(when(g.last_at)) + '</td></tr>').join('') + '</tbody></table></div>'
-      : measuredZero('behaviour events')) + '</div>' +
+      : emptyState('No behaviour events',
+          'Nothing writes to this table yet, so this is an absence of plumbing rather than an ' +
+          'absence of activity. See the banner above.')) + '</div>' +
   '<div class="card pad0"><div class="card-h"><h2>Recent</h2>' +
     (f.name ? '<span class="sp"><span class="pill brand">' + esc(f.name) +
       '</span><button class="btn ghost sm" data-act="clear-event">Clear</button></span>' : '') + '</div>' +
@@ -821,7 +849,9 @@ VIEWS.events = async () => {
       d.rows.slice(0, 40).map((r) => '<tr><td class="muted">' + esc(when(r.at)) + '</td>' +
         '<td class="mono">' + esc(r.name) + '</td><td class="muted"><span class="trunc">' + esc(r.page || '—') + '</span></td>' +
         '<td>' + (r.business_name ? esc(r.business_name) : '<span class="muted">anonymous</span>') + '</td></tr>').join('') +
-      '</tbody></table></div>' : measuredZero('events in this window')) + '</div>' +
+      '</tbody></table></div>'
+      : emptyState('Nothing to show',
+          'No collector writes this table, so this list cannot fill regardless of site traffic.')) + '</div>' +
   '</div>';
 };
 
