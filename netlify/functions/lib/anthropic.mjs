@@ -94,7 +94,25 @@ export async function ask({
   }
   if (tools) payload.tools = tools;
   if (tool_choice) payload.tool_choice = tool_choice;
-  if (typeof temperature === 'number') payload.temperature = temperature;
+  // ★ `temperature` IS REJECTED BY THESE MODELS AND IT WAS SILENTLY DOWNGRADING THE LIVE PHONE LINE.
+  //
+  // Measured against the live API on 2026-08-14, both slots, one token out:
+  //   claude-opus-5   without temperature -> 200 · WITH temperature -> 400 "`temperature` is
+  //   claude-sonnet-5 without temperature -> 200 · WITH temperature -> 400  deprecated for this model."
+  //
+  // A 400 is not in the transient set below (429/529/5xx), so it throws on the FIRST attempt with no
+  // retry. `personas.mjs` sends temperature 0.6/0.5 on the PRIMARY model at four call sites and its
+  // own comment says "the backup call omits it on purpose" — so the primary died every single time
+  // and the backup answered every single time. A permanent, invisible downgrade of the flagship
+  // model on David's live phone line, which is exactly what the best-model-per-slot rule forbids,
+  // and nothing anywhere reported it because a 400 reads as "the agent could not answer".
+  //
+  // Dropped at this chokepoint rather than at the four call sites, so every present and future
+  // caller is protected by one guard instead of four that can drift. It is logged rather than
+  // silently swallowed: a caller quietly losing a parameter it asked for is its own bug class.
+  if (typeof temperature === 'number') {
+    console.warn(`ai: dropping temperature=${temperature} for ${payload.model}; the model rejects it with a 400 and the request would fail outright`);
+  }
 
   const size = JSON.stringify(payload).length;
   if (size > MAX_INPUT_CHARS) {
