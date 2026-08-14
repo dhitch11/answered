@@ -2549,3 +2549,230 @@ section.listen:has(.vo[hidden]) { display: none; }
   .num-in { animation: none; }
   html.js.answering .hero-field, html.js.answered-in .hero-field { opacity: 1; transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CRAFT PASS, 2026-08-13. VISUAL + UX LANE.
+   Every rule below carries the measurement that caused it. Nothing here is
+   taste unbacked by a number or a screenshot. Order matters: this block is
+   last, so it wins on cascade against equal specificity, and it never uses
+   !important against the reduced-motion block that follows nothing.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · A FIXED NAV WITHOUT SCROLL PADDING EATS EVERY ANCHOR. ──────────────
+   Measured 2026-08-13 through the serving path at 1440: jumping to #early
+   landed its top edge at y=29 under a 68px nav, so the eyebrow and the first
+   line of the heading sat BEHIND the bar. #main landed at y=0, fully covered.
+   Every in-page link on the site was arriving 40 to 68px short, including the
+   two hero CTAs and every footer anchor. scroll-behavior was already smooth,
+   which made it worse: the page glided to a spot that was wrong.
+   The extra 22px is optical, not arithmetic: stopping exactly at the nav edge
+   reads as a section jammed under a shelf. ── */
+html { scroll-padding-top: calc(var(--nav-h) + 22px); }
+
+/* ── 2 · THE FOUR SIGN-UP FORMS PAINTED HALOGEN ON BONE. ────────────────────
+   The INK CONTRACT above is explicit that a component may not work out its own
+   ink from the section it was dropped into. `.form input::placeholder` did
+   exactly that: a hardcoded var(--t3), which is Halogen at 66%. All four
+   forms on this site (index #early, trades #start, hold #start, pricing
+   #interest) are mounted inside `.paper`. Measured 2026-08-13 on the live
+   serving path: placeholder rgba(242,244,240,.66) over the field's
+   rgb(234,236,231) = 1.04:1. The prompt on every conversion form on the site
+   was invisible. Screenshot F-390-form-empty confirms it: near-white type on
+   a near-white field.
+   The fix is the contract, not a second hardcode. --ink-3 is already rebound
+   to rgba(11,12,14,.66) by .paper, and stays --t3 on the dark ground, so the
+   dark-mounted case does not move a pixel. `opacity: 1` is required because
+   Firefox applies its own placeholder opacity on top of the colour. ── */
+/* NOTE 2026-08-13: while this was being measured the HTML lane retired
+   class="form" on all four closes in favour of the .iform/.ifield paper
+   primitive, which paints a white field and a rgba(11,12,14,.42) placeholder
+   (re-measured here at 2.84:1 on white, legible). These rules stay as the
+   contract for any .form that returns: the law is that a component reads the
+   ground's ink, never a hardcoded dark-ground token. */
+.form input::placeholder,
+.form textarea::placeholder { color: var(--ink-3); opacity: 1; }
+/* the same contract for the caret and the typed glyph, so a paper-mounted
+   field can never hand back an invisible cursor either. */
+.form input, .form textarea { color: var(--ink); }
+.paper .form input, .paper .form textarea { caret-color: var(--paper-ink); }
+/* .form input:focus kills the outline for EVERY focus, keyboard included, and
+   left only a border-colour change behind. Put a real ring back for the
+   keyboard, in the ink the ground is already spending. */
+.form input:focus-visible, .form textarea:focus-visible,
+.ifield input:focus-visible, .ifield select:focus-visible, .ifield textarea:focus-visible {
+  outline: 2px solid var(--accent-ink); outline-offset: 2px;
+}
+
+/* ── 3 · A SUBMIT NARROWER THAN ITS OWN FIELD READS AS UNFINISHED. ──────────
+   Measured at 390: the email field is 350px and the submit is 172.7px, so the
+   button floats centred under a full-bleed input with 89px of dead air on
+   each side. Under 560 the row is stacked anyway, so both members take the
+   full column and the pair reads as one control. ── */
+@media (max-width: 560px) {
+  .form { flex-direction: column; align-items: stretch; gap: 12px; }
+  .form input[type='email'], .form input[type='text'] { flex: 1 1 auto; width: 100%; }
+  .form .btn, .form button[type='submit'] { width: 100%; justify-content: center; }
+}
+
+/* ── 4 · THE MENU HAS TO OWN THE SCREEN. ────────────────────────────────────
+   Measured at 390 with the sheet open: the scrim was rgba(5,6,8,.6), and over
+   an Obsidian page that removes almost nothing. The screenshot shows the hero
+   source note and the ring reading straight through the menu at full legible
+   contrast, so the sheet looked like a panel that had failed to paint. .92
+   still lets the page show as a ghost underneath, which is the intent, but
+   nothing under it competes for a word. ── */
+.sheet::after { background: rgba(5,6,8,.92); }
+/* the sheet CTA was an inline-block sitting at its own text width, 240px in a
+   350px column, hard left, directly under five full-width rows. It also
+   inherited the row divider from `.sheet a`. It is the one action in the
+   menu; it gets the full column and the button's own height. */
+.sheet .nav-cta {
+  display: flex; width: 100%; margin-top: 22px;
+  padding: 15px 18px; font-size: 16px; border-radius: 12px;
+  border-bottom: 0; text-align: center;
+}
+/* the last row above the CTA does not need a rule under it: the CTA is its
+   own terminator. */
+.sheet nav > :last-child, .sheet ul > li:last-child > a { border-bottom: 0; }
+
+/* ── 5 · TWO HI-VIS PILLS, THIRTY-TWO PIXELS APART. ─────────────────────────
+   Hi-Vis is the ONE accent and it is supposed to mean one thing. In the nav it
+   was meaning two: the segmented control's thumb and the CTA were the same
+   fill, the same radius and nearly the same height, side by side. Measured on
+   the business track at 1440 the thumb sits at 952-1076 and the CTA at
+   1108-1231, so the top right corner reads as a single 280px Hi-Vis smear and
+   a stranger cannot tell which one is the button.
+   The thumb is a SELECTED SURFACE, not an action, so it takes Halogen, the
+   paper token this system already owns. Obsidian on Halogen measures 17.68:1,
+   the same ink the selected label was already using. Hi-Vis in the nav now
+   means exactly one thing: press this. ── */
+.seg-thumb { background: var(--bone); }
+/* a switch reads as a physical thing when the moving part sits above the
+   track, so the thumb takes one hairline of separation rather than a shadow. */
+.seg { background: var(--ink-950); }
+
+/* ── 6 · THE 390 NAV WAS WEIGHTED TO ONE SIDE. ──────────────────────────────
+   Measured at 390: mark 20-50, then 81px of nothing, then the control at
+   131-312, then 16px, then the burger at 328-370. The control was jammed
+   against the burger and adrift from the mark, and the mark, alone at 30px
+   with its outer arc dropped below 480, had no weight to hold the corner.
+   space-between distributes the same 97px of slack evenly at about 48px a
+   side, and the mark grows 13% so the lockup still anchors the row. ── */
+@media (max-width: 449px) {
+  .nav .wrap { gap: 10px; justify-content: space-between; }
+  .brand { margin-right: 0; }
+  /* an auto margin is consumed BEFORE justify-content ever runs, so the
+     .nav .seg { margin-left: auto } that lands below 1080 silently made
+     space-between a no-op. Measured after the first attempt: brand 20-54,
+     83px of nothing, control 137-318, 10px, burger 328-370 -- worse than
+     before. Both auto margins have to go for the row to distribute. */
+  .nav .seg { margin-left: 0; margin-right: 0; }
+  .brand-mark { width: 34px; height: 34px; }
+}
+
+/* ── 7 · A FULL-WIDTH CELL IS NOT A LICENCE TO LEAVE 1200px EMPTY. ──────────
+   The business track's stat band ends on a fifth cell that spans all four
+   columns. Measured at 1440: the claim ran 1080px and the source note ran
+   460px, both in column one, leaving roughly 1200 x 180 of nothing to their
+   right, directly above the seam. The band's whole argument is that every
+   number carries a source, so the source belongs BESIDE the number where the
+   eye already is, not stranded under it.
+   Scoped by structure, not by an inline style another lane owns: the fifth
+   cell that is also the last cell exists only here. ── */
+@media (min-width: 881px) {
+  .band-grid > .band-cell:nth-child(5):last-child {
+    display: grid;
+    grid-template-columns: minmax(0, 1.04fr) minmax(0, .96fr);
+    column-gap: clamp(32px, 4vw, 76px);
+    align-items: start;
+  }
+  .band-grid > .band-cell:nth-child(5):last-child > :first-child { grid-column: 1 / -1; }
+  .band-grid > .band-cell:nth-child(5):last-child > .band-v { grid-column: 1; grid-row: 2; }
+  .band-grid > .band-cell:nth-child(5):last-child > .band-k { grid-column: 1; grid-row: 3; }
+  .band-grid > .band-cell:nth-child(5):last-child > .band-s {
+    grid-column: 2; grid-row: 2 / span 2; align-self: start;
+  }
+}
+
+/* ── 8 · A FOOTER COLUMN NARROWER THAN ITS OWN LINKS. ───────────────────────
+   Measured at 390: the two footer columns are 140px each and five of the nine
+   links wrap, so "Recover, for your invoices", "The terms, in plain words" and
+   "If your call was recorded" each break mid-phrase and the two stacks end at
+   different heights. Below 460 the groups take the full column, every link
+   sits on one line, and the rag disappears. ── */
+@media (max-width: 460px) {
+  .foot-grid { grid-template-columns: 1fr; gap: 30px; }
+  .foot-grid > :first-child { grid-column: 1 / -1; }
+}
+
+/* ── 9 · A DIAGRAM NOBODY CAN READ IS NOT A DIAGRAM. ────────────────────────
+   The blueprint is a 900 x 300 viewBox. On /pricing it ships inside a
+   horizontal scroller with min-width 820, which is correct. On /trades it
+   ships bare, so at 390 the SVG scales to 350px and every label scales with
+   it: measured 10.5 user units at a 0.389 viewBox scale = 4.1px of type, with
+   the HTML caption beside it still at 10px. Screenshot T-390-_bp shows a
+   diagram of illegible hairlines under a full-size caption.
+   Same remedy as /pricing, applied by structure so both pages obey one law.
+   The inline min-width of 820 on /pricing outranks the 720 here, so that page
+   does not move. ── */
+@supports selector(:has(*)) {
+  @media (max-width: 899px) {
+    div:has(> .bp) {
+      overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+      /* the cut edge is the affordance: a hard clip at the viewport edge says
+         "broken", a fade says "there is more, push it". */
+      -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 44px), transparent 100%);
+              mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 44px), transparent 100%);
+    }
+    /* the trailing margin is what lets the LAST node clear the fade: without
+       it, scrolling to the end parks node 05 underneath the mask and its
+       label can never be read in full. 44px of empty scroller after the
+       drawing means the fade always lands on nothing. */
+    .bp { min-width: 720px; margin-right: 44px; }
+  }
+}
+
+/* ── 10 · THE HOLD LADDER RESTED AT 2.55:1. ────────────────────────────────
+   `.rung { opacity: .34 }` was the BASE state, not a JS-gated one, so the
+   five steps of the hold ladder sat at a third of their ink for every reader
+   who had not yet triggered the scene, for every reader with JS off, and for
+   every reader under prefers-reduced-motion. Measured on /hold at 1440 with
+   reducedMotion: reduce, 2.2s after load: five .rung rows computed opacity
+   .34, which composites --t2 (Halogen at 82%) down to rgb(89,90,88) on
+   Obsidian = 2.55:1. AA needs 4.5. Five rows of the product's own
+   explanation, unreadable.
+   Three corrections, in the order the file already uses for every other
+   scene on this site:
+     · the base rests LEGIBLE, so a no-JS reader gets the whole ladder;
+     · the dim is html.js-gated and scoped off the played states, so
+       .rung.done and .rung.hit are untouched;
+     · .34 becomes .72, re-measured below, because the point of the dim is
+       "not yet", not "not readable". The state was never carried by opacity
+       anyway: .done takes a Hi-Vis numeral chip and .hit takes a Hi-Vis fill.
+   Re-measured after: row copy 6.26:1, the 10.5px step numeral 4.50:1, the
+   13px timestamp 4.50:1. Reduced motion rests every rung at full ink. ── */
+.rung { opacity: 1; }
+html.js .rung:not(.done):not(.hit) { opacity: .72; }
+@media (prefers-reduced-motion: reduce) {
+  html.js .rung:not(.done):not(.hit) { opacity: 1; }
+}
+
+/* ── 11 · NOT FIXABLE FROM THIS LANE, RECORDED SO NOBODY RE-DERIVES IT. ────
+   The missed-call scene brings a bubble's SURFACE in on its own timer and
+   then types the words inside it. Measured 2026-08-13 at 1440 and 390, 2.6s
+   after the handset entered view: bubble one typed, bubble two mid-word, and
+   bubbles three and four full-height slabs with nothing in them, holding
+   about 300px of the handset empty (screenshot E-1440-_phone).
+   A CSS hold was written for it and then REMOVED, because it cannot win:
+   answered.js writes the waiting state as an INLINE style on the element
+   itself -- `opacity:1; transform:none; background:rgba(242,244,240,.055);
+   border-color:rgba(242,244,240,.09); box-shadow:none; color:transparent` --
+   and inline beats every selector short of !important. Forcing it from here
+   would silently overwrite another lane's state machine mid-sequence, which
+   is the exact clobber Rule 0 exists to stop.
+   So the remedy belongs in answered.js: hold the surface until the bubble's
+   first word lands, or give the waiting bubble a typing indicator. The
+   selector that would do it in CSS, if the inline style ever goes away, is
+   `html.js .pb.in:has(.tw):not(:has(.tw.on))` -- and `:has(.tw)` is
+   load-bearing there, or a wordless bubble would hold forever. ── */

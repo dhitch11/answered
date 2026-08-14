@@ -734,6 +734,37 @@
      untouched and stays far inside the 1.5s budget. */
   var wordMs = function (w) { return 28 + Math.min(120, w.textContent.length * 16); };
 
+  /* ── LEDGER OUTCOMES ──────────────────────────────────────────────────────
+     Three outcomes, not one. .cleared already exists in CSS and owns PAID; the
+     other two are painted from here rather than from a new class because the
+     stylesheet is another lane's surface and an outcome that only exists in one
+     of the two files is exactly how a rule ships and does nothing.
+
+     Both non-paid states are written in the NEUTRAL ink family on purpose. Hi-
+     Vis is the money colour on this site and it is reserved for dollars that
+     actually cleared: a promise painted in the same accent as a payment would
+     re-tell the lie the animation was fixed to stop telling, just quieter. */
+  var OUTCOME = {
+    promised: { label: ' PROMISED THU', ink: 'rgba(242,244,240,.82)',
+                bg: 'rgba(242,244,240,.055)', line: 'rgba(242,244,240,.26)' },
+    open:     { label: ' CALLING BACK FRI', ink: 'rgba(242,244,240,.66)',
+                bg: '', line: '' }
+  };
+  var markRow = function (r, out) {
+    var o = OUTCOME[out];
+    if (!o || r.dataset.marked === '1') return;
+    r.dataset.marked = '1';
+    if (o.bg) r.style.background = o.bg;
+    if (o.line) r.style.borderColor = o.line;
+    var age = r.querySelector('.age');
+    if (!age) return;
+    var tag = document.createElement('span');
+    tag.textContent = o.label;
+    tag.style.color = o.ink;
+    tag.style.letterSpacing = '.1em';
+    age.appendChild(tag);
+  };
+
   if (shows.length) {
     var play = function (el) {
       var kind = el.getAttribute('data-show');
@@ -743,9 +774,21 @@
         el.querySelectorAll('.turn, .sc-result, .hold-hit').forEach(function (n) { n.classList.add('in'); });
         el.querySelectorAll('.sc-kv dt, .sc-kv dd, .sc-bill').forEach(function (n) { n.classList.add('on'); });
         el.querySelectorAll('.rung').forEach(function (n) { n.classList.add('done'); });
-        el.querySelectorAll('.inv-row').forEach(function (n) { n.classList.add('cleared'); });
+        /* REDUCED MOTION GETS THE SAME TRUTH, NOT A SHORTER LIE. This branch
+           used to stamp every row cleared and hardcode the meter to '$0', so a
+           visitor with reduced motion on was served the 100% recovery rate the
+           animated branch no longer claims. The end state is now computed from
+           the same data-outcome attributes: what is left is what did not land. */
+        var rr = el.querySelectorAll('.inv-row'), rem = 0;
+        rr.forEach(function (n) {
+          var out = n.getAttribute('data-outcome') || 'paid';
+          if (out === 'paid') { n.classList.add('cleared'); return; }
+          rem += parseFloat(n.getAttribute('data-amt') || '0');
+          markRow(n, out);
+        });
         var c0 = el.querySelector('.hold-clock'); if (c0) c0.textContent = '2:11:04';
-        var m0 = el.querySelector('.meter-big'); if (m0) m0.textContent = '$0';
+        var m0 = el.querySelector('.meter-big');
+        if (m0 && rr.length) m0.textContent = '$' + Math.round(rem).toLocaleString('en-US');
         return;
       }
 
@@ -815,6 +858,16 @@
       }
 
       if (kind === 'recover') {
+        /* THE LEDGER DOES NOT GO TO ZERO. Every row used to stamp PAID and the
+           meter used to animate down to $0, which renders a 100% recovery rate
+           in motion underneath a caption promising it is "not a projection of
+           results". The caption was right and the picture was wrong, and the
+           picture is what a reader keeps. Each row now plays the outcome the
+           markup gives it, and the meter subtracts ONLY on data-outcome="paid",
+           because that is the same line the fee itself is drawn on: money that
+           actually cleared. A row with no outcome is treated as paid, which
+           keeps this backward compatible with any deck that has not been
+           annotated. */
         var rows = el.querySelectorAll('.inv-row');
         var meter = el.querySelector('.meter-big');
         var total = 0;
@@ -824,6 +877,8 @@
         if (meter) meter.textContent = fmt(total);
         rows.forEach(function (r, n) {
           setTimeout(function () {
+            var out = r.getAttribute('data-outcome') || 'paid';
+            if (out !== 'paid') { markRow(r, out); return; }
             r.classList.add('cleared');
             var amt = parseFloat(r.getAttribute('data-amt') || '0');
             var from = left, to = left - amt, t0 = null;
@@ -1187,6 +1242,123 @@
   });
 })();
 
+/* ══ THE INTEREST FORM, WITHOUT THE DEAD END ═══════════════════════════════
+   This is the only conversion on the site. Everything else is reading.
+
+   It shipped as a plain full-page POST, which is correct and works, right up
+   until it does not. netlify/functions/interest.js is deliberately fail-loud:
+   no RESEND_API_KEY returns 503, an unreachable mail provider returns 502, a
+   missing email returns 400. Every one of those is a NAVIGATION, so what the
+   person actually gets is a white browser page reading "We could not record
+   that right now" in Times New Roman, with no nav, no styling, no way back,
+   and their typed note gone. Failing loud was the right call; landing them in
+   a void was not. A lead that reaches a 502 today is a lead lost twice, once
+   to the outage and once to the dead end.
+
+   So the submit is intercepted and the person never leaves the page:
+     ok        -> go where the server sent us (it 303s to /thanks.html, and
+                  fetch has already followed it, so r.url is the truth rather
+                  than a second hardcoded copy of the path)
+     4xx/5xx   -> the server's own sentence, in the page's type, under the
+                  form, with the button live again and every field still
+                  filled in, plus a mailto that carries the note they wrote
+     offline   -> the same treatment, said honestly
+
+   Rules this keeps. It never swallows a failure and it never invents a
+   success: nothing here can show "thanks" for a request that did not land,
+   which is the failure mode this estate names fail-open. The browser's own
+   validation runs first and is left alone. If fetch or FormData is missing
+   the listener never attaches at all and the native POST is untouched, so
+   the worst case is exactly today's behaviour rather than a broken form. And
+   it is painted in the INK CONTRACT tokens, so it reads on bone paper and on
+   obsidian without a second variant.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (!window.fetch || !window.FormData || !window.URLSearchParams) return;
+  var forms = document.querySelectorAll('form[action="/api/interest"]');
+  if (!forms.length) return;
+
+  var MAIL = 'info@reddenda.com';
+
+  var attach = function (form) {
+    var btn = form.querySelector('button[type="submit"]') || form.querySelector('button');
+    var note = null;
+
+    var clear = function () { if (note && note.parentNode) { note.parentNode.removeChild(note); note = null; } };
+
+    var fail = function (msg, sent) {
+      var text = (msg || '').trim();
+      // a server that answered with HTML rather than its own sentence must not
+      // have that HTML poured into the page. Only a short plain sentence is
+      // ever echoed, and it is set as TEXT, never as markup.
+      if (!text || text.length > 240 || text.indexOf('<') > -1) {
+        text = 'That did not reach us. It is our side, not yours.';
+      }
+      clear();
+      note = document.createElement('p');
+      note.setAttribute('role', 'status');
+      note.className = 'src';
+      note.style.cssText = 'margin-top:16px;padding:12px 0 12px 14px;border-left:2px solid var(--accent-ink);' +
+        'font-size:15px;line-height:1.5;color:var(--ink);text-align:left;max-width:52ch;margin-inline:auto';
+      note.appendChild(document.createTextNode(text + ' Nothing you typed is lost. Press it again, or '));
+      var a = document.createElement('a');
+      // inherit the colour, keep the underline: on this paper ground an
+      // unmarked same-colour link is not a link, and this is the one link in
+      // the whole flow that a person in trouble has to be able to find.
+      a.style.color = 'inherit';
+      a.style.textDecoration = 'underline';
+      a.style.textUnderlineOffset = '3px';
+      a.href = 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Answered: the form would not send') +
+        '&body=' + encodeURIComponent(sent || '');
+      a.textContent = 'send it to a person instead';
+      note.appendChild(a);
+      note.appendChild(document.createTextNode('. A human reads that address.'));
+      form.parentNode.insertBefore(note, form.nextSibling);
+    };
+
+    form.addEventListener('submit', function (e) {
+      // the browser's own validation first: required, type=email, all of it.
+      if (form.checkValidity && !form.checkValidity()) return;
+      e.preventDefault();
+      if (form.dataset.sending === '1') return;
+      form.dataset.sending = '1';
+      clear();
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending'; }
+
+      var pairs = new URLSearchParams();
+      var fd = new FormData(form);
+      var readable = [];
+      fd.forEach(function (v, k) {
+        pairs.append(k, v);
+        if (k !== 'bot-field' && String(v).trim()) readable.push(k + ': ' + v);
+      });
+
+      var done = function () {
+        form.dataset.sending = '';
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+      };
+
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: pairs.toString(),
+        credentials: 'same-origin'
+      }).then(function (r) {
+        if (r.ok) { window.location.assign(r.url || '/thanks.html'); return null; }
+        return r.text().then(function (t) { done(); fail(t, readable.join('\n')); });
+      }).catch(function () {
+        done();
+        fail('That did not reach us, and it looks like the connection dropped rather than the form.',
+             readable.join('\n'));
+      });
+    });
+  };
+
+  for (var i = 0; i < forms.length; i++) attach(forms[i]);
+})();
+
 /* ══ MEASUREMENT BEACONS ═══════════════════════════════════════════════════
    First-party only. One helper, three wire-ups, nothing else. Every name
    sent from here must be on the /api/event allowlist or the collector
@@ -1253,7 +1425,8 @@
   if (!window.fetch) return;
   var slots = document.querySelectorAll('[data-callslot]');
   var gated = document.querySelectorAll('[data-callgate]');
-  if (!slots.length && !gated.length) return;
+  var offs = document.querySelectorAll('[data-callgate-off]');
+  if (!slots.length && !gated.length && !offs.length) return;
 
   var NUM_TEL = '+19163504869';
   var NUM_TEXT = '+1 (916) 350-4869';
@@ -1346,6 +1519,19 @@
     // re-query: a slot could have been written into the page after load.
     var live = document.querySelectorAll('[data-callslot]');
     for (var i = 0; i < live.length; i++) buildControl(live[i]);
+    /* THE INVERSE GATE. [data-callgate-off] ships VISIBLE and is retired the
+       moment the line is green. It exists because the opposite of a hidden
+       green line is not an empty space, it is a sentence that is still true.
+       Measured 2026-08-13 on the red path: /pricing and /thanks both printed
+       "The demo line is answering right now" under a heading that said "Call
+       it", with no number anywhere on the page, because the only gated node
+       in those sections was the fine print underneath. A page that states a
+       present fact about a line that is down is not a degraded page, it is a
+       false one. Default-visible is also the correct fail direction: JS off,
+       fetch missing, a non-200, malformed JSON or a dead network all leave
+       the honest copy standing rather than leaving the false copy standing. */
+    var off = document.querySelectorAll('[data-callgate-off]');
+    for (var q = 0; q < off.length; q++) off[q].hidden = true;
     var g = document.querySelectorAll('[data-callgate]');
     var revealed = [];
     for (var k = 0; k < g.length; k++) {

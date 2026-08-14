@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/trades.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
+<link rel="stylesheet" href="/assets/answered.css?v=ff2543fa">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -42,10 +42,22 @@
         <p class="eyebrow rv">For plumbers, HVAC, electrical, roofing, landscaping</p>
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You were on a roof.<br> <span class="lit">It answered anyway.</span></h1>
         <p class="lede hero-sub rv d2">A 24/7 voice on the number already painted on your truck. It answers, works out what they need, books it into your calendar, and puts a real emergency straight through to your cell.</p>
+        <!-- THE DEMO IS THE ARGUMENT ON THIS PAGE, so it leads on this page.
+             It used to sit 8,600px down, at the very bottom, which meant the
+             one contractor-proof thing we own ("call it, it answers as a
+             plumbing shop") was invisible to everybody who did not read to
+             the end. The number is never in this file: the slot ships as a
+             ghost and the health gate fills it.
+
+             RED-LINE SHAPE: the slot falls back to the list CTA and the
+             gated second button stays hidden, so a red line shows exactly
+             one button and never two that say the same words.
+             GREEN-LINE SHAPE: call control, then the list CTA beside it. -->
         <div class="hero-actions rv d3">
-          <a class="btn btn-primary" href="/#early">Get on the list</a>
-          <a class="btn btn-ghost" href="#math">Do the math on one missed call</a>
+          <span class="cta-slot" data-callslot="Hear it answer"><a class="btn btn-primary" href="#start">Get on the list</a></span>
+          <a class="btn btn-ghost" href="#start" data-callgate hidden>Get on the list</a>
         </div>
+        <p class="rv d3" style="margin-top:16px"><a class="card-go" href="#math">Do the math on one missed call <span aria-hidden="true">&rarr;</span></a></p>
         <!-- THE DECISION MOMENT, on the first screen of the page a contractor
              lands on. The offer and the way out of it, adjacent to the button,
              at 16px instead of in a footnote. Ground-portable tokens. -->
@@ -138,6 +150,14 @@
         <p class="setup-flash" style="text-wrap:pretty;margin-top:20px;max-width:52ch;color:var(--ink-2);border-color:var(--accent-ink)">Seventeen real jobs for <b style="color:var(--ink)">$413</b>, and <b style="color:var(--ink)">$0</b> for the other 83 calls. If one of those bookings is not real, reply <b style="color:var(--ink)">VOID</b> and it comes off the bill.</p>
         <p class="src" style="margin-top:16px">Example arithmetic on the published rates, not a customer record. The 48% miss rate is Invoca's measured figure. The share of answered calls that turn into a booking is our own planning assumption and is not yet measured in production.</p>
       </div>
+    </div>
+    <!-- THE ACT, IMMEDIATELY AFTER THE PROOF. This ledger is the strongest
+         argument on the page and it lands at about a third of the way down;
+         before this row the next pressable thing was 5,500px later on a
+         phone. -->
+    <div class="rv d3" style="margin-top:clamp(34px,4vw,52px);padding-top:clamp(26px,3vw,34px);border-top:1px solid var(--line2);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 22px">
+      <a class="btn btn-primary" href="#start">Put my line on it</a>
+      <span style="font-size:16px;line-height:1.5;color:var(--ink-2);max-width:38ch">Free until it books you work. One code switches it on, one code switches it off, and nothing gets reprinted on the truck.</span>
     </div>
   </div>
 </section>
@@ -283,21 +303,52 @@
   </div>
 </section>
 
-<section class="paper seam pad">
+<!-- ══ THE CLOSE. MEASURED DEFECT, 2026-08-13, fixed here: this section shipped
+     with NO WAY TO SIGN UP ON IT. Its only control was one [data-callslot],
+     and the health gate REPLACES a slot's contents, so on a green line the
+     ghost "Get on the list" button was destroyed and the close of the single
+     highest-intent page on this site ended with a phone number and nothing
+     else. A contractor who read 8,600px and wanted in had to scroll back to
+     the nav or leave. Screenshotted at 1440 on the live site before the fix.
+
+     THE STRUCTURAL RULE THAT CAME OUT OF IT: a signup control and a demo slot
+     are two different elements, always. The slot may be emptied, filled or
+     left as a ghost by a fetch that can fail; the form beside it never moves.
+     ══ -->
+<section class="paper seam pad" id="start">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
     <h2 class="h2 rv d1" style="margin-top:18px">Free until it books you work.</h2>
     <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:50ch">Put it on the line for a week. If it does not book a job, you have paid nothing, and you turn it off with one code.</p>
-    <!-- THE HEALTH GATE. What ships is the ghost below: a plain list CTA. The
-         module in answered.js swaps it for the live call control, and un-hides
-         the two lines around it, ONLY when /api/demo-health answers
-         healthy:true. The demo number is never in this file. -->
-    <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:44ch">Call it. It answers as a plumbing shop.</p>
-    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" data-callslot><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <!-- THE FORM. Its own element, never a gated slot. Same endpoint as the
+         home page close; the product field is what tells us a plumber signed
+         up on the trades page rather than a consumer on the home page. -->
+    <!-- .iform/.ifield, the house PAPER form primitive, never class="form".
+         Measured 2026-08-13: .form input::placeholder spends --t3, a dark
+         ground token .paper does not rebind, so on bone the hint computed
+         rgba(242,244,240,.66) on #F2F4F0 and was invisible. Full note on the
+         home page close. -->
+    <form class="iform rv d2" name="early-access" method="POST" action="/api/interest" style="max-width:440px;margin-inline:auto;text-align:left;margin-top:28px">
+      <input type="hidden" name="product" value="Answered for trades, from the trades page">
+      <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
+      <div class="ifield full">
+        <label for="email">Your email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="mike@riveraplumbing.com" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Put my line on it</button>
+    </form>
     <!-- the reversal, adjacent to the last button on the page. paper ground, so
          every colour comes from --ink / --ink-2, never from a dark token. -->
-    <p class="rv d3" style="margin-top:18px;margin-inline:auto;max-width:42ch;font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> base. <b style="color:var(--ink);font-weight:600">$19</b> when it books a job. Reply <b style="color:var(--ink);font-weight:600">VOID</b> and the charge comes off.</p>
-    <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. It is the engine this page describes, answering live.</p>
+    <p class="rv d3" style="margin-top:20px;margin-inline:auto;max-width:42ch;font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> base. <b style="color:var(--ink);font-weight:600">$19</b> when it books a job. Reply <b style="color:var(--ink);font-weight:600">VOID</b> and the charge comes off.</p>
+    <p class="src form-note rv d3">No card. No account. No salesperson calling you. Nothing to reprint on the truck.</p>
+
+    <!-- THE DEMO, BESIDE THE FORM INSTEAD OF INSTEAD OF IT. Gated, ships
+         [hidden], the number is never in this file. -->
+    <div class="rv d3" data-callgate hidden style="margin-top:36px;padding-top:28px;border-top:1px solid rgba(11,12,14,.14)">
+      <p class="lede" style="margin:0 auto;max-width:44ch">Want to hear it before you hand over anything? Call it. It answers as a plumbing shop.</p>
+      <p style="margin-top:20px"><span class="cta-slot" data-callslot="Hear it answer"></span></p>
+      <p class="src" style="margin-top:14px;margin-inline:auto;max-width:52ch">Free. No account. Nobody calls you back. It is the engine this page describes, answering live.</p>
+    </div>
   </div>
 </section>
 
@@ -338,6 +389,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=8c6327ab" defer></script>
+<script src="/assets/answered.js?v=49ce5411" defer></script>
 </body>
 </html>

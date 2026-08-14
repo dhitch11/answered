@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
+<link rel="stylesheet" href="/assets/answered.css?v=ff2543fa">
 </head>
 <body class="track-me">
 <a class="skip" href="#main">Skip to content</a>
@@ -51,7 +51,13 @@
                never in this file. Every [data-callslot] on the site upgrades
                together, so the closing CTA on each product page gets the same
                control from the same one fetch. -->
-          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-ghost" href="#early">Get on the list</a></span>
+          <!-- THE RED-LINE STATE HAS TO SELL TOO. This ghost shipped as
+               .btn-ghost beside a second .btn-ghost, so on a red line the
+               first screen of the site carried no primary button at all and
+               nothing told a visitor what to do. It is .btn-primary now: the
+               same one-row shape, so the upgrade to the call control still
+               shifts nothing, and the red state still has an obvious act. -->
+          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="#early">Get on the list</a></span>
           <a class="btn btn-ghost" href="#price">See what it costs</a>
         </div>
         <!-- THE DECISION MOMENT, adjacent to the control and LOUD.
@@ -100,6 +106,13 @@
     <p class="eyebrow rv" style="justify-content:center">Do not take our word for anything on this page</p>
     <h2 class="h2 rv d1" style="margin-top:18px">Call it. Right now. Mid-scroll.</h2>
     <p class="rv d2" style="margin-top:26px"><span class="cta-slot" id="callit-slot" data-callslot></span></p>
+    <!-- WHY THE BUTTON BEING THERE IS ITSELF THE PROOF. Stated because it is
+         exactly what the code does: demo-health returns healthy only when the
+         scheduled canary placed a REAL call through the whole seam inside the
+         last three hours, and two consecutive fails hold the gate red. So the
+         presence of this control is a measurement, not a promise, and saying
+         so out loud is the most convincing sentence available to us. -->
+    <p class="src rv d2" style="margin-top:16px;margin-inline:auto;max-width:48ch">A real test call goes through this line every two hours. This button is only here because the last one went through.</p>
     <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:50ch;text-wrap:pretty">That is not a recording. It is the same engine we sell, answering live as a plumbing shop. Here are three things worth trying on it.</p>
     <!-- the dare. every one of these is a claim made elsewhere on this page,
          written as something the visitor can go and test in thirty seconds. -->
@@ -109,6 +122,11 @@
       <li style="flex:1 1 190px;align-items:flex-start"><span class="chip-n">3</span> Say your water heater is leaking. Watch it book the slot.</li>
     </ul>
     <p class="src rv d3" style="margin-top:22px">Free. No account. Nobody calls you back. Hang up whenever you like. It is just a phone doing the thing this whole page claims.</p>
+    <!-- THE SHARE MOMENT. No counter, no badge, no invented traction: just the
+         instruction, at the one point on the page where somebody has just had
+         the experience worth passing on. No mechanic is claimed, because the
+         control dials on a phone and copies on a desktop. -->
+    <p class="rv d3" style="margin-top:30px;margin-inline:auto;max-width:40ch;font-size:clamp(19px,1.7vw,23px);line-height:1.36;color:var(--t1);text-wrap:balance">Then send the number to one person who will not believe you.</p>
   </div>
 </section>
 
@@ -440,6 +458,15 @@
         <p class="src" style="margin-top:14px">Example arithmetic on the published rates, not a customer record. Call volume and the 48% miss rate are from Invoca's July 2026 benchmark; the booking rate is our own planning assumption and is not yet measured in production.</p>
       </div>
     </div>
+    <!-- THE ACT, IMMEDIATELY AFTER THE PROOF. Measured 2026-08-13: on a phone
+         this page runs 21,703px and the nav CTA is behind the burger, so a
+         visitor who was sold by the ledger at 55% depth had nothing to press
+         until the pricing cards at 85%. That is 12,000px of persuaded
+         silence. One button here, on the strongest proof on the page. -->
+    <div class="rv d3" style="margin-top:clamp(34px,4vw,52px);padding-top:clamp(26px,3vw,34px);border-top:1px solid rgba(11,12,14,.14);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 22px;text-align:center">
+      <a class="btn btn-primary" href="#early">Put me on the list</a>
+      <span style="font-size:16px;line-height:1.5;color:var(--ink-2);max-width:38ch;text-align:left">Free while the first group goes live. No card, no account, and one code turns it off in ten seconds.</span>
+    </div>
   </div>
 </section>
 
@@ -581,7 +608,7 @@
         <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 to start &middot; $0 a month &middot; $0 if nothing lands</div>
         <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
-        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
+        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>15% is the standard band. Newer invoices are 10%, the oldest are 20%, and Answered subscribers pay less on every band. You see which band an invoice sits in before the first call is placed, and all three are written into the <a href="/terms" style="color:inherit">terms</a>.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
         <ul class="pc-list">
           <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
           <li>Already knows the job, the address and the date, because it booked the work</li>
@@ -605,21 +632,71 @@
 <section class="paper seam pad" id="early">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
-    <h2 class="h2 rv d1" style="margin-top:18px">Put it on one line and watch what it catches.</h2>
-    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:52ch">The first group goes live free and stays free until it books work. Sixty seconds to switch on, ten seconds to switch off, and the meter only ever moves when something good happened.</p>
-    <form class="form rv d2" name="early-access" method="POST" action="/api/interest" style="justify-content:center;max-width:540px;margin-inline:auto">
+    <!-- THE OFFER IS THE HEADLINE. It used to be the third sentence of a lede
+         under a headline that described a feeling. A visitor who reads one
+         line at the close must read the thing they get, not the thing we
+         think about it. -->
+    <!-- TRACK-AWARE, because the offer is not the same offer on both sides of
+         the phone. "Stay free until it books work" means nothing to somebody
+         who came here to stop sitting on hold, and the old headline ("Put it
+         on one line and watch what it catches") had the same business tilt on
+         the consumer track. Same data-track machinery the h1 and the stat
+         bands already use, so the nav control flips this with everything
+         else and neither version is ever on screen at the same time. -->
+    <h2 class="h2 rv d1" data-track="me" style="margin-top:18px">Your first hold is free. Bring the worst line you have.</h2>
+    <h2 class="h2 rv d1" data-track="biz" style="margin-top:18px">Go live free. Stay free until it books work.</h2>
+    <p class="lede rv d2" data-track="me" style="margin-top:20px;margin-inline:auto;max-width:52ch">The benefits office. The airline. The bank you have been meaning to call for a month. Tell it who to call, go and do something else, and pick up when a person is on the line.</p>
+    <p class="lede rv d2" data-track="biz" style="margin-top:20px;margin-inline:auto;max-width:52ch">That is the offer for the first group. Sixty seconds to switch on, from the handset already in your hand. Ten seconds to switch off. The meter only ever moves when something good happened.</p>
+    <!-- MEASURED 2026-08-13, THE SAME 1.00:1 DEFECT THE INK CONTRACT WAS
+         WRITTEN FOR, at the one field that has to be filled in for this
+         company to have a customer. The old markup was `class="form"`, and
+         `.form input::placeholder` spends --t3, which is a DARK-ground token
+         and is not rebound by .paper. Computed through the serving path:
+         placeholder rgba(242,244,240,.66) on #F2F4F0. The hint was invisible,
+         and .form input:focus paints a Hi-Vis border that cream cannot hold
+         either. Inline styles could not fix it, because a colour set inline
+         also beats the :focus rule and would have killed the focus state.
+         So this uses the house PAPER form primitive instead: .iform/.ifield
+         rebinds the ink, paints a white field, gives the placeholder
+         rgba(11,12,14,.42) and gives focus a Dialtone border on #fff. Same
+         fix applied to the closes on /trades and /hold. -->
+    <form class="iform rv d2" name="early-access" method="POST" action="/api/interest" style="max-width:440px;margin-inline:auto;text-align:left;margin-top:28px">
       <input type="hidden" name="product" value="Get started from the home page">
       <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
-      <label class="sr" for="email" style="position:absolute;left:-9999px">Email address</label>
-      <input id="email" type="email" name="email" placeholder="you@yourcompany.com" required autocomplete="email" style="border-color:rgba(30,27,23,.2);background:rgba(30,27,23,.04);color:var(--paper-ink)">
-      <button class="btn btn-primary" type="submit">Request access</button>
+      <div class="ifield full">
+        <label for="email">Your email</label>
+        <!-- neutral on purpose: this one field serves both tracks, and
+             "yourcompany" reads wrong to the person who came here to stop
+             sitting on hold. -->
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <!-- FIRST PERSON, like every other button on this site ("I want this on
+           my line"). "Request access" made the visitor the supplicant at the
+           one moment we need them to feel in charge of the transaction. -->
+      <button class="btn btn-primary" type="submit">Put me on the list</button>
     </form>
     <!-- PAPER GROUND. Every colour here is written from the paper tokens
          (--ink, --accent-ink), never from --t1/--bronze, because this block
          sits on bone and a dark-ground token would paint white on cream.
          That is the exact defect the jury caught on /trades. -->
-    <p class="rv d2" style="margin-top:20px;margin-inline:auto;max-width:47ch;text-align:left;padding:2px 0 2px 14px;border-left:2px solid var(--accent-ink);font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> to start, and <b style="color:var(--ink);font-weight:600">$0</b> for every call that books nothing. The meter only moves when something good happened, and one code switches the whole thing off in ten seconds.</p>
-    <p class="src form-note rv d3">One email when it is your turn. Nothing else, ever.</p>
+    <!-- the reversal, in the words of the track that is showing. -->
+    <p class="rv d2" data-track="me" style="margin-top:20px;margin-inline:auto;max-width:47ch;text-align:left;padding:2px 0 2px 14px;border-left:2px solid var(--accent-ink);font-size:16px;line-height:1.5;color:var(--ink-2)">Your first hold is <b style="color:var(--ink);font-weight:600">free</b>. After that it is <b style="color:var(--ink);font-weight:600">$20</b> when a real person picks up, and <b style="color:var(--ink);font-weight:600">$0</b> when nobody ever does. There is nothing to install and nothing to cancel.</p>
+    <p class="rv d2" data-track="biz" style="margin-top:20px;margin-inline:auto;max-width:47ch;text-align:left;padding:2px 0 2px 14px;border-left:2px solid var(--accent-ink);font-size:16px;line-height:1.5;color:var(--ink-2)"><b style="color:var(--ink);font-weight:600">$0</b> to start, and <b style="color:var(--ink);font-weight:600">$0</b> for every call that books nothing. The meter only moves when something good happened, and one code switches the whole thing off in ten seconds.</p>
+    <!-- EVERY OBJECTION A PERSON HAS AT AN EMAIL FIELD, ANSWERED IN ONE LINE.
+         The old note answered one of the four and left three standing. -->
+    <p class="src form-note rv d3">No card. No account. No salesperson calling you. One email when it is your turn, and nothing else, ever.</p>
+
+    <!-- ══ THE DEMO AT THE DECISION MOMENT. GATED, ships [hidden].
+         The number is never in this file: the slot below is empty markup and
+         the health gate fills it from one fetch, so this whole block only
+         exists on a green line. It is here because the strongest thing this
+         company owns was missing from the one place a visitor decides, and
+         a person who will not give an email will absolutely dial a number. ══ -->
+    <div class="rv d3" data-callgate hidden style="margin-top:36px;padding-top:28px;border-top:1px solid rgba(11,12,14,.14)">
+      <p class="lede" style="margin:0 auto;max-width:46ch">Not ready to hand over an email? Then do not. Call the line first and make it prove every word on this page.</p>
+      <p style="margin-top:20px"><span class="cta-slot" data-callslot="Hear it before you decide"></span></p>
+      <p class="src" style="margin-top:14px;margin-inline:auto;max-width:52ch">Free. No account. Nobody calls you back. Hang up whenever you like.</p>
+    </div>
   </div>
 </section>
 
@@ -685,6 +762,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=8c6327ab" defer></script>
+<script src="/assets/answered.js?v=49ce5411" defer></script>
 </body>
 </html>

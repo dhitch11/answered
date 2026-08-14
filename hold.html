@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/hold.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
+<link rel="stylesheet" href="/assets/answered.css?v=ff2543fa">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -42,10 +42,19 @@
         <p class="eyebrow rv">For everyone who has ever been put on hold</p>
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You have better<br> things to do than<br> <span class="lit">listen to that music.</span></h1>
         <p class="lede hero-sub rv d2">Hold makes the call. It works through the menu, it waits however long it takes, and it rings your phone the second an actual person is on the line. You go and live your afternoon.</p>
+        <!-- The line answers as a plumbing shop, so it is not a demo OF Hold.
+             It is a demo of the voice that will be doing the waiting, which is
+             the thing a sceptic actually wants to hear before they trust it
+             with the benefits office. Said in those words, and never as
+             "hear Hold", because that would not be true.
+             RED-LINE SHAPE: slot falls back to the list CTA, gated button
+             stays hidden, one button, no duplicate words. -->
         <div class="hero-actions rv d3">
-          <a class="btn btn-primary" href="/#early">Get on the list</a>
-          <a class="btn btn-ghost" href="#receipt">See the receipt</a>
+          <span class="cta-slot" data-callslot="Hear the voice"><a class="btn btn-primary" href="#start">Get on the list</a></span>
+          <a class="btn btn-ghost" href="#start" data-callgate hidden>Get on the list</a>
         </div>
+        <p class="rv d3" data-callgate hidden style="margin-top:12px"><span class="src">That is the same voice, pointed the other way. Free, no account, and nobody calls you back.</span></p>
+        <p class="rv d3" style="margin-top:16px"><a class="card-go" href="#receipt">See the receipt it hands you <span aria-hidden="true">&rarr;</span></a></p>
         <!-- THE DECISION MOMENT. This was an 11.5px footnote under the fold of
              a reader's attention; it is the entire offer, so it is now 16px on
              a Hi-Vis rule, directly under the buttons. Ground-portable tokens
@@ -151,6 +160,13 @@
         </div>
       </div>
     </div>
+    <!-- THE ACT, IMMEDIATELY AFTER THE PROOF. The receipt is the whole
+         argument of this page and it lands at about halfway down; before this
+         row the next pressable thing was thousands of pixels later. -->
+    <div class="rv d3" style="margin-top:clamp(34px,4vw,52px);padding-top:clamp(26px,3vw,34px);border-top:1px solid rgba(11,12,14,.14);display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 22px">
+      <a class="btn btn-primary" href="#start">Give me my free hold</a>
+      <span style="font-size:16px;line-height:1.5;color:var(--ink-2);max-width:38ch">Your first hold is free. No card, no account, and $0 any time nobody ever picks up.</span>
+    </div>
   </div>
 </section>
 
@@ -209,21 +225,42 @@
   </div>
 </section>
 
-<section class="paper seam pad">
+<!-- ══ THE CLOSE. Same measured defect as /trades, fixed the same way: this
+     section's only control was one [data-callslot], and the health gate
+     REPLACES a slot's contents, so on a green line the ghost "Get on the
+     list" button was destroyed and the close of the page ended with a phone
+     number and no way to sign up. Form and slot are two elements now. ══ -->
+<section class="paper seam pad" id="start">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Get started</p>
-    <h2 class="h2 rv d1" style="margin-top:18px">Never sit on hold again.</h2>
-    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:48ch">First calls are on us. After that you pay only when there is a person on the line, and never when there is not.</p>
-    <!-- THE HEALTH GATE. What ships is the ghost below: a plain list CTA. The
-         module in answered.js swaps it for the live call control, and un-hides
-         the two lines around it, ONLY when /api/demo-health answers
-         healthy:true. The demo number is never in this file. -->
-    <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:46ch">Call it first. It is the same voice that will be doing the waiting.</p>
-    <p class="rv d2" style="margin-top:26px"><span class="cta-slot" data-callslot><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
+    <h2 class="h2 rv d1" style="margin-top:18px">Your first hold is free. Bring the worst line you have.</h2>
+    <p class="lede rv d2" style="margin-top:20px;margin-inline:auto;max-width:48ch">The benefits office. The airline. The carrier you have been meaning to call for a month. After the first one you pay only when there is a person on the line, and never when there is not.</p>
+    <!-- .iform/.ifield, the house PAPER form primitive, never class="form".
+         Measured 2026-08-13: .form input::placeholder spends --t3, a dark
+         ground token .paper does not rebind, so on bone the hint computed
+         rgba(242,244,240,.66) on #F2F4F0 and was invisible. Full note on the
+         home page close. -->
+    <form class="iform rv d2" name="early-access" method="POST" action="/api/interest" style="max-width:440px;margin-inline:auto;text-align:left;margin-top:28px">
+      <input type="hidden" name="product" value="Answered Hold, from the hold page">
+      <p style="display:none"><label>Leave this empty <input name="bot-field"></label></p>
+      <div class="ifield full">
+        <label for="email">Your email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Give me my free hold</button>
+    </form>
     <!-- the reversal, adjacent to the last button on the page. paper ground, so
          every colour comes from --ink / --ink-2, never from a dark token. -->
-    <p class="rv d3" style="margin-top:18px;margin-inline:auto;max-width:44ch;font-size:16px;line-height:1.5;color:var(--ink-2)">Your <b style="color:var(--ink);font-weight:600">first hold is free</b>. After that, <b style="color:var(--ink);font-weight:600">$20</b> when a person picks up, and <b style="color:var(--ink);font-weight:600">$0</b> when nobody ever does.</p>
-    <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. The line answers as a plumbing shop, which is the same engine pointed the other way.</p>
+    <p class="rv d3" style="margin-top:20px;margin-inline:auto;max-width:44ch;font-size:16px;line-height:1.5;color:var(--ink-2)">Your <b style="color:var(--ink);font-weight:600">first hold is free</b>. After that, <b style="color:var(--ink);font-weight:600">$20</b> when a person picks up, and <b style="color:var(--ink);font-weight:600">$0</b> when nobody ever does.</p>
+    <p class="src form-note rv d3">No card. No account. Nothing to install. One email when it is your turn, and nothing else, ever.</p>
+
+    <!-- THE DEMO, BESIDE THE FORM INSTEAD OF INSTEAD OF IT. Gated, ships
+         [hidden], the number is never in this file. -->
+    <div class="rv d3" data-callgate hidden style="margin-top:36px;padding-top:28px;border-top:1px solid rgba(11,12,14,.14)">
+      <p class="lede" style="margin:0 auto;max-width:46ch">Want to hear the voice first? Call it. It is the same one that will be doing the waiting for you.</p>
+      <p style="margin-top:20px"><span class="cta-slot" data-callslot="Hear the voice"></span></p>
+      <p class="src" style="margin-top:14px;margin-inline:auto;max-width:54ch">Free. No account. Nobody calls you back. The line answers as a plumbing shop, which is the same engine pointed the other way.</p>
+    </div>
   </div>
 </section>
 
@@ -264,6 +301,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=8c6327ab" defer></script>
+<script src="/assets/answered.js?v=49ce5411" defer></script>
 </body>
 </html>

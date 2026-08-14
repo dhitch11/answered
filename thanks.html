@@ -16,7 +16,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=874bb56d">
+<link rel="stylesheet" href="/assets/answered.css?v=ff2543fa">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -52,15 +52,28 @@
 <!-- The highest intent moment on the whole site: they have just asked for it.
      The one thing better than reading about the voice here is hearing it, so
      this close carries the same health-gated call control as every other page.
-     What ships is the ghost; the number is never in this file. -->
+     What ships is the ghost; the number is never in this file, in either branch.
+
+     BOTH BRANCHES ARE WRITTEN, because the red one was the one that shipped.
+     Measured 2026-08-13 with /api/demo-health forced to 503: this section
+     printed "The demo line is answering right now" in 30px type under the
+     heading "You do not have to take our word for the voice", and then handed
+     over a button reading "See what each part costs" that was byte-identical
+     to the one already in the hero of this same page. A false present-tense
+     claim, an unkept promise and a duplicated control, all in one section, all
+     invisible to a green-path check. The red branch now says what is true and
+     sends them to the seven minute walkthrough, which is the same voice and is
+     a file on this origin rather than a line that has to be up. -->
 <section class="paper seam pad-s">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">While you wait</p>
     <h2 class="h2 rv d1" style="font-size:clamp(34px,3.9vw,58px);line-height:1.06;letter-spacing:-.018em;text-wrap:balance;margin-top:16px">You do not have to take our word for the voice.</h2>
-    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:50ch">The demo line is answering right now. It says it is an AI in its first sentence, it will refuse to quote you a price, and it will book you a slot anyway.</p>
+    <p class="lede rv d2" data-callgate hidden style="margin-top:22px;margin-inline:auto;max-width:50ch">The demo line is answering right now. It says it is an AI in its first sentence, it will refuse to quote you a price, and it will book you a slot anyway.</p>
+    <p class="lede rv d2" data-callgate-off style="margin-top:22px;margin-inline:auto;max-width:52ch">The demo line is not answering this minute, and we would rather tell you that than hand you a number that rings out. The seven minute walkthrough is the same voice, it is sitting on the home page, and it plays whether or not a phone line is up.</p>
     <p class="rv d2" style="margin-top:26px;margin-inline:auto;text-align:left;width:fit-content;max-width:min(56ch,100%);padding-left:15px;border-left:2px solid var(--accent-ink);font-size:clamp(16.5px,1.45vw,20px);line-height:1.46;color:var(--ink)">$0 base. <b class="num" style="color:var(--accent-ink);font-weight:600">$19</b> when it books. Reply <b class="num" style="color:var(--accent-ink);font-weight:600;letter-spacing:.04em">VOID</b> and it comes off.</p>
-    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it answer now"><a class="btn btn-primary" href="/pricing">See what each part costs</a></span></p>
+    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it answer now"><a class="btn btn-primary" href="/#listen">Hear the walkthrough instead</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. It answers as a plumbing shop, which is the same engine every product on this site runs on.</p>
+    <p class="src rv d3" data-callgate-off style="margin-top:14px">A real call is placed to the line every two hours. The number comes back onto this page by itself the moment one passes, so it is worth another look later today.</p>
   </div>
 </section>
 
@@ -99,6 +112,6 @@
     </div>
   </div>
 </footer>
-<script src="/assets/answered.js?v=8c6327ab" defer></script>
+<script src="/assets/answered.js?v=49ce5411" defer></script>
 </body>
 </html>

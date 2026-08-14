@@ -193,13 +193,28 @@ def reversal(kind, top=22, center=False, delay='d2'):
             '%s</p>') % (delay, top, mid, _RULE, body)
 
 
-def band_cell(idx, value, claim, source, delay=''):
-    """A stat tile as an ARTIFACT: plate number, figure, claim, ruled source.
+def band_cell(idx, value, claim, source, delay='', kind='Source'):
+    """A stat tile as an ARTIFACT: plate number, figure, claim, ruled provenance.
 
-    The source line is the credibility engine of the whole band and it shipped
-    at 11.5px on a .66 alpha, which is a whisper nobody reads. It is now ruled
-    off from the claim, labelled, and set at 12.8px on --ink-2, so the thing
-    that makes the number believable is legible at the distance the number is.
+    The provenance line is the credibility engine of the whole band and it
+    shipped at 11.5px on a .66 alpha, which is a whisper nobody reads. It is now
+    ruled off from the claim, labelled, and set at 12.8px on --ink-2, so the
+    thing that makes the number believable is legible at the distance the number
+    is.
+
+    ★ THE LABEL IS AN ARGUMENT, SO IT HAS TO BE ACCURATE (2026-08-13). It read
+    "SOURCE" on all eight cells across /recover and /trust, and on five of the
+    eight the thing underneath it was not a source. "SOURCE: Design target."
+    "SOURCE: Answered pricing law." A reader who catches the word being stretched
+    once discounts it on the three cells where the citation is real and external
+    and checkable, which is the only place it was ever earning anything. So the
+    word now means one thing: SOURCE sits over somebody else's published
+    document, with a date. Our own commitments say COMMITMENT, our own
+    definitions say DEFINITION, our own price says OUR PRICE. Fewer cells claim
+    a citation and the three that do are worth something.
+
+    kind is a plain label, not an enum, so a new cell cannot fail a lookup and
+    silently fall back to claiming a source it does not have.
     """
     return (
         '<div class="band-cell rv %s">'
@@ -210,8 +225,8 @@ def band_cell(idx, value, claim, source, delay=''):
         '<div class="band-s src" style="margin-top:15px;padding-top:12px;'
         'border-top:1px solid var(--line);font-size:12.8px;line-height:1.58;color:var(--ink-2)">'
         '<span style="display:block;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;'
-        'color:var(--accent-ink);margin-bottom:6px">Source</span>%s</div>'
-        '</div>') % (delay, idx, value, claim, source)
+        'color:var(--accent-ink);margin-bottom:6px">%s</span>%s</div>'
+        '</div>') % (delay, idx, value, claim, kind, source)
 
 
 # TYPE MODULATION. Every H2 on these pages shipped at the same 62px, which gives
@@ -328,7 +343,7 @@ PRICING = '''
         <div class="pc-unit">of dollars actually recovered.<br> You pay nothing unless the money lands.</div>
         <div class="pc-free" style="font-size:12.5px;line-height:1.7;letter-spacing:.045em;border-style:solid;border-color:rgba(227,255,79,.36)">$0 to start &middot; $0 a month &middot; $0 if nothing lands</div>
         <p class="pc-void" style="margin-top:13px;padding-left:13px;border-left:2px solid var(--bronze);font-size:15px;line-height:1.42;color:var(--t1)">Reply <b class="num" style="color:var(--bronze-2);font-weight:600;letter-spacing:.04em">VOID</b> to any charge and it comes off. No argument, no ticket, no phone call.</p>
-        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
+        <div class="pc-meter"><span>The share exists only on dollars that actually clear into your account, never on calls placed or letters sent.</span><span>Nothing lands, nothing is owed. There is no minimum, no retainer and no monthly floor underneath it.</span><span>15% is the standard band. Newer invoices are 10%, the oldest are 20%, and Answered subscribers pay less on every band. You see which band an invoice sits in before the first call is placed, and all three are written into the <a href="/terms.html" style="color:inherit">terms</a>.</span><span>Prefer a flat number? <b>Autopilot</b> is $19 for every invoice that gets paid, and no share at all.</span><span>Where the shape of a contingency fee is barred by state law, you are served the flat option automatically.</span></div>
         <ul class="pc-list">
           <li>Calls on every invoice past day thirty, in your name and on your caller ID</li>
           <li>Already knows the job, the address and the date, because it booked the work</li>
@@ -575,6 +590,12 @@ PRICING = '''
       <summary>Fleets and franchises are a conversation, not a listed price.</summary>
       <div class="disc-body"><p>Multiple trucks, multiple locations and multiple numbers change the shape of the meter, so those get scheduled properly rather than guessed at on a page.</p></div>
     </details>
+    <!-- Same disclosure the trust page carries, because these four are written
+         in the present tense about a meter that has not billed anybody yet.
+         They are the terms we are binding ourselves to, which is a different
+         kind of statement from a measurement, and a reader is entitled to know
+         which one he is reading before he reads four of them. -->
+    <p class="src rv d3" style="margin-top:22px;max-width:74ch">Stated 2026-08-13. These four are the terms of the meter, written before it has billed anybody: no customer line is running yet, so none of them is a measurement. Which parts of the product are live today and which start with the first customer line is set out plainly on the <a href="/trust.html" style="color:var(--bronze-2)">trust page</a>, and nothing on this page is charged to anyone until that day.</p>
   </div>
 </section>
 
@@ -582,14 +603,19 @@ PRICING = '''
 <section class="pad-s seam" data-aud="consumer business both" style="padding-block:clamp(46px,5.4vw,80px)">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">Before you decide</p>
-    <h2 class="h2 rv d1" style="''' + H2_MID + ''';margin-top:16px">Do not take the page's word for it. <span class="lit">Call it.</span></h2>
-    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:52ch">Every number above describes a voice you have not heard yet. The demo line is answering right now, it is the same engine behind all three meters, and it costs you nothing to find out whether it is any good.</p>
-    <!-- THE HEALTH GATE. What ships is the ghost: a plain anchor to the form
-         below. answered.js swaps it for the live call control, and un-hides the
-         line under it, ONLY when /api/demo-health answers healthy:true. The
-         demo number is never in this file. -->
+    <h2 class="h2 rv d1" style="''' + H2_MID + ''';margin-top:16px">Do not take the page's word for it. <span class="lit" data-callgate hidden>Call it.</span><span class="lit" data-callgate-off>Check it.</span></h2>
+    <!-- THE HEALTH GATE, BOTH WAYS. [data-callgate] ships hidden and appears
+         only on healthy:true. [data-callgate-off] ships VISIBLE and is retired
+         on healthy:true. The section therefore has a true sentence in it in
+         every state, which the single-direction gate did not: measured on the
+         red path 2026-08-13, this section printed "The demo line is answering
+         right now" with no number anywhere on the page. The demo number is
+         never in this file, in either branch. -->
+    <p class="lede rv d2" data-callgate hidden style="margin-top:22px;margin-inline:auto;max-width:52ch">Every number above describes a voice you have not heard yet. The demo line is answering right now, it is the same engine behind all three meters, and it costs you nothing to find out whether it is any good.</p>
+    <p class="lede rv d2" data-callgate-off style="margin-top:22px;margin-inline:auto;max-width:54ch">Every number above describes a voice you have not heard yet. The demo line is not answering this minute, so this page is not going to hand you a number that rings out. A real call is placed to it every two hours, and the number returns here the moment one passes.</p>
     <p class="rv d2" style="margin-top:24px"><span class="cta-slot" data-callslot="Hear it answer"><a class="btn btn-primary" href="#interest">Tell us what you need</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px;font-size:12.8px;color:var(--ink-2)">Free, no account, and nobody calls you back. It answers as a plumbing shop. Push it for a price and watch it refuse, which is the guardrail on the trust page doing its job.</p>
+    <p class="src rv d3" data-callgate-off style="margin-top:14px;font-size:12.8px;color:var(--ink-2)">Nothing else on this page changes while the line is down. The page reads the line before it offers it to you, which is the same reason a charge on this site has to show you the call it came from.</p>
   </div>
 </section>
 
@@ -652,7 +678,7 @@ RECOVER = '''
           <a class="btn btn-primary" href="/#early">Get on the list</a>
           <a class="btn btn-ghost" href="/pricing.html">See what it costs</a>
         </div>
-        <p class="src hero-note rv d3">The fee is a function of dollars that actually land in your account, never of calls placed or letters sent.</p>
+        <p class="src hero-note rv d3">The fee is a function of dollars that actually land in your account, never of calls placed or letters sent. The whole fee, all three bands and the flat alternative, is <a href="#fee" style="color:var(--bronze-2)">further down this page</a>.</p>
       </div>
       <div class="rv d2">
         <div class="ring-stage" style="max-width:420px">
@@ -669,9 +695,9 @@ RECOVER = '''
   <div class="wrap" style="padding-inline:0">
     <div class="band-grid">
       ''' + band_cell('01', '$299B', 'of US construction payments ran late in one year.', 'Rabbet Construction Payments Report, 2025. Commercial contractor to subcontractor payments.') + '''
-      ''' + band_cell('02', '20-50%', 'is what collections agencies publish for this work.', 'PSI Collect publishes 22% on $5,000 to $50,000 accounts, accessed 2026-08-10.', 'd1') + '''
-      ''' + band_cell('03', 'Day 31', 'is when an invoice stops being late and starts being a project.', 'The window Recover works, before default and before an agency.', 'd2') + '''
-      ''' + band_cell('04', '$0', 'is the whole bill if nothing lands. The fee exists only on recovered dollars.', 'Answered pricing law, the same on every surface of this site.', 'd3') + '''
+      ''' + band_cell('02', '20-50%', 'is the range agencies publish for this work, in their own rate cards.', 'Two published cards, not one. The Kaplan Group lists 20% on $5,000 to $50,000 claims and 50% on claims under $1,000, dated 2023-08-29. PSI Collect lists 22% on $5,000 to $50,000, accessed 2026-08-10.', 'd1') + '''
+      ''' + band_cell('03', 'Day 31', 'is when an invoice stops being late and starts being a project.', 'The window Recover works, before default and before an agency. It is where we chose to start, not a finding about the world.', 'd2', kind='Our definition') + '''
+      ''' + band_cell('04', '$0', 'is the whole bill if nothing lands. The fee exists only on recovered dollars.', 'Our price, stated by us, identical on every surface of this site and in the terms. Not a source and not a measurement: an offer you can hold us to.', 'd3', kind='Our price') + '''
     </div>
   </div>
 </section>
@@ -702,13 +728,23 @@ RECOVER = '''
     <div class="meter-lab">Money out there</div>
     <div class="meter-big">$23,410</div>
     <div class="inv">
-      <div class="inv-row" data-amt="1193"><span class="name">Rivera, water heater</span><span class="age">34d</span><span class="amt">$1,193</span></div>
-      <div class="inv-row" data-amt="2850"><span class="name">Okafor, panel upgrade</span><span class="age">41d</span><span class="amt">$2,850</span></div>
-      <div class="inv-row" data-amt="11400"><span class="name">Delgado GC, phase two</span><span class="age">63d</span><span class="amt">$11,400</span></div>
-      <div class="inv-row" data-amt="7967"><span class="name">Whitmore, roof section</span><span class="age">88d</span><span class="amt">$7,967</span></div>
+      <div class="inv-row" data-amt="1193" data-outcome="paid"><span class="name">Rivera, water heater</span><span class="age">34d</span><span class="amt">$1,193</span></div>
+      <div class="inv-row" data-amt="2850" data-outcome="paid"><span class="name">Okafor, panel upgrade</span><span class="age">41d</span><span class="amt">$2,850</span></div>
+      <div class="inv-row" data-amt="11400" data-outcome="promised"><span class="name">Delgado GC, phase two</span><span class="age">63d</span><span class="amt">$11,400</span></div>
+      <div class="inv-row" data-amt="7967" data-outcome="open"><span class="name">Whitmore, roof section</span><span class="age">88d</span><span class="amt">$7,967</span></div>
     </div>
   </div>
-  <div class="sc-note">Concept rendering of the product running. Not a customer record and not a projection of results. Every promise to pay captured on a call is written to this ledger as it happens.</div>
+  <!-- THE LEDGER DOES NOT GO TO ZERO, AND THAT IS THE POINT (2026-08-13). It
+       used to: all four rows stamped PAID and the meter animated $23,410 down
+       to $0. The note underneath said "not a projection of results" while the
+       picture above it projected a 100% recovery rate, and the picture is what
+       a reader takes away. A collections demo that wins every account is the
+       least believable thing we could show a contractor, who knows perfectly
+       well that the 88 day one does not pay on the first call. Two land, one
+       gives a dated promise, one is still being worked, and the meter moves
+       only on money that actually cleared, which is the same rule the fee
+       runs on. Honest AND more persuasive, which is usually the same move. -->
+  <div class="sc-note">Concept rendering of the product running. Not a customer record and not a projection of results. The number moves only when money actually lands, so a promise to pay is written down and dated here but never counted as recovered.</div>
 </div></div>
     </div>
   </div>
@@ -724,6 +760,31 @@ RECOVER = '''
   </div>
 </section>
 
+
+<!-- THE WHOLE FEE, ON THE PRODUCT PAGE (2026-08-13). /recover said 15% and
+     nothing else. The terms page, which says of itself "if your bill and this
+     page ever disagree, this page wins", has published three bands the whole
+     time: 10% on newer invoices, 15% on most, 20% on the oldest, and less again
+     for Answered subscribers. A buyer who read the product page and then read
+     the governing document found a price he had not been shown, which is the
+     definition of a bait number no matter how honest the intent was. The
+     headline offer does not move, because 15 IS the standard band. What
+     changes is that the page now states the whole thing, which is also where
+     the flat option and the state-law gate belong: for a contractor in New
+     York, Illinois or North Carolina the flat option is not an alternative,
+     it is the only lawful shape, and that cannot live only in a card. -->
+<section class="pad-s seam" id="fee" style="padding-top:clamp(48px,5.4vw,76px)">
+  <div class="wrap">
+    <p class="eyebrow rv">The whole fee</p>
+    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;max-width:26ch">Fifteen percent is the standard band. Here are the other two.</h2>
+    <div class="steps" style="margin-top:30px">
+      <div class="step rv"><h3 class="h3">Three bands, by age, shown before the first call</h3><p>Newer invoices are <b class="num" style="color:var(--bronze-2)">10%</b>. Most are <b class="num" style="color:var(--bronze-2)">15%</b>. The oldest are <b class="num" style="color:var(--bronze-2)">20%</b>. Older money is harder to get back and the price says so. Answered subscribers pay less on every band, because the agent already knows the job it booked. You are told which band an invoice sits in before anyone dials, so the fee is never a surprise afterwards.</p></div>
+      <div class="step rv d1"><h3 class="h3">Or no share at all, if you would rather</h3><p>Autopilot is a flat <b class="num" style="color:var(--bronze-2)">$19</b> for every invoice that actually gets paid, with no percentage on top. Never per call, never per invoice placed. Some owners would rather know the number in advance than pay a share of a big one, and that is a reasonable thing to want.</p></div>
+      <div class="step rv d2"><h3 class="h3">In three states the flat option is the only one</h3><p>New York, Illinois and North Carolina bar the shape of a contingency fee for this work, whoever is charging it. If your practice sits in one of them you are served the flat option automatically, gated on your verified business location rather than on what you tell us or what your IP address suggests. You do not have to know the rule, and you cannot accidentally opt out of it.</p></div>
+    </div>
+    <p class="src rv d3" style="margin-top:24px;max-width:78ch">Recovered means the payment lands within 30 days of our last contact on that invoice, or by a date the payer promised in writing. Money outside that window is yours alone and we never charge on it. All of it is in the <a href="/terms.html" style="color:var(--bronze-2)">terms</a>, which win over any page on this site if the two ever disagree.</p>
+  </div>
+</section>
 
 <section class="pad-s seam" style="padding-block:clamp(40px,4.6vw,64px)">
   <div class="wrap">
@@ -746,6 +807,7 @@ RECOVER = '''
     <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:46ch">Hear the voice before you hand it an invoice. It is the same one.</p>
     <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it chase an invoice"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. The demo line answers as a plumbing shop, which is the same engine pointed at your ledger.</p>
+    <p class="src rv d3" data-callgate-off style="margin-top:14px">There is usually a live number here. It is not answering this minute, so the page has taken it down rather than let you dial something that rings out. A real call is placed to the line every two hours and the number returns by itself.</p>
   </div>
 </section>
 '''
@@ -756,17 +818,17 @@ TRUST = '''
   <div class="wrap">
     <p class="eyebrow rv">Trust</p>
     <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance;margin-top:16px">Audit every word<br> <span class="lit">from the truck.</span></h1>
-    <p class="lede rv d2" style="margin-top:22px;max-width:60ch">Your phone is your business, so you get to see exactly what happens on it. Every call transcribed to you inside a minute. Every charge linked to the call that made it. Guardrails you can watch working, and four numbers that tell you the truth every day.</p>
+    <p class="lede rv d2" style="margin-top:22px;max-width:60ch">Your phone is your business, so you get to see exactly what happens on it. Every call transcribed to you inside a minute. Every charge linked to the call that made it. Guardrails you can go and test on a live line right now, and a section further down that tells you plainly which parts of this are running today and which parts are not.</p>
   </div>
 </section>
 
 <section class="band">
   <div class="wrap" style="padding-inline:0">
     <div class="band-grid">
-      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand, by text.', 'Design target. If the pipeline is down, calls pause rather than run unaudited.') + '''
-      ''' + band_cell('02', '5s', 'from a caller asking for a human to your cell ringing.', 'Warm transfer attempt. 20 seconds without a pickup and it takes a callback and texts you.', 'd1') + '''
-      ''' + band_cell('03', '0', 'prices quoted. Ever. It is not allowed to say a number.', 'Three stacked guardrails, below. The counter is published per account.', 'd2') + '''
-      ''' + band_cell('04', '1st', 'sentence of every call is the AI saying it is an AI.', 'On every call, everywhere, whether or not the law requires it.', 'd3') + '''
+      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand, by text.', 'Our design target, published 2026-08-13. It is not a measurement, and we will not print one until customer lines are running. If the pipeline is down, calls pause rather than run unaudited.', kind='Our commitment') + '''
+      ''' + band_cell('02', '5s', 'from a caller asking for a human to your cell ringing.', 'Our design target, published 2026-08-13. Warm transfer attempt. 20 seconds without a pickup and it takes a callback and texts you.', 'd1', kind='Our commitment') + '''
+      ''' + band_cell('03', '0', 'prices quoted. Ever. It is not allowed to say a number.', 'Our rule, published 2026-08-13, held by three stacked guardrails below. Two of the three run on the demo line today, which means you can test this one against us yourself before you believe it.', 'd2', kind='Our commitment') + '''
+      ''' + band_cell('04', '1st', 'sentence of every call is the AI saying it is an AI.', 'Our rule, published 2026-08-13. On every call, everywhere, whether or not the law requires it. The demo line is the copy of it you can check yourself.', 'd3', kind='Our commitment') + '''
     </div>
   </div>
 </section>
@@ -777,10 +839,35 @@ TRUST = '''
     <h2 class="h2 rv d1" style="''' + H2_PEAK + ''';margin-top:18px;max-width:22ch">It will never quote a price. <span class="lit">Enforced in three places, not one.</span></h2>
     <p class="lede rv d2" style="margin-top:24px;max-width:62ch">Pricing is yours to give, and it stays yours. The agent books the visit, captures everything you need, and tells the caller you will confirm the number personally. That promise is enforced in three independent places, so it holds every single time.</p>
     <div class="cards">
-      <article class="card rv"><div class="card-tag">Layer 1</div><h3 class="h3">The instruction</h3><p>It is told exactly what to say instead: that it cannot quote, that you will call back with a real number today, and then it books the visit anyway.</p></article>
-      <article class="card rv d1"><div class="card-tag">Layer 2</div><h3 class="h3">The filter</h3><p>Every sentence is checked for dollar amounts and price language before it is ever spoken aloud. A number that slips the instruction is cut before it reaches the caller's ear.</p></article>
-      <article class="card rv d2"><div class="card-tag">Layer 3</div><h3 class="h3">The nightly replay</h3><p>Fifty recorded calls where a caller pushes hard for a price are replayed against the current build every night. A regression is caught by us, before it is caught by your customer.</p></article>
+      <article class="card rv"><div class="card-tag">Layer 1 &middot; running now</div><h3 class="h3">The instruction</h3><p>It is told exactly what to say instead: that it cannot quote, that you will call back with a real number today, and then it books the visit anyway. This is in the code serving the demo line right now.</p></article>
+      <article class="card rv d1"><div class="card-tag">Layer 2 &middot; running now</div><h3 class="h3">The filter</h3><p>Every sentence is checked for dollar amounts and price language before it is ever spoken aloud. A number that slips the instruction is cut before it reaches the caller's ear. Also running on the demo line, which is why you can go and try to break it.</p></article>
+      <article class="card rv d2"><div class="card-tag">Layer 3 &middot; starts with the first customer line</div><h3 class="h3">The nightly replay</h3><p>Fifty recorded calls where a caller pushes hard for a price, replayed against the current build every night, so a regression is caught by us before it is caught by your customer. This one needs recorded customer calls to replay, so it starts when the first line does. We would rather tell you which layer is not running yet than let you find out.</p></article>
     </div>
+  </div>
+</section>
+
+<!-- WHERE WE ACTUALLY ARE (2026-08-13). The rest of this page was written in
+     the present tense about a product with no customer lines on it. Every
+     mechanism described is real and designed and some of it is genuinely
+     running, but "Every call transcribed to you inside a minute" reads as a
+     measurement of a fleet, and there is no fleet. The privacy page already
+     does this correctly and says so in as many words ("Customer lines: not
+     live yet... We would rather show you a blank than invent a number"), which
+     is the strongest paragraph on this whole site. This page owed the same
+     paragraph. It is placed HIGH, above the audit mechanics, because a
+     disclosure a skeptic finds after he has already discounted the page is
+     worth nothing, and one he finds before he starts is the reason he keeps
+     reading. -->
+<section class="pad-s seam" style="padding-top:clamp(52px,6vw,88px)">
+  <div class="wrap">
+    <p class="eyebrow rv">Where we actually are</p>
+    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;max-width:30ch">Some of this is running right now. Some of it is not. Here is the line.</h2>
+    <div class="steps" style="margin-top:30px">
+      <div class="step rv"><h3 class="h3">Running today, and you can check it yourself</h3><p>The demo line answers. It says it is an AI in its first sentence, it announces that the call is recorded, and it will not say a dollar amount, because layers one and two above are in the code that serves that call. You do not have to believe any of that. Call it and try to make it quote you a price.</p></div>
+      <div class="step rv d1"><h3 class="h3">Not running yet, because there are no customer lines yet</h3><p>The transcript inside a minute, the warm transfer to your cell, the per account guardrail counter and the nightly replay all need a live customer line to run on. They are built toward and they are stated above as targets, not as measurements. The privacy page says the same thing about how long customer recordings are kept: we would rather show you a blank than invent a number.</p></div>
+      <div class="step rv d2"><h3 class="h3">Numbers we will not print until we have them</h3><p>There is no answer rate on this site, no recovery rate, no customer count, no logo wall and no testimonial. Not one of them exists yet, and writing them ourselves is the only way we could have put them here. The first pilot produces the first real ones, and the day they land they go up and they stay up, including the ones that are not flattering.</p></div>
+    </div>
+    <p class="src rv d3" style="margin-top:24px;max-width:78ch">Stated 2026-08-13. If you are reading this after the first customer lines are live and it still says this, that is a page we failed to update, and it is worth writing to us about.</p>
   </div>
 </section>
 
@@ -832,6 +919,7 @@ TRUST = '''
     <p class="lede rv d2" data-callgate hidden style="margin-top:26px;margin-inline:auto;max-width:48ch">Start the audit now. Call it and listen to the first sentence.</p>
     <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear the first sentence"><a class="btn btn-primary" href="/#early">Get on the list</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">It will tell you it is an AI before it tells you anything else. Push it for a price and watch it refuse. Free, no account, and nobody calls you back.</p>
+    <p class="src rv d3" data-callgate-off style="margin-top:14px">There is usually a live number here. It is not answering this minute, so the page has taken it down rather than let you dial something that rings out. That is the same rule as the one above: if the recording pipeline is down we stop taking calls instead of taking them unwatched.</p>
   </div>
 </section>
 '''
@@ -862,15 +950,28 @@ THANKS = '''
 <!-- The highest intent moment on the whole site: they have just asked for it.
      The one thing better than reading about the voice here is hearing it, so
      this close carries the same health-gated call control as every other page.
-     What ships is the ghost; the number is never in this file. -->
+     What ships is the ghost; the number is never in this file, in either branch.
+
+     BOTH BRANCHES ARE WRITTEN, because the red one was the one that shipped.
+     Measured 2026-08-13 with /api/demo-health forced to 503: this section
+     printed "The demo line is answering right now" in 30px type under the
+     heading "You do not have to take our word for the voice", and then handed
+     over a button reading "See what each part costs" that was byte-identical
+     to the one already in the hero of this same page. A false present-tense
+     claim, an unkept promise and a duplicated control, all in one section, all
+     invisible to a green-path check. The red branch now says what is true and
+     sends them to the seven minute walkthrough, which is the same voice and is
+     a file on this origin rather than a line that has to be up. -->
 <section class="paper seam pad-s">
   <div class="wrap narrow" style="text-align:center">
     <p class="eyebrow rv" style="justify-content:center">While you wait</p>
     <h2 class="h2 rv d1" style="''' + H2_MID + ''';margin-top:16px">You do not have to take our word for the voice.</h2>
-    <p class="lede rv d2" style="margin-top:22px;margin-inline:auto;max-width:50ch">The demo line is answering right now. It says it is an AI in its first sentence, it will refuse to quote you a price, and it will book you a slot anyway.</p>
+    <p class="lede rv d2" data-callgate hidden style="margin-top:22px;margin-inline:auto;max-width:50ch">The demo line is answering right now. It says it is an AI in its first sentence, it will refuse to quote you a price, and it will book you a slot anyway.</p>
+    <p class="lede rv d2" data-callgate-off style="margin-top:22px;margin-inline:auto;max-width:52ch">The demo line is not answering this minute, and we would rather tell you that than hand you a number that rings out. The seven minute walkthrough is the same voice, it is sitting on the home page, and it plays whether or not a phone line is up.</p>
     ''' + reversal('answered', top=26, center=True) + '''
-    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it answer now"><a class="btn btn-primary" href="/pricing.html">See what each part costs</a></span></p>
+    <p class="rv d2" style="margin-top:22px"><span class="cta-slot" data-callslot="Hear it answer now"><a class="btn btn-primary" href="/#listen">Hear the walkthrough instead</a></span></p>
     <p class="src rv d3" data-callgate hidden style="margin-top:14px">Free. No account. Nobody calls you back. It answers as a plumbing shop, which is the same engine every product on this site runs on.</p>
+    <p class="src rv d3" data-callgate-off style="margin-top:14px">A real call is placed to the line every two hours. The number comes back onto this page by itself the moment one passes, so it is worth another look later today.</p>
   </div>
 </section>
 '''
