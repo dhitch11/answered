@@ -2792,7 +2792,15 @@ async function summarizeCall(sid, btn) {
  */
 function callSummaryCard(c, transcript) {
   const finals = transcript.filter((t) => t.is_final).length;
-  const existing = c.ai_notes && typeof c.ai_notes === 'object' ? c.ai_notes : null;
+  // ★ THE TWO MOST IMPORTANT FIELDS LIVE SOMEWHERE ELSE. sv_admin_call_summary deliberately splits
+  // the result: summary and sentiment go to their own columns on calls, because they are queried
+  // and displayed in lists, and ai_notes keeps the rest. Rendering ai_notes alone therefore drew a
+  // panel with no summary line and no sentiment row - the two things an operator opens it for.
+  // Measured on prod: the card came back headed "They wanted" with the prose simply absent.
+  const notes = c.ai_notes && typeof c.ai_notes === 'object' ? c.ai_notes : null;
+  const existing = notes
+    ? { ...notes, summary: c.summary || notes.summary || '', sentiment: c.sentiment || notes.sentiment || '' }
+    : null;
 
   const head = '<div class="card-h"><h2>What happened on this call</h2>' +
     '<span class="sp muted">' + finals + ' final of ' + transcript.length + ' lines</span></div>';
@@ -2831,9 +2839,11 @@ function renderCallSummary(s) {
       kv('Outcome', s.outcome) +
       kv('Sentiment', s.sentiment) +
     '</dl>' +
-    '<div style="margin-top:9px"><strong class="sm">Follow-ups</strong>' + list(s.follow_ups) + '</div>' +
+    '<div style="margin-top:11px"><strong class="sm" style="display:block;margin-bottom:3px">Follow-ups</strong>' +
+      list(s.follow_ups) + '</div>' +
     ((s.quotes || []).length
-      ? '<div style="margin-top:11px"><strong class="sm">Verbatim, checked against the transcript</strong>' +
+      ? '<div style="margin-top:11px"><strong class="sm" style="display:block;margin-bottom:3px">' +
+        'Verbatim, checked against the transcript</strong>' +
         s.quotes.map((q) => '<blockquote class="quote"><span class="pill">' + esc(q.speaker || '?') +
           '</span> ' + esc(q.text) + '</blockquote>').join('') + '</div>'
       : '') +
