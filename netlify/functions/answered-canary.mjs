@@ -105,12 +105,20 @@
 // every one of the twelve runs a day.
 const TWIML = '<Response><Pause length="8"/></Response>';
 
-// Budgets, set from the instrumented run above with room on top, not from a
-// guess. Total worst case sits under 40 seconds and the normal case finishes
-// around 14, because every poll short circuits the moment it has its answer.
+// Budgets, set from the instrumented run above, then CAPPED by the platform.
+// Two constraints, and the tighter one wins:
+//   the measurement  conversation at 2.7s, transcript readable at 13.7s
+//   the platform     a scheduled function is killed at 30 seconds, and a
+//                    canary killed mid-run writes NOTHING, which is the exact
+//                    invisible failure this file exists to stop being
+// So the worst case is engineered to land near 27 seconds, not to be generous:
+//   1s to place the call + 10s of list budget (3.7x the measured 2.7s)
+//   + 16s of detail budget (measured need is ~11s once the conversation exists)
+// Every poll short circuits the moment it has its answer, so the normal run is
+// about 15 seconds and the budgets only get spent when something is wrong.
 const POLL_MS = 2000;
-const LIST_BUDGET_MS = 20000;   // conversation appeared at 2.7s; this is 7x that
-const DETAIL_BUDGET_MS = 26000; // transcript was ready at 13.7s; this is ~2x
+const LIST_BUDGET_MS = 10000;
+const DETAIL_BUDGET_MS = 16000;
 const TERMINAL = new Set(['done', 'failed', 'error']);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

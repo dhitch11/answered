@@ -223,6 +223,39 @@ export const handler = async (event) => {
         });
       }
 
+      /**
+       * Ask Stripe what card this account actually has, and write down the answer.
+       *
+       * ★ THIS EXISTS SO CARD ON FILE DOES NOT DEPEND ON A WEBHOOK. The webhook is the fast path
+       * and it is the one that fails: an endpoint not yet deployed, a signing secret not yet set, a
+       * retry budget exhausted overnight. If the only way card_on_file ever became true were an
+       * event we might not receive, then a customer who really did save a card would be told at the
+       * end of the month that we cannot charge them. This asks the authority directly.
+       *
+       * It writes FALSE just as readily as true. A reconcile that can only turn a flag on is not a
+       * reconcile, it is an optimistic guess with a schedule.
+       */
+      case 'refresh_card': {
+        if (!key) return bad(400, 'refresh_card needs an account_key');
+        const ctx = await context(key);
+        if (!ctx || ctx.error) return bad(404, ctx?.error || 'unknown account');
+        if (!ctx.stripe_customer_id) {
+          // No write here on purpose. sv_bill_card matches on the stripe customer id, so passing
+          // null would match no row and return a cheerful matched:false, which is a call that looks
+          // like it did something and did not. The account already reads card_on_file false.
+          return ok({ card_on_file: false, reason: 'this account has never opened a card link, so there is nothing to reconcile' });
+        }
+        const pms = await stripe.listPaymentMethods(ctx.stripe_customer_id);
+        const card = (pms.data || [])[0];
+        if (!card) {
+          await setCard(ctx.stripe_customer_id, null, null, false);
+          return ok({ card_on_file: false, reason: 'stripe holds no card for this customer' });
+        }
+        await stripe.setDefaultPaymentMethod(ctx.stripe_customer_id, card.id);
+        await setCard(ctx.stripe_customer_id, card.card?.brand || null, card.card?.last4 || null, true);
+        return ok({ card_on_file: true, brand: card.card?.brand || null, last4: card.card?.last4 || null });
+      }
+
       // Turn a cycle's open lines into ONE draft invoice. Stops at the draft on purpose.
       case 'close': {
         if (!key) return bad(400, 'close needs an account_key');
@@ -320,7 +353,7 @@ export const handler = async (event) => {
       }
 
       default:
-        return bad(400, `unknown op "${op}"`, { ops: ['status', 'card_link', 'close', 'discard_draft'] });
+        return bad(400, `unknown op "${op}"`, { ops: ['status', 'card_link', 'refresh_card', 'close', 'discard_draft'] });
     }
   } catch (e) {
     if (e.disarmed) return bad(409, e.message, { charged: false });

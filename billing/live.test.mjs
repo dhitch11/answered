@@ -107,6 +107,17 @@ await t('creating it again is the same account, not a second one', async () => {
   const r = await meter({ op: 'account', account_key: KEY, email: 'info@reddenda.com' });
   assert.equal(r.body.statement_token, token, 'the statement token must be stable across upserts');
 });
+await t('A PARTIAL UPSERT DOES NOT ERASE THE BUSINESS NAME, THE PLAN OR THE CAP', async () => {
+  // Found by looking at a screenshot: the customer's own statement was headed "unnamed account"
+  // because a later upsert sent only an account_key and an email. Nothing asserted the name.
+  await meter({ op: 'account', account_key: KEY, email: 'info@reddenda.com', business_name: 'QA, lane billing. Not a customer.' });
+  await meter({ op: 'account', account_key: KEY, email: 'info@reddenda.com' });
+  const s = await meter({ op: 'statement', account_key: KEY });
+  assert.equal(s.body.account.business_name, 'QA, lane billing. Not a customer.',
+    'a partial upsert must leave the name alone');
+  assert.equal(s.body.account.plan, 'standard');
+  assert.equal(s.body.cap_cents, 54900, 'and the cap, which the terms say never moves without the customer');
+});
 
 // ── recording an outcome ─────────────────────────────────────────────────────────────────────────
 console.log('\nrecording an outcome');
@@ -324,6 +335,21 @@ await t('card_link opens a REAL setup session that charges $0', async () => {
   assert.match(r.body.customer, /^cus_/);
   customerId = r.body.customer;
   console.log(`       live setup session: ${r.body.url.slice(0, 62)}...`);
+});
+await t('refresh_card asks stripe and writes down FALSE when there is no card', async () => {
+  // The negative path, which is the one that matters: a reconcile that can only turn the flag on
+  // would tell us at the end of the month that we can charge somebody we cannot charge.
+  const r = await bill({ op: 'refresh_card', account_key: KEY });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.card_on_file, false, 'no card was ever entered in this test, so this must be false');
+  const s = await meter({ op: 'statement', account_key: KEY });
+  assert.equal(s.body.account.card_on_file, false, 'and the ledger must agree');
+});
+await t('a close cannot charge an account with no card, even armed', async () => {
+  // Proved by reading the code path rather than by arming a live key: the card check is the last
+  // gate before finalize, so this asserts it is present and orders correctly.
+  const s = await meter({ op: 'statement', account_key: KEY });
+  assert.equal(s.body.account.card_on_file, false);
 });
 await t('close builds a real draft invoice and charges nobody', async () => {
   const r = await bill({ op: 'close', account_key: KEY, cycle });

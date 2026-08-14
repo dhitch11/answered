@@ -1,8 +1,8 @@
 // /statement/:token — the customer's own bill, and the working half of the VOID promise.
 //
 // /terms says: "Every charge shows you the call it came from." and "If you think a charge is wrong,
-// tap it or reply VOID, and it dies." THIS PAGE IS THE TAP. It is a real server-rendered document
-// against the real ledger, with a real button that really writes.
+// tap it or send us the word VOID, and it dies." THIS PAGE IS THE TAP. It is a real server-rendered
+// document against the real ledger, with a real button that really writes.
 //
 // ★ WHY THE REPLY HALF IS NOT HERE, STATED ON THE PAGE RATHER THAN QUIETLY DROPPED. Replying VOID
 // needs SMS, and the A2P campaign has failed three times, so today a text cannot be relied on to
