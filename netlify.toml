@@ -98,3 +98,38 @@
   to = "/.netlify/functions/recording"
   status = 200
   force = true
+
+# The text-negotiation product's runtime (@ANSWERED-RESEARCH). parley.html calls this with fetch.
+[[redirects]]
+  from = "/api/truce"
+  to = "/.netlify/functions/truce"
+  status = 200
+  force = true
+
+# ── one click activation (@ANSWERED-ACTIVATION) ──────────────────────────────
+# One function, three routes. The two webhook routes are declared FIRST and
+# they are exact matches, never a splat: /api/call-me must not be able to
+# swallow /api/call-me/twiml, because that endpoint is what Twilio asks for
+# when a real person picks up.
+#
+# The role is decided inside the function from the request path, not from a
+# query string added here, so a rewrite that drops or merges query parameters
+# can never turn the TwiML webhook into the public JSON API.
+
+[[redirects]]
+  from = "/api/call-me/twiml"
+  to = "/.netlify/functions/call-me"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-me/status"
+  to = "/.netlify/functions/call-me"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/call-me"
+  to = "/.netlify/functions/call-me"
+  status = 200
+  force = true
