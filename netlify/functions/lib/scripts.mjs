@@ -57,7 +57,19 @@ export function opening() {
     // actually on the line.
     "I'm an A I voice, this call is recorded, and software is transcribing it as we speak.",
     cb ? `If you want to reach a person here, the number is ${cb}.` : '',
-    "I'm not selling anything.",
+    // ★ THIS SENTENCE USED TO READ "I'm not selling anything." IT WAS FALSE, AND IT WAS THE MOST
+    // DANGEROUS SENTENCE IN THE SCRIPT.
+    //
+    // The discovery script ends by offering a free week of a paid service. A.R.S. 44-1522(A)
+    // declares unlawful any "deception, deceptive or unfair act or practice ... false promise,
+    // misrepresentation, or concealment, suppression or omission of any material fact" made in
+    // connection with the SALE OR ADVERTISEMENT of merchandise, and an inducement to try a paid
+    // product is advertisement. Saying "not selling" while offering a free trial of the thing we
+    // sell is the misrepresentation, stated in our own voice, in our own recording, on every call.
+    //
+    // The replacement is narrower and true on every call we place: we take no payment and quote
+    // no price. If the script ever does quote a price, this line has to change with it.
+    "I'm not asking for a payment and I won't quote you a price.",
   ].filter(Boolean).join(' ');
 }
 

@@ -7,7 +7,7 @@
 // the positive ones: this file exists to prove that uncertainty resolves to RED, never to "dial".
 
 import assert from 'node:assert/strict';
-import { classify, DEFAULT_POLICY, LANES, LICENSING_REQUIRED_STATES, BIOMETRIC_RISK_STATES } from './lib/lane.mjs';
+import { classify, DEFAULT_POLICY, LANES, LICENSING_REQUIRED_STATES, BIOMETRIC_RISK_STATES, VERIFIED_STATES } from './lib/lane.mjs';
 import { withinWindow, STATE_ZONES, MULTI_ZONE_STATES } from './lib/geo.mjs';
 import { suppress, suppression, paths } from './lib/store.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -25,10 +25,14 @@ const SHUT = new Date('2026-08-11T10:00:00Z');
 // A Saturday.
 const WEEKEND = new Date('2026-08-15T18:00:00Z');
 
-// Ohio: single-timezone, no solicitor licensing gate, no biometric gate. The neutral state for
-// testing everything that is not itself about geography.
 // dncListed false = checked against a fresh snapshot and not listed. null = could not check.
-const base = { phone: '+15125550142', state: 'OH', lookupOk: true, callCount30d: 0, dncListed: false };
+// ★ Oregon, not Ohio. The fixture used to sit in a state nobody had read, which meant every
+// line-type, clock and registry case in this file was silently asserting against an unverified
+// state — and once the gate started refusing those, nine tests failed at once for a reason that
+// had nothing to do with what they were testing. The fixture state is now the one state of the
+// four verified from primary text that a clean number actually passes, so each test below fails
+// only for its own reason.
+const base = { phone: '+15125550142', state: 'OR', lookupOk: true, callCount30d: 0, dncListed: false };
 
 // ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
 // not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
@@ -200,8 +204,72 @@ test('consent still clears the licensing states, because it is a different basis
   assert.equal(v.lane, LANES.GREEN);
 });
 test('the licensing and biometric lists are the verified ones, not guesses', () => {
-  assert.deepEqual([...LICENSING_REQUIRED_STATES].sort(), ['FL', 'TX', 'WA']);
+  // AZ joined this set on 2026-08-14 from primary text: A.R.S. 44-1272(A) binds "before the
+  // seller solicits", and soliciting unregistered is a CLASS 5 FELONY under 44-1277(C).
+  assert.deepEqual([...LICENSING_REQUIRED_STATES].sort(), ['AZ', 'FL', 'TX', 'WA']);
   assert.deepEqual([...BIOMETRIC_RISK_STATES], ['IL']);
+});
+
+console.log('\nTHE FOUR-STATE VERIFICATION, ENFORCED RATHER THAN NOTED');
+test('CALIFORNIA is refused for an autonomous call, however clean the number is', () => {
+  // The number itself is perfect: fixed business landline, registry-clear, inside the window.
+  // California still refuses, because 2874 is about WHO SPEAKS FIRST, not about the number.
+  const v = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /2874|natural-voice/i);
+});
+test('CALIFORNIA opens the moment a live human really opens the call', () => {
+  const v = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false },
+    { ...READY, humanOpener: true }, new Set(), OPEN);
+  assert.equal(v.dialable, true);
+});
+test('NEVADA is refused until the recording region is attested in writing', () => {
+  const v = classify({ ...base, state: 'NV', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /all-party|NRS 200\.620/i);
+});
+test('ARIZONA is refused as a licensing gate, exactly like TX/WA/FL', () => {
+  const v = classify({ ...base, state: 'AZ', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /registration/i);
+});
+test('OREGON is the one of the four that a clean number actually passes', () => {
+  const v = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  assert.equal(v.dialable, true, v.reasons.join(' '));
+});
+test('AN UNREAD STATE IS REFUSED, however clean the number is', () => {
+  // This is the seam that measuring the book exposed: 774 numbers in NY, PA, NC, MI, OH and VA
+  // came back dialable under a gate that refuses everything else it cannot prove.
+  for (const st of ['NY', 'PA', 'NC', 'MI', 'OH', 'VA']) {
+    const v = classify({ ...base, state: st, lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+    assert.equal(v.lane, LANES.RED, `${st} must be refused until somebody reads it`);
+    assert.match(v.reasons.join(' '), /nobody has read/);
+  }
+});
+test('the verified set is the states actually read, and it is not the same as the open set', () => {
+  assert.deepEqual([...VERIFIED_STATES].sort(), ['AZ', 'CA', 'FL', 'IL', 'NV', 'OR', 'TX', 'WA']);
+  // Verified does NOT mean open. Seven of the eight refuse; being on the list means the answer is
+  // known rather than assumed, which is the only claim this set makes.
+  const open = [...VERIFIED_STATES].filter((st) => classify(
+    { ...base, state: st, lineType: 'landline', dncListed: false }, READY, new Set(), OPEN,
+  ).dialable);
+  assert.deepEqual(open, ['OR']);
+});
+test('the incentive offer is an OBLIGATION on the call, not a note in the script', () => {
+  const v = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  assert.ok(v.obligations.includes('make_no_incentive_offer'));
+  const cleared = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false },
+    { ...READY, mayOfferIncentive: true }, new Set(), OPEN);
+  assert.ok(!cleared.obligations.includes('make_no_incentive_offer'));
+});
+test('a state window floor can only tighten our window, never widen it', () => {
+  // 08:30 Pacific is inside a hypothetical 8am campaign window but outside California's 9am floor.
+  const eightThirtyPacific = new Date('2026-08-17T15:30:00Z'); // Monday, 08:30 PDT
+  const wide = { ...READY, humanOpener: true, window: { ...READY.window, startHour: 8 } };
+  const ca = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false }, wide, new Set(), eightThirtyPacific);
+  assert.equal(ca.dialable, false, 'CA must not be dialable at 08:30 even on an 8am campaign window');
+  const or = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, wide, new Set(), eightThirtyPacific);
+  assert.equal(or.dialable, true, 'Oregon has no such floor and should still be dialable at 08:30');
 });
 
 console.log('\nTHE REGISTRY ANSWER IS THREE-STATE');

@@ -60,7 +60,94 @@ const LINE_TYPES = {
  * Texas and Florida are two of the largest contractor markets in the country, so suppressing them
  * is a revenue decision and not a footnote. It is recorded here as a decision rather than buried.
  */
-export const LICENSING_REQUIRED_STATES = new Set(['TX', 'WA', 'FL']);
+export const LICENSING_REQUIRED_STATES = new Set(['TX', 'WA', 'FL', 'AZ']);
+
+/**
+ * ★ ARIZONA was added to the set above on 2026-08-14, from primary text.
+ * A.R.S. 44-1272(A) and 44-1272.01(A) both bind "before the seller solicits any consumer located
+ * in this state." Soliciting unregistered as a full-registration-class seller is a CLASS 5 FELONY
+ * (44-1277(C)), and 44-1279 lets any consumer rescind and recover damages plus fees. There is a
+ * plausible exemption we have NOT established (44-1273(B)(9), "telephone answering services"),
+ * and the identical exemption exists in Nevada at NRS 599B.010(10)(s) — one written question to
+ * both regulators likely resolves the registration analysis in two states at once. Until an
+ * answer is on file, Arizona is a licensing gate like the other three.
+ *
+ * ★ CALIFORNIA REQUIRES A LIVE HUMAN TO OPEN EVERY CALL BEFORE THE AI MAY SPEAK.
+ *
+ * This is the finding that decides where the program can start, so it is written out in full.
+ * Cal. Pub. Util. Code 2874, as amended by AB 2905 (approved 2024-09-20, effective 2025-01-01):
+ * an automatic dialing-announcing device "may be operated only after an unrecorded, natural voice
+ * announcement has been made to the person called by the person calling," stating the nature of
+ * the call, the business name, address and telephone number, disclosing the artificial voice, and
+ * obtaining consent to continue.
+ *
+ * Every other state in our first four has a limit that lets a business-line program through, and
+ * California has none of them:
+ *   AZ  44-1278(B)(4) reaches RESIDENTIAL lines only.
+ *   OR  646A.370(7) attaches duties to a "subscriber", defined as residential or wireless only.
+ *   NV  the ADAD definition is conjunctive and needs a random/sequential generator, so a curated
+ *       list of businesses falls outside it.
+ *   CA  2874 has no business-line carve-out at all, and 2872(f) exempts only an established
+ *       business relationship, which a cold call by definition is not.
+ *
+ * So this is a PRODUCT blocker, not a paperwork one: there is no autonomous version of a live
+ * human announcement, and California is where we were asked to start. Cal. Pen. Code 637.2 prices
+ * a defect here at $5,000 per call with no actual damages required, against a uniform script — the
+ * textbook class-certification fact pattern.
+ *
+ * The gate therefore refuses California for an autonomous call and ALLOWS it the moment a human
+ * opener is really in the loop, which is what `policy.humanOpener` asserts.
+ */
+export const HUMAN_OPENER_REQUIRED_STATES = new Set(['CA']);
+
+/**
+ * ★ NEVADA: NRS 200.620 is all-party for wire communications, and the only escape is Ditech,
+ * which is a CHOICE-OF-LAW ruling rather than a permission: it protects a recorder "located AND
+ * using recording equipment outside of Nevada", and then hands the question to the law of
+ * wherever the equipment actually sits. Escaping Nevada is not the same as being clear, and no
+ * candidate recording state has been verified as one-party for this stack.
+ *
+ * "Intercept" is AURAL ACQUISITION at each point (NRS 179.430), so every hop that hears audio
+ * counts: the carrier media region, the speech-to-text region, and the model region. That is a
+ * per-vendor, contractual, written attestation of processing region — not a marketing page and
+ * not an assumption. `policy.recordingRegionAttested` is that evidence, and it is false until the
+ * attestations exist.
+ */
+export const ALL_PARTY_RECORDING_STATES = new Set(['NV']);
+
+/**
+ * ★ STATE CALLING-WINDOW FLOORS, tighter than the federal 8am-9pm.
+ * Cal. Pub. Util. Code 2872(c) bars ADAD calls between 9pm and 9am California time. Our default
+ * window (09:00-16:30) already sits inside it, so this changes nothing today. It is encoded so
+ * that widening the default window later cannot silently violate a state floor — the constraint
+ * lives next to the rule it constrains rather than in a comment somebody has to remember.
+ */
+export const STATE_WINDOW_FLOOR = {
+  CA: { startHour: 9, endHour: 21 },
+};
+
+/**
+ * ★ STATES WHOSE LAW WE HAVE ACTUALLY READ. EVERYTHING ELSE IS REFUSED.
+ *
+ * This set exists because measuring the book exposed a fail-open seam in this very file. Every
+ * other rule here is written as "refuse unless proven", and then state law was handled as "allow
+ * unless listed" — so 774 numbers came back dialable, in NY, PA, NC, MI, OH and VA, not one of
+ * which anybody had read. The gate would have placed those calls.
+ *
+ * The base rate says that is not a theoretical risk. Of the first four states examined from
+ * primary text, three carried a real blocker and one of those (AZ) makes an unregistered call a
+ * CLASS 5 FELONY. Assuming the unread twenty-six are clean is the same bet, twenty-six times.
+ *
+ * Membership means the state's own text was read for: telephone-solicitor registration, bonding,
+ * artificial-voice restrictions, recording consent, its DNC treatment, and its damages exposure.
+ * It does NOT mean the state is open — TX, WA, FL, IL, CA, NV and AZ are all here and all refuse.
+ * It means the answer is known rather than assumed.
+ */
+export const VERIFIED_STATES = new Set([
+  'TX', 'WA', 'FL', // telephone-solicitor registration and bond, verified 2026-08-13
+  'IL',             // BIPA voiceprint, verified 2026-08-13
+  'CA', 'NV', 'AZ', 'OR', // four-state primary-law verification, 2026-08-14
+]);
 
 /**
  * ★ ILLINOIS: BIPA 740 ILCS 14/15(b) requires a WRITTEN release before a voiceprint is collected,
@@ -95,6 +182,28 @@ export const DEFAULT_POLICY = {
   // unmitigated. These two flags are false because those programs do not exist yet.
   dncScrubbed: false,          // national DNC registry, snapshot no older than 31 days
   dncProceduresInPlace: false, // the six elements of 64.1200(d), written, trained, retained
+
+  // ★ ADDED 2026-08-14 from the four-state primary-law verification (CA / NV / AZ / OR).
+  //
+  // A live human personally makes the Pub. Util. Code 2874 announcement before the AI speaks:
+  // nature of the call, business name, address, phone, the artificial-voice disclosure, and a
+  // captured consent to continue. This is the ONLY thing that opens California. It is false
+  // because it describes a staffing arrangement, and no code change can make it true.
+  humanOpener: false,
+
+  // Written, per-vendor, contractual attestation of the processing region for every hop that
+  // aurally acquires the audio — carrier media, speech-to-text, and model. Opens Nevada.
+  recordingRegionAttested: false,
+
+  // Whether this campaign may make the free-week offer at all. It is an "inducement or incentive
+  // to purchase", which is the statutory definition of a PREMIUM in NRS 599B.010(6) and
+  // A.R.S. 44-1271(10) and a trigger in ORS 646.551(2)(b)(B) — and in Nevada, selling with a
+  // premium while unregistered is a CATEGORY D FELONY (NRS 599B.255(3)), not a misdemeanour.
+  // Default false: the outbound call measures and asks, and anyone who wants the free week is
+  // routed to an inbound path where the relationship, and the registration analysis, are
+  // different. This is a business decision with legal consequences and it is David's to make,
+  // so it is a flag he can flip rather than a deletion I made on his behalf.
+  mayOfferIncentive: false,
 };
 
 /**
@@ -143,11 +252,24 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
   // call, AI-voiced or human-voiced, because none of them care which it is.
   const st = String(rec.state || '').toUpperCase();
   if (!consentValid) {
+    // Fail closed on the map itself, before any per-state rule runs. An unread state is an
+    // unanswered question, and this file answers those the same way everywhere else: no.
+    if (!VERIFIED_STATES.has(st)) {
+      return deny(`${st || 'unknown state'}: nobody has read this state's telephone-solicitation, artificial-voice and recording law yet, and three of the first four states read carried a real blocker; an unverified state is a refusal, not a default yes`);
+    }
     if (LICENSING_REQUIRED_STATES.has(st)) {
       return deny(`${st} requires a telephone-solicitor registration and bond before the first call; a licensing gate no script or dialling method cures`);
     }
     if (BIOMETRIC_RISK_STATES.has(st)) {
       return deny(`${st}: BIPA 740 ILCS 14/15(b) needs a WRITTEN release before any voiceprint, which a spoken disclosure cannot supply`);
+    }
+    // ★ The four-state verification, enforced. Each of these is a state whose own text closes the
+    // door on the program AS DESIGNED, and each names the exact condition that reopens it.
+    if (HUMAN_OPENER_REQUIRED_STATES.has(st) && !policy.humanOpener) {
+      return deny(`${st}: Pub. Util. Code 2874 requires an UNRECORDED, NATURAL-VOICE announcement by the person calling before the device may operate — there is no business-line exemption and no autonomous version of it. Opens only with a live human opener on every call`);
+    }
+    if (ALL_PARTY_RECORDING_STATES.has(st) && !policy.recordingRegionAttested) {
+      return deny(`${st}: all-party recording under NRS 200.620, and the Ditech escape is a choice-of-law ruling that needs a written per-vendor attestation that every point of aural acquisition sits outside the state`);
     }
     if (!policy.dncScrubbed) {
       return deny('the national do-not-call registry has not been scrubbed; 47 CFR 64.1200(c)(2) has no business exemption and the FCC expressly refused to create one in 2005');
@@ -167,7 +289,16 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
 
   // --- hour of day. Not a refusal, a deferral. ----------------------------------------------
   if (!rec.state) return deny('no source state on the record, so the local time cannot be established');
-  const win = withinWindow(rec.state, policy.window, at);
+  // A state floor tightens our window; it can never widen it. Enforced by intersection rather than
+  // by replacement, so a future edit to the default window cannot loosen a statutory limit.
+  const floor = STATE_WINDOW_FLOOR[st];
+  const win = withinWindow(rec.state, floor
+    ? {
+      ...policy.window,
+      startHour: Math.max(policy.window.startHour, floor.startHour),
+      endHour: Math.min(policy.window.endHour, floor.endHour),
+    }
+    : policy.window, at);
   if (!win.ok) {
     return {
       lane: LANES.HOLD,
@@ -199,6 +330,10 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
       'disclose_ai_at_open',          // FCC 24-17 posture + Cal. AB 2905
       'announce_recording_if_recorded',
       'honour_stop_immediately',
+      // The free week is a statutory PREMIUM in three of our first four states. When the campaign
+      // is not cleared to offer it, that is an obligation ON THE CALL, carried next to the other
+      // five, so the dialler refuses rather than relying on whoever last edited the script.
+      ...(policy.mayOfferIncentive ? [] : ['make_no_incentive_offer']),
     ],
   };
 }
