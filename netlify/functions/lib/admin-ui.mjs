@@ -376,6 +376,7 @@ export function consolePage({ admin, buildInfo = {} }) {
     <button class="nav" data-view="events"><span class="nav-ico">✦</span>Behaviour</button>
 
     <div class="nav-h">Control</div>
+    <button class="nav" data-view="compliance"><span class="nav-ico">§</span>Compliance</button>
     <button class="nav" data-view="audit"><span class="nav-ico">⎗</span>Audit log</button>
     <button class="nav" data-view="system"><span class="nav-ico">⚙</span>System</button>
 
@@ -824,6 +825,129 @@ VIEWS.events = async () => {
   '</div>';
 };
 
+VIEWS.compliance = async () => {
+  const d = await api('compliance');
+  S.lastMeasuredAt = d.at; freshness();
+  const t = d.totals, e = d.evidence, k = d.dnc;
+
+  // ★ THE HEADLINE NUMBER NEVER SHIPS WITHOUT ITS DENOMINATOR. A zero here means either "nothing
+  // is wrong" or "nothing has been measured", and those are opposite. The columns behind it are
+  // new, so most existing rows carry NULL, and a bare reassuring 0 would be the worst kind of lie:
+  // the comfortable one.
+  const exposure = e.ai_listened_without_verified_disclosure;
+  const measured = t.ai_listened;
+  const exposureTone = exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn');
+  const exposureNote = exposure > 0
+    ? 'Calls where an AI was receiving the audio and no disclosure has been verified on the wire. ' +
+      'This is the count that a class claim turns on. It should be zero.'
+    : (measured > 0
+        ? 'Zero, and it is a measured zero: ' + n(measured) + ' calls had an AI listening and every ' +
+          'one of them has a disclosure verified from the transcript.'
+        : 'Zero, but <strong>nothing has been measured yet</strong>. No call on record carries ' +
+          'ai_listening, because the column is newer than these rows. This is an unmeasured zero ' +
+          'and it must not be read as a clean bill.');
+
+  const three = (v, yes, no, unknown) => v === true
+    ? '<span class="pill ok">' + yes + '</span>'
+    : (v === false ? '<span class="pill">' + no + '</span>'
+                   : '<span class="pill warn">' + unknown + '</span>');
+
+  const gateOpen = k.scrub_ready && k.procedures_ready;
+
+  const CLASS_TEXT = {
+    ai_cold: 'AI voice to a verified landline or fixed VoIP',
+    human_cold: 'A person dials and speaks, no artificial voice on the call',
+    consented: 'AI voice, any line type, consent on file',
+    inbound: 'They called us. CIPA, not TCPA.',
+    demo: 'Our own demo and canary traffic',
+    unclassified: 'Placed before the class column existed. Not a real category.',
+  };
+
+  return '' +
+  '<div class="card" style="border-color:var(--' + (exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn')) + ')">' +
+    '<div class="tile-k">AI listening without a verified disclosure</div>' +
+    '<div class="tile-v" style="color:var(--' + (exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn')) + ')">' + n(exposure) + '</div>' +
+    '<div class="tile-s">' + exposureNote + '</div></div>' +
+
+  '<div class="grid g4">' +
+    '<div class="card"><div class="tile-k">Do-not-call gate</div><div class="tile-v" style="font-size:18px">' +
+      (gateOpen ? '<span class="pill ok">OPEN</span>' : '<span class="pill bad">SHUT</span>') + '</div>' +
+      '<div class="tile-s">' + (gateOpen
+        ? 'The registry scrub and the 64.1200(d) procedures are both in place, so non-consented cold calls may be placed.'
+        : 'Non-consented cold calls cannot be placed. The gate reads this from the database on every dial, not from a constant anyone can flip.') +
+      '</div></div>' +
+    '<div class="card"><div class="tile-k">Registry scrub</div><div class="tile-v" style="font-size:18px">' +
+      (k.scrub_ready ? '<span class="pill ok">ready</span>' : '<span class="pill bad">not ready</span>') + '</div>' +
+      '<div class="tile-s">' + (k.snapshot_numbers
+        ? n(k.snapshot_numbers) + ' numbers across ' + n(k.snapshot_area_codes) + ' area codes, ' +
+          (k.snapshot_age_days == null ? 'age unknown' : n(k.snapshot_age_days) + ' days old')
+        : 'No registry snapshot has ever been loaded. Freshness is a property of the snapshot, so a stale one shuts the gate on day 32 without anyone having to remember.') +
+      '</div></div>' +
+    '<div class="card"><div class="tile-k">Written procedures</div><div class="tile-v" style="font-size:18px">' +
+      (k.procedures_ready ? '<span class="pill ok">in place</span>' : '<span class="pill bad">incomplete</span>') + '</div>' +
+      '<div class="tile-s">The six elements of 47 CFR 64.1200(d). A condition precedent, not a mitigation.</div></div>' +
+    '<div class="card"><div class="tile-k">Opt-outs overdue</div><div class="tile-v">' + n(k.overdue_requests) + '</div>' +
+      '<div class="tile-s">Requests past the ten business day deadline. We honour immediately and record both times, so the evidence shows we were inside the window rather than that we spent it.</div></div>' +
+  '</div>' +
+
+  '<div class="card pad0"><div class="card-h"><h2>What the registry program still needs</h2>' +
+    '<span class="sp muted">this part is a signature, not a build</span></div>' +
+    '<div class="tw"><table><tbody>' +
+    row3('Subscription Account Number on file', k.san_on_file,
+         'An organisation account at telemarketing.donotcall.gov. $82 per area code, first five free, $22,626 national cap. Nobody can engineer this one.') +
+    row3('Registry snapshot loaded', k.scrub_ready,
+         'research/dnc-ingest.mjs loads a download the moment one exists and reports honestly until then.') +
+    row3('Policy written', k.policy_written, 'The written do-not-call policy, available on demand.') +
+    row3('Affiliate scope recorded', k.affiliate_scope, 'Which entities a request covers.') +
+    row3('Retention policy', k.retention_policy, 'How long a request is honoured.') +
+    row3('Training recorded', k.training_recorded, 'Personnel trained in the procedures, with a record of it.') +
+    row3('Internal list live', k.internal_list_live, 'Our own suppression list, checked before every dial.') +
+    '</tbody></table></div></div>' +
+
+  '<div class="card pad0"><div class="card-h"><h2>Evidence by call class</h2>' +
+    '<span class="sp muted">since ' + esc(String(e.window_start || '').slice(0, 10)) + '</span></div>' +
+    (e.by_class && e.by_class.length
+      ? '<div class="tw"><table><thead><tr><th>Class</th><th>What it means</th>' +
+        '<th class="num">Placed</th><th class="num">Refused</th><th class="num">AI spoke</th>' +
+        '<th class="num">AI listened</th><th class="num">Disclosure verified</th>' +
+        '<th class="num">Failed</th><th class="num">Unchecked</th><th class="num">DNC scrubbed</th></tr></thead><tbody>' +
+        e.by_class.map((c) => '<tr><td><span class="pill ' +
+          (c.call_class === 'unclassified' ? 'warn' : 'info') + '">' + esc(c.call_class) + '</span></td>' +
+          '<td class="dim">' + esc(CLASS_TEXT[c.call_class] || '') + '</td>' +
+          '<td class="num">' + n(c.placed) + '</td><td class="num">' + n(c.refused) + '</td>' +
+          '<td class="num">' + n(c.ai_spoke) + '</td><td class="num">' + n(c.ai_listened) + '</td>' +
+          '<td class="num">' + (c.disclosure_verified ? '<span style="color:var(--ok)">' + n(c.disclosure_verified) + '</span>' : n(c.disclosure_verified)) + '</td>' +
+          '<td class="num">' + (c.disclosure_failed ? '<span style="color:var(--bad)">' + n(c.disclosure_failed) + '</span>' : n(c.disclosure_failed)) + '</td>' +
+          '<td class="num">' + (c.disclosure_unchecked ? '<span style="color:var(--warn)">' + n(c.disclosure_unchecked) + '</span>' : n(c.disclosure_unchecked)) + '</td>' +
+          '<td class="num">' + n(c.dnc_scrubbed) + '</td></tr>').join('') +
+        '</tbody></table></div>'
+      : measuredZero('calls in this window')) +
+    '<div class="card-h" style="border-bottom:none;border-top:1px solid var(--line)">' +
+      '<span class="muted" style="font-size:13px;line-height:1.6">Disclosure is read back from the ' +
+      'transcript, never set at dial time. A real call once had the disclosure present in the script, ' +
+      'complete in the obligations list, approved by its own checker and findable by grep, while the ' +
+      'entire spoken output was the word &ldquo;Hi&rdquo;, because a bare instruction nested inside a ' +
+      'listening block is cut off by the first word the other person says. <strong>Unchecked is not ' +
+      'disclosed.</strong></span></div>' +
+  '</div>' +
+
+  ((e.states_refused && Object.keys(e.states_refused).length)
+    ? '<div class="card pad0"><div class="card-h"><h2>Why the gate refused</h2>' +
+      '<span class="sp muted">refusals are recorded, never discarded: they are the proof the gate ran</span></div>' +
+      '<div class="tw"><table><thead><tr><th>Reason</th><th class="num">Calls</th></tr></thead><tbody>' +
+      Object.entries(e.states_refused).sort((a, b) => b[1] - a[1]).map(([reason, count]) =>
+        '<tr><td class="dim">' + esc(reason) + '</td><td class="num">' + n(count) + '</td></tr>').join('') +
+      '</tbody></table></div></div>'
+    : '');
+};
+
+const row3 = (label, ok, detail) =>
+  '<tr><td><strong>' + esc(label) + '</strong><br><span class="muted" style="font-size:12.5px">' +
+  detail + '</span></td><td class="num" style="vertical-align:top">' +
+  (ok === true ? '<span class="pill ok">yes</span>'
+    : ok === false ? '<span class="pill bad">no</span>'
+    : '<span class="pill warn">unknown</span>') + '</td></tr>';
+
 VIEWS.audit = async () => {
   const d = await api('audit?limit=200');
   S.lastMeasuredAt = new Date().toISOString(); freshness();
@@ -911,8 +1035,8 @@ function pager(group, d) {
 
 // ── router ────────────────────────────────────────────────────────────────
 const TITLES = { overview:'Overview', customers:'Customers', calls:'Calls and recordings',
-  usage:'Usage', billing:'Billing', parley:'Parley', events:'Behaviour', audit:'Audit log',
-  system:'System' };
+  usage:'Usage', billing:'Billing', parley:'Parley', events:'Behaviour', compliance:'Compliance',
+  audit:'Audit log', system:'System' };
 
 let painting = false;
 async function go(view, opts) {
@@ -1239,7 +1363,7 @@ function wire() {
     if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
     if (e.target !== document.body) return;
     const map = { g:'overview', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
-      e:'events', a:'audit', s:'system' };
+      e:'events', k:'compliance', a:'audit', s:'system' };
     if (map[e.key]) { e.preventDefault(); go(map[e.key]); }
   });
 
@@ -1285,6 +1409,16 @@ async function openCall(sid) {
       '<div class="card"><dl class="kv">' +
         kv('Customer', d.account ? d.account.business_name : 'unattributed') +
         kv('Direction', c.direction) + kv('Class', c.call_class || 'unclassified') +
+        kv('AI spoke', c.ai_speaking === true ? 'yes' : c.ai_speaking === false ? 'no' : 'not recorded') +
+        kv('AI listening', c.ai_listening === true ? 'yes' : c.ai_listening === false ? 'no' : 'not recorded') +
+        kv('Disclosure', c.disclosure_verified === true
+             ? 'verified on the wire'
+             : c.disclosure_verified === false
+               ? 'FAILED: the words did not reach the caller'
+               : 'not checked. This is not the same as disclosed.') +
+        kv('DNC scrubbed at dial', c.dnc_scrubbed_at_dial === true ? 'yes, against a fresh snapshot'
+             : c.dnc_scrubbed_at_dial === false ? 'checked and clear'
+             : 'could not answer, which the gate treats as a refusal') +
         kv('Status', c.status) + kv('Answered by', c.answered_by) +
         kv('Length', dur(c.duration_seconds)) +
         kv('Placed', c.placed ? 'yes' : 'no, refused: ' + (c.refused_reason || 'unknown')) +

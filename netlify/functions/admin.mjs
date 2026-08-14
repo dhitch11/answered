@@ -58,6 +58,7 @@ export const config = {
     '/api/admin/parley',
     '/api/admin/audit',
     '/api/admin/system',
+    '/api/admin/compliance',
     '/api/admin/recording',
     '/api/admin/refund',
     '/api/admin/attribute-backfill',
@@ -339,6 +340,9 @@ async function apiRoute(req, url, name) {
     case 'system':
       return json(200, await systemPanel());
 
+    case 'compliance':
+      return json(200, await compliancePanel(nz(q.get('since'))));
+
     case 'recording':
       return await streamRecording(req, q.get('sid'), admin);
 
@@ -452,6 +456,38 @@ async function systemPanel() {
     env,
     tables,
     build: { ...buildInfo(), ui: 'served' },
+  };
+}
+
+/**
+ * Compliance evidence. Built by the outbound lane, rendered here, never re-derived.
+ *
+ * ★ THE DENOMINATOR TRAVELS WITH THE HEADLINE NUMBER, ALWAYS.
+ * `ai_listened_without_verified_disclosure` is the exposure figure, and a zero means one of two
+ * completely different things: nothing is wrong, or nothing has been measured. The columns behind
+ * it are new, so most existing rows carry NULL. This attaches `checked` and `total` so the console
+ * can say which zero it is rather than printing a reassuring one.
+ */
+async function compliancePanel(since) {
+  const [evidence, dnc] = await Promise.all([
+    rpc('sv_compliance_evidence', { p_since: since || null }),
+    rpc('sv_dnc_readiness'),
+  ]);
+  const classes = evidence.by_class || [];
+  const sum = (k) => classes.reduce((n, c) => n + (Number(c[k]) || 0), 0);
+  return {
+    at: new Date().toISOString(),
+    evidence,
+    dnc,
+    totals: {
+      placed: sum('placed'),
+      refused: sum('refused'),
+      ai_listened: sum('ai_listened'),
+      ai_spoke: sum('ai_spoke'),
+      disclosure_verified: sum('disclosure_verified'),
+      disclosure_failed: sum('disclosure_failed'),
+      disclosure_unchecked: sum('disclosure_unchecked'),
+    },
   };
 }
 
