@@ -573,6 +573,14 @@ table.dense th{padding:7px 12px}
   .ln-bar i{transition:none}
 }
 
+/* ── the call summary ─────────────────────────────────────────────────────
+   A quote is the part of a summary that reads as evidence, so it is set apart from the model's own
+   prose rather than blended into it. The left rule is the whole point: the reader can see at a
+   glance which words are the caller's and which are the machine's. */
+.sumbox{border-left:2px solid var(--ai);padding-left:12px}
+.quote{margin:7px 0 0;padding:7px 10px;border-left:2px solid var(--line-2);background:var(--bg);
+  border-radius:0 8px 8px 0;font-size:13.5px;line-height:var(--lh-base);overflow-wrap:anywhere}
+
 /* ── the conversation ──────────────────────────────────────────────────────
    A thread, not a table. Outbound sits right and inbound sits left, which is the convention every
    messaging app has trained every operator on for fifteen years; fighting it would cost a beat of
@@ -2220,6 +2228,10 @@ async function openAccount(id) {
 }
 
 let drawerTab = 'summary';
+// Whether the call drawer is showing interim transcript lines. Off by default: a streaming
+// transcript is mostly the same sentence being revised, and one call here is 471 lines of which 6
+// are final.
+let showInterim = false;
 function renderAccount(d) {
   const a = d.account, b = d.billing, u = d.usage || {};
   const tabs = [['summary','Summary'],['rules','Rules'],['calls','Calls'],['billing','Billing'],
@@ -2500,6 +2512,15 @@ async function actionClick(t, act) {
     case 'ai-draft':  aiDraft(t.dataset.contact); return true;
     case 'backfill':  backfill(t); return true;
     case 'status':    statusChange(t.dataset.value); return true;
+    case 'summarize-call': await summarizeCall(t.dataset.sid, t); return true;
+    case 'toggle-interim': {
+      showInterim = !showInterim;
+      // Re-open the same call rather than repainting a fragment: the drawer owns its own data and
+      // a half-repainted drawer is how a panel starts showing two different calls at once.
+      const sid = $('#drawer').__callSid;
+      if (sid) openCall(sid);
+      return true;
+    }
     default:          return false;      // fall through to the noun branches
   }
 }
@@ -2715,13 +2736,148 @@ async function openCall(sid) {
         kv('Summary', c.summary) + kv('Sentiment', c.sentiment) +
       '</dl>' + (c.recording_sid ? '<div style="margin-top:12px"><button class="btn ghost sm" data-rec="' +
         esc(c.recording_sid) + '">Listen to the recording</button></div>' : '') + '</div>' +
-      ((d.transcript || []).length
-        ? '<div class="card"><h2 style="margin-bottom:11px">Transcript</h2>' +
-          d.transcript.map((t) => '<div style="margin-bottom:9px"><span class="pill">' +
-            esc(t.speaker || 'unknown') + '</span> <span style="font-size:14px">' + esc(t.text) + '</span></div>').join('') +
-          '</div>'
-        : emptyState('No transcript', 'Nothing was transcribed for this call. That is a measured absence, not a loading state.')) +
+      callSummaryCard(c, d.transcript || []) +
+      transcriptCard(d.transcript || []) +
     '</div>';
+  dr.__callSid = c.call_sid || sid;
+}
+
+/**
+ * Ask for a summary and render whatever comes back, INCLUDING a refusal.
+ *
+ * The two refusals this can return are not errors and must not look like errors. "There are no
+ * final lines" and "the model quoted something that is not in the transcript" are both the system
+ * working correctly and declining to show the operator something it cannot stand behind. An error
+ * state would teach them to retry; a refusal teaches them what is true.
+ */
+async function summarizeCall(sid, btn) {
+  if (!sid) return;
+  const out = $('#sumout');
+  if (btn) { btn.disabled = true; btn.textContent = 'Reading the call…'; }
+  if (out) out.innerHTML = '<div style="padding:10px 0"><div class="skel" style="width:70%"></div>' +
+    '<div class="skel" style="width:45%;margin-top:8px"></div></div>';
+  try {
+    const r = await api('call/summarize', { body: { call_sid: sid } });
+    if (r.ok) {
+      toast('Summarised by ' + (r.model || 'a model') + '.', 'ok');
+      openCall(sid);                      // re-read, so the panel shows what was actually STORED
+      return;
+    }
+    // a refusal, rendered as the honest answer it is
+    if (out) {
+      out.innerHTML = '<div class="alert warn" style="margin-top:12px">' +
+        '<strong>' + esc(r.refused === 'quote_not_in_transcript'
+            ? 'Rejected: a quote was not in the transcript'
+            : 'Not summarised') + '</strong><br>' + esc(r.why || '') +
+        ((r.quotes || []).length
+          ? '<div style="margin-top:8px">' + r.quotes.map((q) =>
+              '<blockquote class="quote">' + esc(q) + '</blockquote>').join('') + '</div>'
+          : '') +
+        '</div>';
+    }
+  } catch (e) {
+    if (out) out.innerHTML = errState('The summary could not be produced', e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Summarise this call'; }
+  }
+}
+
+/**
+ * The AI summary panel. It is a button and a result, and the interesting part is what it refuses.
+ *
+ * A call with no FINAL transcript lines cannot be summarised honestly, so the button is not offered
+ * and the reason is stated with the counts that justify it. One call in this database has 471 lines
+ * of which 6 are final: the other 465 are the same sentences being revised as speech is recognised.
+ * Summarising those would be summarising a stutter, and a model asked to find meaning in one will.
+ */
+function callSummaryCard(c, transcript) {
+  const finals = transcript.filter((t) => t.is_final).length;
+  const existing = c.ai_notes && typeof c.ai_notes === 'object' ? c.ai_notes : null;
+
+  const head = '<div class="card-h"><h2>What happened on this call</h2>' +
+    '<span class="sp muted">' + finals + ' final of ' + transcript.length + ' lines</span></div>';
+
+  if (!finals) {
+    return '<div class="card pad0">' + head + '<div style="padding:14px 16px">' +
+      emptyState(transcript.length ? 'Not enough of this call is final' : 'Nothing was transcribed',
+        transcript.length
+          ? 'This call has ' + transcript.length + ' transcript lines and none are marked final. Interim ' +
+            'lines are the same sentence being revised as it is recognised, so a summary of them would ' +
+            'be a summary of a stutter. Nothing will be sent to a model.'
+          : 'That is a measured absence rather than a failure. Not every call is transcribed.') +
+      '</div></div>';
+  }
+
+  return '<div class="card pad0">' + head + '<div style="padding:14px 16px">' +
+    (existing ? renderCallSummary(existing) : '') +
+    '<div class="row" style="gap:8px;align-items:center;margin-top:' + (existing ? '12px' : '0') + '">' +
+      '<button class="btn ' + (existing ? 'ghost ' : '') + 'sm" data-act="summarize-call" data-sid="' +
+        esc(c.call_sid) + '">' + (existing ? 'Summarise again' : 'Summarise this call') + '</button>' +
+      '<span class="sm muted">Reads the ' + finals + ' final line' + (finals === 1 ? '' : 's') +
+        ' only. Every quote it returns is checked against the transcript before anything is stored.</span>' +
+    '</div>' +
+    '<div id="sumout"></div>' +
+  '</div></div>';
+}
+
+function renderCallSummary(s) {
+  const list = (arr) => (arr || []).length
+    ? '<ul style="margin:4px 0 0 16px">' + arr.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>'
+    : '<span class="muted">none</span>';
+  return '<div class="sumbox">' +
+    '<div style="font-size:14px;line-height:var(--lh-base)">' + esc(s.summary || '') + '</div>' +
+    '<dl class="kv" style="margin-top:11px">' +
+      kv('They wanted', s.caller_wanted) +
+      kv('Outcome', s.outcome) +
+      kv('Sentiment', s.sentiment) +
+    '</dl>' +
+    '<div style="margin-top:9px"><strong class="sm">Follow-ups</strong>' + list(s.follow_ups) + '</div>' +
+    ((s.quotes || []).length
+      ? '<div style="margin-top:11px"><strong class="sm">Verbatim, checked against the transcript</strong>' +
+        s.quotes.map((q) => '<blockquote class="quote"><span class="pill">' + esc(q.speaker || '?') +
+          '</span> ' + esc(q.text) + '</blockquote>').join('') + '</div>'
+      : '') +
+    // ★ THE ABSTENTION IS RENDERED, NOT DROPPED. A model saying what it could not determine is the
+    // most valuable field on this panel, and hiding it would turn a careful answer into a confident one.
+    (s.unclear && String(s.unclear).trim()
+      ? '<div class="alert" style="margin-top:11px"><strong>Not determined from this call:</strong> ' +
+        esc(s.unclear) + '</div>'
+      : '') +
+    '<div class="sm muted" style="margin-top:11px">' +
+      esc(s.model || 'model not recorded') +
+      (s.cost_usd != null ? ' · ' + esc(String(s.cost_usd)) + ' USD, modeled from published rates' : '') +
+      (s.lines_final != null ? ' · read ' + s.lines_final + ' final line' + (s.lines_final === 1 ? '' : 's') : '') +
+      (s.at ? ' · ' + esc(stamp(s.at)) : '') +
+    '</div>' +
+  '</div>';
+}
+
+/**
+ * The transcript. Final lines by default, because a raw stream is mostly the same sentence six
+ * times and reading it is a chore rather than a feature. The interim lines are one click away and
+ * the counts are stated, so nothing is hidden - it is ordered.
+ */
+function transcriptCard(transcript) {
+  if (!transcript.length) {
+    return emptyState('No transcript',
+      'Nothing was transcribed for this call. That is a measured absence, not a loading state.');
+  }
+  const finals = transcript.filter((t) => t.is_final);
+  const show = showInterim ? transcript : (finals.length ? finals : transcript);
+  const line = (t) => '<div style="margin-bottom:9px' + (t.is_final ? '' : ';opacity:.62') + '">' +
+    '<span class="pill">' + esc(t.speaker || t.track || 'unknown') + '</span> ' +
+    '<span style="font-size:14px">' + esc(t.text) + '</span>' +
+    (t.is_final ? '' : ' <span class="sm muted">interim</span>') + '</div>';
+  return '<div class="card pad0"><div class="card-h"><h2>Transcript</h2>' +
+    '<span class="sp muted">' + finals.length + ' final · ' + (transcript.length - finals.length) + ' interim</span>' +
+    (transcript.length > finals.length
+      ? '<button class="btn ghost sm" data-act="toggle-interim">' +
+        (showInterim ? 'Final lines only' : 'Show interim lines') + '</button>'
+      : '') +
+    '</div><div style="padding:14px 16px">' +
+    (finals.length || showInterim ? show.map(line).join('')
+      : '<div class="sm muted">Every line on this call is interim. Nothing was ever finalised.</div>') +
+    '</div></div>';
 }
 
 async function playRecording(sid, btn) {

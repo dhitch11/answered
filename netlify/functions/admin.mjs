@@ -54,6 +54,7 @@ export const config = {
     '/api/admin/account-status',
     '/api/admin/calls',
     '/api/admin/call',
+    '/api/admin/call/summarize',
     '/api/admin/usage',
     '/api/admin/billing',
     '/api/admin/events',
@@ -281,7 +282,7 @@ async function getConsole(req, url) {
 const MUTATING = new Set([
   'account-status', 'refund', 'attribute-backfill', 'log',
   'crm/update', 'crm/bulk', 'crm/note', 'crm/task', 'crm/email', 'crm/sms', 'crm/call',
-  'crm/draft',
+  'crm/draft', 'call/summarize',
 ]);
 
 async function apiRoute(req, url, name) {
@@ -547,6 +548,9 @@ async function apiRoute(req, url, name) {
       });
       return json(200, r);
     }
+
+    case 'call/summarize':
+      return await summarizeCall(req, admin);
 
     case 'crm/draft':
       return await draftMessage(req, admin);
@@ -864,6 +868,157 @@ async function doRefund(req, admin) {
  * a product decision, not a limitation: an operator who edits a draft has read it, and an operator
  * who approves a queue has not.
  */
+/**
+ * SUMMARISE A REAL CALL FROM ITS REAL TRANSCRIPT.
+ *
+ * Three rules make this safe to put in front of an operator, and all three are enforced in code
+ * rather than requested in the prompt.
+ *
+ * 1. ONLY FINAL LINES ARE READ. A streaming transcript is mostly interim hypotheses: one call in
+ *    this database has 471 lines of which 6 are final. Interim lines are the same sentence being
+ *    revised in public, so summarising them means summarising a stutter, and the model would
+ *    dutifully find meaning in it. If a call has interim lines but no final ones, this REFUSES and
+ *    says which, rather than producing a confident summary of noise.
+ *
+ * 2. EVERY QUOTE IS CHECKED AGAINST THE TRANSCRIPT BEFORE ANYTHING IS STORED. A quote is the one
+ *    part of a summary that reads as evidence, so it is the one part that must not be paraphrased.
+ *    Any quote that does not appear verbatim in the source fails the whole request: the summary is
+ *    not stored, and the offending text is returned so the failure is visible instead of averaged
+ *    away. This is the same principle as the numbers rule - the model may choose what to highlight,
+ *    it may not author the underlying fact.
+ *
+ * 3. THE MODEL THAT SERVED IT IS STORED WITH IT. A summary with no provenance is a claim with no
+ *    author, and this estate has already had a live phone line quietly running on backup models
+ *    with nobody able to tell from the output.
+ */
+async function summarizeCall(req, admin) {
+  const b = await readJson(req);
+  const sid = String(b.call_sid || '').trim();
+  if (!sid) return json(400, { error: 'a call sid is required' });
+  if (!ai.configured()) {
+    return json(503, { error: 'ANTHROPIC_API_KEY_LIVE is not set on this deploy, so nothing can be summarised.' });
+  }
+
+  const row = await rpc('sv_admin_call', { p_call_sid: sid });
+  const call = row && row.call;
+  if (!call) return json(404, { error: 'no call has that sid' });
+
+  const all = Array.isArray(row.transcript) ? row.transcript : [];
+  const finals = all.filter((t) => t.is_final);
+
+  if (!finals.length) {
+    // An honest refusal, with the numbers that justify it. Not an error: there is simply nothing
+    // here that is safe to read.
+    return json(200, {
+      ok: false,
+      refused: 'no_final_transcript',
+      lines_total: all.length,
+      lines_final: 0,
+      why: all.length
+        ? `This call has ${all.length} transcript lines and none of them are final. Interim lines are the ` +
+          'same sentence being revised as it is recognised, so a summary of them would be a summary of a ' +
+          'stutter. Nothing was sent to a model and nothing was stored.'
+        : 'This call has no transcript at all, so there is nothing to summarise. That is a measured ' +
+          'absence rather than a failure: not every call is transcribed.',
+    });
+  }
+
+  const script = finals
+    .map((t) => `${(t.speaker || t.track || 'unknown')}: ${String(t.text || '').trim()}`)
+    .filter((l) => l.length > 12)
+    .join('\n');
+
+  const out = await ai.askJson({
+    slot: 'deep',
+    system:
+      'You summarise recorded business phone calls for the operator of a small telephone-answering ' +
+      'company. You are reading a real conversation with a real business.\n\n' +
+      'RULES THAT DO NOT BEND:\n' +
+      '- Every quote you return must be copied EXACTLY from the transcript, character for character. ' +
+      'Do not tidy grammar, do not join two lines, do not trim a word. Quotes are checked against the ' +
+      'source and any mismatch discards your entire answer.\n' +
+      '- Never state anything the transcript does not support. If the purpose of the call is not clear, ' +
+      'say it is not clear in the "unclear" field. An honest "I could not tell" is a correct answer here ' +
+      'and is more useful than a confident guess.\n' +
+      '- This is a machine transcription of speech. Expect mishearings. Where a word is obviously ' +
+      'garbled, say so rather than inventing the intended word.',
+    messages: [{
+      role: 'user',
+      content:
+        `Call ${sid}. Direction: ${call.direction || 'unknown'}. Duration: ` +
+        `${call.duration_seconds == null ? 'unknown' : call.duration_seconds + ' seconds'}. ` +
+        `${finals.length} final transcript lines of ${all.length} total.\n\n` +
+        `TRANSCRIPT:\n${script}`,
+    }],
+    name: 'call_summary',
+    description: 'The summary of this call.',
+    schema: {
+      type: 'object',
+      properties: {
+        summary: { type: 'string', description: 'Two or three sentences an operator can read in five seconds.' },
+        caller_wanted: { type: 'string', description: 'What the other party was trying to achieve, or that it is unclear.' },
+        outcome: { type: 'string', description: 'How the call ended, from the transcript only.' },
+        sentiment: { type: 'string', enum: ['positive', 'neutral', 'negative', 'unclear'] },
+        follow_ups: { type: 'array', items: { type: 'string' }, description: 'Concrete actions, empty if none are warranted.' },
+        quotes: {
+          type: 'array',
+          description: 'Up to three VERBATIM lines that carry the call. Copied exactly.',
+          items: {
+            type: 'object',
+            properties: { speaker: { type: 'string' }, text: { type: 'string' } },
+            required: ['speaker', 'text'],
+          },
+        },
+        unclear: { type: 'string', description: 'What you could not determine. Empty string if nothing.' },
+      },
+      required: ['summary', 'caller_wanted', 'outcome', 'sentiment', 'follow_ups', 'quotes', 'unclear'],
+    },
+  });
+
+  // ── the quote check. Normalise whitespace only; anything else would be forgiving a paraphrase.
+  const hay = finals.map((t) => String(t.text || '')).join('\n').replace(/\s+/g, ' ').toLowerCase();
+  const bad = (out.data.quotes || [])
+    .map((q) => String(q.text || ''))
+    .filter((t) => t.trim() && !hay.includes(t.replace(/\s+/g, ' ').toLowerCase().trim()));
+
+  if (bad.length) {
+    await audit(admin, req, 'call.summarize', {
+      targetKind: 'call', targetId: sid, result: 'rejected',
+      payload: { reason: 'quote_not_in_transcript', quotes: bad, model: out.model },
+    });
+    return json(200, {
+      ok: false,
+      refused: 'quote_not_in_transcript',
+      quotes: bad,
+      model: out.model,
+      why: 'The model returned ' + bad.length + ' quote(s) that do not appear in the transcript. A quote ' +
+           'is the part of a summary that reads as evidence, so a paraphrased one is worse than none. ' +
+           'Nothing was stored. Run it again, or read the transcript directly.',
+    });
+  }
+
+  const payload = {
+    ...out.data,
+    model: out.model,
+    slot: out.slot,
+    cost_usd: out.cost_usd,
+    usage: out.usage,
+    lines_final: finals.length,
+    lines_total: all.length,
+    actor: admin.email,
+    at: new Date().toISOString(),
+  };
+  const stored = await rpc('sv_admin_call_summary', { p_call_sid: sid, p_row: payload });
+
+  await audit(admin, req, 'call.summarize', {
+    targetKind: 'call', targetId: sid,
+    result: stored && stored.ok ? 'ok' : 'failed',
+    payload: { model: out.model, cost_usd: out.cost_usd, lines_final: finals.length },
+  });
+
+  return json(200, { ok: Boolean(stored && stored.ok), stored, ...payload });
+}
+
 async function draftMessage(req, admin) {
   const b = await readJson(req);
   if (!b.contact_id) return json(400, { error: 'a contact is required' });
