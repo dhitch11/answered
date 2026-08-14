@@ -175,6 +175,8 @@ export const PRIVATE_HEADERS = Object.freeze({
   'Content-Security-Policy':
     "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; " +
     "img-src 'self' data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; " +
+    // font-src 'self' adds ZERO external origins: the brand faces are same-origin files.
+    "font-src 'self'; " +
     "connect-src 'self'; media-src 'self'",
 });
 

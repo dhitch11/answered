@@ -403,16 +403,22 @@ async function apiRoute(req, url, name) {
     }
 
     // ── CRM ────────────────────────────────────────────────────────────────────────────────
-    case 'crm':
+    case 'crm': {
+      // `reach` collapses three related questions an operator actually asks into one control.
+      // The RPC keeps them as separate columns; only the vocabulary is collapsed, so the filter
+      // stays explainable in the query it runs.
+      const reach = nz(q.get('reach'));
       return json(200, await rpc('sv_admin_contacts', {
         p_q: nz(q.get('q')), p_lane: nz(q.get('lane')), p_disposition: nz(q.get('disposition')),
         p_state: nz(q.get('state')), p_trade: nz(q.get('trade')), p_line_type: nz(q.get('line_type')),
         p_owner: nz(q.get('owner')), p_tag: nz(q.get('tag')),
-        p_suppressed: tri(q.get('suppressed')), p_dialable: tri(q.get('dialable')),
-        p_has_email: tri(q.get('has_email')),
+        p_suppressed: tri(q.get('suppressed')),
+        p_reach: reach,
+        p_enriched: nz(q.get('enriched')),
         p_sort: nz(q.get('sort')) || 'recent',
         p_limit: num(q.get('limit'), 50), p_offset: num(q.get('offset'), 0),
       }));
+    }
 
     case 'crm/facets':
       return json(200, await rpc('sv_admin_contact_facets'));

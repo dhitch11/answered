@@ -41,29 +41,96 @@ export const esc = (s) => String(s == null ? '' : s)
 // and nothing else, because the shape of what is behind a door is information about the door.
 // TOKENS + BASE is what an anonymous client gets. CONSOLE is added only after a session resolves.
 const TOKENS = `
+/* ── THE BRAND FACES, SELF-HOSTED ──────────────────────────────────────────────────────────
+   Same-origin only. font-src 'self' adds ZERO external origins, so the page keeps the property
+   that matters: it can reach nobody. Not a CDN, not a font host, not a data: URI (base64 inflates
+   ~33% and would sit inside a no-store document, re-downloading on every navigation).
+   The previous stack shipped Inter and Roboto, both banned by the brand law, so on every Windows
+   and Android machine this console was rendering in a forbidden face. */
+@font-face{font-family:"Switzer";src:url("/assets/fonts/switzer-400.woff2") format("woff2");
+  font-weight:450;font-style:normal;font-display:optional}
+@font-face{font-family:"Switzer";src:url("/assets/fonts/switzer-500.woff2") format("woff2");
+  font-weight:500;font-style:normal;font-display:optional}
+@font-face{font-family:"Switzer";src:url("/assets/fonts/switzer-700.woff2") format("woff2");
+  font-weight:620 700;font-style:normal;font-display:optional}
+@font-face{font-family:"Martian Mono";src:url("/assets/fonts/martian-mono-400-600.woff2") format("woff2");
+  font-weight:400 600;font-style:normal;font-display:optional}
+
 :root{
-  --bg:#08090B;          /* page                                              */
-  --surface:#0E1013;     /* cards, table bodies                               */
-  --raised:#151920;      /* hover, active row, inputs                         */
-  --raised-2:#1C212A;    /* pressed, selected                                 */
-  --line:#232830;        /* hairlines                                         */
-  --line-2:#333A45;      /* emphasised borders, focus rings                   */
-  --ink:#F5F7FA;         /* primary text     17.6:1 on --bg                   */
-  --ink-2:#AAB3BF;       /* secondary text    9.0:1 on --bg                   */
-  --ink-3:#8B94A1;       /* labels, meta      5.8:1 on --bg, 5.4:1 on surface */
-  --brand:#DFFF4F;       /* Answered hi-vis  16.1:1 on --bg                   */
-  --brand-ink:#0A0C05;
-  --ok:#4ADE80; --ok-bg:#0C1F15;
-  --warn:#FBBF24; --warn-bg:#221A08;
-  --bad:#FF5C7A; --bad-bg:#251016;
-  --info:#56CCF2; --info-bg:#0A1C24;
-  --r-lg:14px; --r:10px; --r-sm:7px;
-  --sp:4px;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif;
-  --ease:cubic-bezier(.2,.8,.2,1);
-  --shadow:0 1px 2px rgba(0,0,0,.5),0 8px 24px -12px rgba(0,0,0,.7);
+  /* In CSS, not only the meta tag, so UA scrollbars, autofill and pickers follow. */
+  color-scheme: dark;
+
+  /* ground ramp — five real elevations, none decorative */
+  --bg:#08090B; --surface:#0E1013; --raised:#151920; --raised-2:#1C212A; --raised-3:#222834;
+
+  /* ink ramp — MEASURED against all five grounds, not eyeballed */
+  --ink:#F5F7FA;    /* 18.56 17.75 16.42 15.05 13.77 */
+  --ink-2:#CDD4DE;  /* 13.34 12.76 11.80 10.82  9.90  — was #AAB3BF, which topped out at 9.40 */
+  --ink-3:#949DAA;  /*  7.27  6.95  6.43  5.89  5.39  — was #8B94A1, whose FLOOR was 4.82: a FAIL */
+  --ink-4:#6B7482;  /*  4.22  4.03  3.73  3.42  3.13  — DISABLED CONTROLS ONLY. WCAG 1.4.3
+                          exempts inactive components. Never for live text. */
+
+  /* lines — the third exists solely because WCAG 1.4.11 wants 3:1 for non-text UI */
+  --line:#232830;   /* 1.29:1 decorative hairline. NEVER the sole indicator of a state. */
+  --line-2:#333A45; /* 1.66:1 emphasised edge. Still decorative. */
+  --line-3:#606B7B; /* 3.53 on surface. THE ONLY border allowed to BE a control: unchecked
+                       checkbox, radio, resize grip, segmented divider, chip outline. */
+
+  /* brand + semantics */
+  --brand:#E3FF4F;      /* the brand Hi-Vis exactly. 16.95:1 on surface. The console was on
+                           #DFFF4F: dE2000 0.75, below the 2.0 JND, so this swap is invisible
+                           on screen and makes the console token-identical to the brand. */
+  --brand-ink:#0A0C05;  /* 17.50:1 on --brand. The only ink allowed on a brand fill. */
+  --brand-dim:rgba(227,255,79,.10);
+  --ok:#4ADE80;   --ok-bg:#0C1F15;   /* 10.93 — LIFECYCLE only: live, settled, verified */
+  --warn:#FBBF24; --warn-bg:#221A08; /* 11.41 */
+  --bad:#FF5C7A;  --bad-bg:#251016;  /*  6.41 on surface */
+  --bad-2:#FF7A93;                   /*  7.67 — use inside pills on the lightest ground */
+  --info:#56CCF2; --info-bg:#0A1C24; /* 10.27 */
+  --live:#37C8F0;                    /* RESERVED: a call is on the wire RIGHT NOW. One meaning. */
+  --ai:#B08CFF;   --ai-bg:#160F26;   /* AI provenance. Used nowhere else, ever. */
+
+  /* type */
+  --sans:"Switzer",system-ui,-apple-system,"Segoe UI Variable Text","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"Martian Mono",ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --t-micro:11px;  --lh-micro:14px;  --ls-micro:.06em;
+  --t-mini:12px;   --lh-mini:16px;   --ls-mini:0;
+  --t-small:13px;  --lh-small:18px;  --ls-small:-.006em;
+  --t-base:14px;   --lh-base:20px;   --ls-base:-.011em;
+  --t-lg:16px;     --lh-lg:22px;     --ls-lg:-.014em;
+  --t-xl:20px;     --lh-xl:26px;     --ls-xl:-.018em;
+  --t-num:24px;    --lh-num:26px;    --ls-num:-.02em;
+  --t-num-lg:32px; --lh-num-lg:34px; --ls-num-lg:-.022em;
+  /* three weights, not six: 640/650/660 measured a 0.23% width spread on the same string */
+  --w-body:450; --w-med:500; --w-semi:620;
+
+  /* geometry */
+  --row-h:36px; --row-h-compact:32px; --row-h-comfy:44px;
+  --topbar-h:52px; --side-w:212px;
+  --r-lg:12px; --r:8px; --r-sm:6px; --r-xs:4px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+
+  --shadow-pop:0 4px 12px -2px rgba(0,0,0,.6), inset 0 1px 0 0 rgba(255,255,255,.03);
+  --shadow-modal:0 24px 64px -16px rgba(0,0,0,.8), inset 0 1px 0 0 rgba(255,255,255,.04);
+
+  --ease:cubic-bezier(.2,.8,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+  --d-fast:100ms; --d-base:160ms; --d-slow:220ms;
+
+  --z-sticky:10; --z-topbar:20; --z-scrim:60; --z-drawer:61; --z-modal:70;
+  --z-popover:80; --z-toast:90; --z-tooltip:100;
+
+  /* legacy aliases, so nothing that already shipped breaks while the rest migrates */
+  --r-sm-legacy:7px; --sp:4px;
 }
+
+/* the fixes that are not tokens but ship with them */
+::placeholder{color:var(--ink-3);opacity:1}
+  /* the UA default was rgb(117,117,117) = 3.82:1, a fail. This is 6.43:1 on --raised. */
+.num,.tile-v,time,[data-num],td.num,th.num{
+  font-variant-numeric:tabular-nums lining-nums slashed-zero;
+  font-feature-settings:"tnum" 1,"zero" 1}
+  /* a slashed zero is not decoration: operators read E.164 numbers and call SIDs, and
+     O-versus-0 confusion is a support cost */
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;background:var(--bg)}
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);
@@ -112,6 +179,8 @@ button,input,select,textarea{font:inherit;color:inherit}
   *{animation-duration:.001ms!important;animation-iteration-count:1!important;
     transition-duration:.001ms!important}
 }
+
+/* TOKENS-END */
 `;
 
 // Everything below is added ONLY to an authenticated document.
@@ -295,6 +364,60 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var
     transition-duration:.001ms!important}
   .drawer{transition:none}
 }
+
+
+/* ── the filter bar: real controls ────────────────────────────────────────────────────────── */
+.filterbar{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;
+  padding:var(--sp-3) var(--sp-4);background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);position:sticky;top:calc(var(--topbar-h) + 8px);z-index:var(--z-sticky)}
+.fx{position:relative;display:inline-flex;align-items:center}
+.fx > label{position:absolute;left:10px;top:-7px;font-size:10px;font-weight:var(--w-semi);
+  letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);background:var(--surface);
+  padding:0 4px;pointer-events:none;border-radius:2px}
+select.fsel{appearance:none;-webkit-appearance:none;background:var(--raised);color:var(--ink);
+  border:1px solid var(--line-3);border-radius:var(--r-sm);
+  padding:8px 30px 8px 11px;font-size:var(--t-small);line-height:var(--lh-small);
+  font-family:var(--sans);cursor:pointer;min-width:132px;
+  transition:border-color var(--d-fast) var(--ease),background var(--d-fast) var(--ease)}
+select.fsel:hover{border-color:var(--ink-3);background:var(--raised-2)}
+select.fsel:focus-visible{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+select.fsel[data-on="1"]{border-color:var(--brand);color:var(--brand);background:var(--brand-dim)}
+.fx::after{content:"";position:absolute;right:11px;top:50%;width:0;height:0;pointer-events:none;
+  border-left:4px solid transparent;border-right:4px solid transparent;
+  border-top:5px solid var(--ink-3);transform:translateY(-2px)}
+.fx:hover::after{border-top-color:var(--ink)}
+.fsearch{flex:1 1 260px;min-width:200px;position:relative}
+.fsearch input{width:100%;background:var(--raised);border:1px solid var(--line-3);
+  border-radius:var(--r-sm);padding:8px 12px 8px 32px;font-size:var(--t-small);
+  color:var(--ink);font-family:var(--sans)}
+.fsearch input:focus{outline:none;border-color:var(--brand);background:var(--raised-2)}
+.fsearch::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  color:var(--ink-3);font-size:15px;pointer-events:none}
+.fcount{margin-left:auto;display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap}
+.fcount b{font-size:var(--t-lg);font-weight:var(--w-semi);letter-spacing:var(--ls-lg);
+  font-variant-numeric:tabular-nums}
+.activef{display:flex;flex-wrap:wrap;gap:6px;padding:0 var(--sp-4) var(--sp-3)}
+.afx{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-mini);
+  background:var(--brand-dim);border:1px solid rgba(227,255,79,.35);color:var(--brand);
+  border-radius:100px;padding:3px 5px 3px 10px}
+.afx button{background:none;border:none;color:inherit;cursor:pointer;font-size:14px;
+  line-height:1;padding:0 3px;opacity:.75}
+.afx button:hover{opacity:1}
+
+/* ── reach indicators: one glyph per channel, colour-blind safe by shape ─────────────────── */
+.reach{display:inline-flex;gap:4px;align-items:center}
+.rch{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:var(--r-xs);
+  font-size:11px;font-weight:var(--w-semi);border:1px solid var(--line-2);color:var(--ink-4);
+  background:var(--raised);cursor:default}
+.rch.on{color:var(--brand-ink);background:var(--brand);border-color:var(--brand)}
+.rch.blocked{color:var(--ink-4);background:transparent;border-style:dashed}
+.rch.wait{color:var(--warn);border-color:rgba(251,191,36,.45);background:var(--warn-bg)}
+
+/* ── density ──────────────────────────────────────────────────────────────────────────────── */
+table.dense td{padding:6px 12px;font-size:var(--t-small)}
+table.dense th{padding:7px 12px}
+
+/* CONSOLE-CSS-END */
 `;
 
 // ── the login document ───────────────────────────────────────────────────────────────────────
@@ -524,8 +647,9 @@ const S = {
   view: 'overview',
   q: '',
   overview: null,
+  dense: false,
   filters: { crm: { lane: null, disposition: null, state: null, trade: null, line_type: null,
-                    dialable: null, suppressed: null, has_email: null, sort: 'recent', offset: 0 },
+                    reach: null, enriched: null, suppressed: null, sort: 'recent', offset: 0 },
              customers: { status: null, sort: 'recent', offset: 0 },
              calls: { recorded: null, direction: null, offset: 0 },
              events: { name: null, offset: 0 } },
@@ -609,6 +733,39 @@ VIEWS.overview = async () => {
   '</div>';
 };
 
+// One place that turns filter state into a query string, so the table and the export can never
+// disagree about what "the current filter" means.
+function crmQuery(f, limit, offset) {
+  const qs = new URLSearchParams({ q: S.q || '', sort: f.sort || 'recent',
+                                   limit: String(limit), offset: String(offset || 0) });
+  for (const k of ['disposition','state','trade','line_type','lane']) if (f[k]) qs.set(k, f[k]);
+  if (f.reach)    qs.set('reach', f.reach);
+  if (f.enriched) qs.set('enriched', f.enriched);
+  // Suppressed leads are hidden by DEFAULT rather than silently included: an operator working a
+  // list should not have to remember that some rows must never be contacted.
+  if (f.suppressed === 'true') qs.set('suppressed', 'true');
+  else if (f.suppressed !== 'any') qs.set('suppressed', 'false');
+  return qs;
+}
+
+const tile = (k, v, sub, cls) =>
+  '<div class="card"><div class="tile-k">' + esc(k) + '</div>' +
+  '<div class="tile-v ' + (cls || '') + '">' + v + '</div>' +
+  (sub ? '<div class="tile-s">' + sub + '</div>' : '') + '</div>';
+
+const FILTER_LABELS = { trade:'Trade', state:'State', line_type:'Line', disposition:'Stage',
+  reach:'Reachable', enriched:'Enrichment', suppressed:'Suppression' };
+
+function activeChips(f) {
+  const on = Object.keys(FILTER_LABELS).filter((k) => f[k] != null && f[k] !== '');
+  if (!on.length && !S.q) return '';
+  return '<div class="activef">' +
+    (S.q ? '<span class="afx">search: ' + esc(S.q) + '<button data-clearf="q" aria-label="Clear search">×</button></span>' : '') +
+    on.map((k) => '<span class="afx">' + FILTER_LABELS[k] + ': ' + esc(String(f[k]).replace(/_/g, ' ')) +
+      '<button data-clearf="' + k + '" aria-label="Clear ' + FILTER_LABELS[k] + '">×</button></span>').join('') +
+    '<button class="btn ghost sm" data-clearf="all">Clear all</button></div>';
+}
+
 const row2 = (k, v) => '<tr><td>' + k + '</td><td class="num">' + v + '</td></tr>';
 
 function ladder(a) {
@@ -627,11 +784,7 @@ function ladder(a) {
 // ── LEADS. The CRM over 4,374 real classified contractor businesses. ─────────────────────────
 VIEWS.crm = async () => {
   const f = S.filters.crm;
-  const qs = new URLSearchParams({ q: S.q || '', sort: f.sort, limit: 50, offset: f.offset });
-  for (const k of ['lane','disposition','state','trade','line_type']) if (f[k]) qs.set(k, f[k]);
-  if (f.dialable != null) qs.set('dialable', String(f.dialable));
-  if (f.suppressed != null) qs.set('suppressed', String(f.suppressed));
-  if (f.has_email != null) qs.set('has_email', String(f.has_email));
+  const qs = crmQuery(f, 50, f.offset);
 
   const [d, facets] = await Promise.all([
     api('crm?' + qs),
@@ -641,47 +794,79 @@ VIEWS.crm = async () => {
   S.lastMeasuredAt = new Date().toISOString(); freshness();
   const n0 = $('[data-count="leads"]'); if (n0) n0.textContent = facets.total || '';
 
-  const chip = (key, value, label, count, active) =>
-    '<button class="btn ghost sm" data-crmfilter="' + key + '" data-value="' + esc(value == null ? '' : value) + '"' +
-    (active ? ' style="border-color:var(--brand);color:var(--brand)"' : '') + '>' +
-    esc(label) + (count != null ? ' <span class="muted" style="margin-left:5px">' + n(count) + '</span>' : '') + '</button>';
+  // ── real form controls, not bubble lists ──────────────────────────────────────────────────
+  // A dropdown carries its whole option set with the count beside each value, so an operator can
+  // see that "roofer" has 844 before choosing it. A row of chips can only show what fits.
+  const dropdown = (key, label, options, current, width) =>
+    '<span class="fx"><label for="f-' + key + '">' + esc(label) + '</label>' +
+    '<select class="fsel" id="f-' + key + '" data-fsel="' + key + '"' +
+    (current != null && current !== '' ? ' data-on="1"' : '') +
+    (width ? ' style="min-width:' + width + '"' : '') + '>' +
+    options.map((o) => {
+      const v = o.v == null ? '' : String(o.v);
+      return '<option value="' + esc(v) + '"' +
+        (String(current == null ? '' : current) === v ? ' selected' : '') + '>' +
+        esc(o.label) + (o.n != null ? '  (' + n(o.n) + ')' : '') + '</option>';
+    }).join('') + '</select></span>';
 
-  const anyFilter = f.lane || f.disposition || f.state || f.trade || f.line_type ||
-                    f.dialable != null || f.suppressed != null || S.q;
+  const opts = (arr, allLabel) =>
+    [{ v: '', label: allLabel }].concat(arr.map((x) => ({ v: x.k, label: String(x.k).replace(/_/g, ' '), n: x.n })));
 
-  const head =
-    '<div class="card"><div class="row" style="align-items:center;gap:8px;margin-bottom:10px">' +
-      '<span class="tile-k" style="margin:0">Who we can actually reach</span>' +
-      '<span class="sp" style="margin-left:auto"></span>' +
-      (anyFilter ? '<button class="btn ghost sm" data-crmfilter="clear" data-value="">Clear filters</button>' : '') +
-      '<button class="btn ghost sm" data-act="crm-export">Export CSV</button>' +
+  const filterBar =
+    '<div class="filterbar">' +
+      '<span class="fsearch"><input id="crmq" type="search" value="' + esc(S.q || '') +
+        '" placeholder="Name, phone, city, website, email, person" aria-label="Search leads"></span>' +
+      dropdown('trade', 'Trade', opts(facets.trade, 'Any trade'), f.trade) +
+      dropdown('state', 'State', opts(facets.state, 'Any state'), f.state, '118px') +
+      dropdown('line_type', 'Line', opts(facets.line_type, 'Any line type'), f.line_type) +
+      dropdown('disposition', 'Stage', opts(facets.disposition, 'Any stage'), f.disposition) +
+      dropdown('reach', 'Reachable', [
+        { v: '', label: 'Any channel' },
+        { v: 'email', label: 'Has an email', n: facets.emailable_now },
+        { v: 'fixed', label: 'Fixed business line', n: facets.fixed_line },
+        { v: 'mobile', label: 'Mobile', n: facets.textable_line },
+        { v: 'none', label: 'No channel at all' },
+      ], f.reach, '176px') +
+      dropdown('enriched', 'Enrichment', [
+        { v: '', label: 'Any' },
+        { v: 'done', label: 'Site read', n: facets.enriched },
+        { v: 'todo', label: 'Site not read yet', n: facets.websites_unread },
+      ], f.enriched, '164px') +
+      dropdown('suppressed', 'Suppression', [
+        { v: '', label: 'Not suppressed' },
+        { v: 'true', label: 'Suppressed only', n: facets.suppressed },
+        { v: 'any', label: 'Include suppressed' },
+      ], f.suppressed == null ? '' : String(f.suppressed), '168px') +
+      dropdown('sort', 'Sort', [
+        { v: 'recent', label: 'Newest first' }, { v: 'name', label: 'A to Z' },
+        { v: 'touched', label: 'Last touched' }, { v: 'calls', label: 'Most called' },
+      ], f.sort, '150px') +
+      '<span class="fcount"><b>' + n(d.total) + '</b><span class="muted">of ' + n(facets.total) + '</span>' +
+        '<button class="btn ghost sm" data-act="crm-density">' + (S.dense ? 'Comfortable' : 'Dense') + '</button>' +
+        '<button class="btn ghost sm" data-act="crm-export">Export</button></span>' +
     '</div>' +
-    '<div class="row">' +
-      chip('dialable', 'true', 'AI-callable lines', facets.ai_dialable, f.dialable === true) +
-      chip('line_type', 'mobile', 'Mobile', (facets.line_type.find((x) => x.k === 'mobile') || {}).n, f.line_type === 'mobile') +
-      chip('has_email', 'true', 'Has an email', facets.with_email, f.has_email === true) +
-      chip('suppressed', 'true', 'Suppressed', facets.suppressed, f.suppressed === true) +
-    '</div>' +
-    '<div class="tile-s" style="margin-top:10px">' +
-      n(facets.ai_dialable) + ' of ' + n(facets.total) + ' are verified fixed business lines, which is the ' +
-      'only pool an AI voice may cold-call. ' + n(facets.with_email) + ' have an email address on file, ' +
-      'read from what each business publishes on its own site. ' +
-      (facets.with_email < facets.with_website
-        ? '<strong>' + n(facets.with_website - facets.with_email) + '</strong> have a website that has not been read yet, so that number is still climbing.'
-        : '') +
-    '</div></div>' +
+    (activeChips(f) || '');
 
-    '<div class="grid g3">' +
-      '<div class="card pad0"><div class="card-h"><h2>Trade</h2></div><div style="padding:10px 12px" class="row">' +
-        facets.trade.slice(0, 12).map((x) => chip('trade', x.k, x.k, x.n, f.trade === x.k)).join('') + '</div></div>' +
-      '<div class="card pad0"><div class="card-h"><h2>State</h2></div><div style="padding:10px 12px" class="row">' +
-        facets.state.slice(0, 14).map((x) => chip('state', x.k, x.k, x.n, f.state === x.k)).join('') + '</div></div>' +
-      '<div class="card pad0"><div class="card-h"><h2>Stage</h2></div><div style="padding:10px 12px" class="row">' +
-        facets.disposition.map((x) => chip('disposition', x.k, String(x.k).replace(/_/g, ' '), x.n, f.disposition === x.k)).join('') + '</div></div>' +
+  // ── the honest headline. fixed_line is a PROPERTY. callable_now is a PERMISSION. ──────────
+  const reachCard =
+    '<div class="grid g4">' +
+      tile('Emailable today', n(facets.emailable_now),
+        'Have a business email and are not suppressed. This channel needs no carrier, no registry ' +
+        'and no state clearance.', facets.emailable_now ? 'brand' : '') +
+      tile('Callable right now', n(facets.callable_now),
+        facets.callable_blocked_because ||
+        'Fixed business lines, scrubbed and inside a cleared state.',
+        facets.callable_now ? 'brand' : '') +
+      tile('Fixed business lines', n(facets.fixed_line),
+        'A property of the phone number, not a permission. These are the lines an artificial ' +
+        'voice may call once the registry and the state are cleared.') +
+      tile('Mobiles', n(facets.textable_line),
+        'Kept and listed, never discarded. A person may dial and speak to these; an artificial ' +
+        'voice may not without consent.') +
     '</div>';
 
   if (!d.rows.length) {
-    return head + '<div class="card pad0">' +
+    return reachCard + filterBar + '<div class="card pad0">' +
       (anyFilter
         ? emptyState('Nothing matches that filter',
             'Measured ' + esc(stamp(S.lastMeasuredAt)) + '. Clear the filters to see the whole book.')
@@ -702,22 +887,32 @@ VIEWS.crm = async () => {
       '</div></div>'
     : '';
 
-  return head + bulk + '<div class="card pad0">' +
-    '<div class="card-h"><h2>' + n(d.total) + ' leads</h2><span class="sp">' +
-      '<button class="btn ghost sm" data-act="crm-sort" data-value="recent">Newest</button>' +
-      '<button class="btn ghost sm" data-act="crm-sort" data-value="name">A to Z</button>' +
-      '<button class="btn ghost sm" data-act="crm-sort" data-value="touched">Last touched</button>' +
-    '</span></div>' +
-    '<div class="tw"><table><thead><tr>' +
+  return reachCard + filterBar + bulk + '<div class="card pad0">' +
+    
+    '<div class="tw"><table class="' + (S.dense ? 'dense' : '') + '"><thead><tr>' +
       '<th style="width:34px"><input type="checkbox" data-act="crm-sel-all" aria-label="Select this page"></th>' +
       '<th>Business</th><th>Trade</th><th>Where</th><th>Line</th><th>Reachable</th>' +
       '<th>Stage</th><th class="num">Calls</th><th>Last touched</th></tr></thead><tbody>' +
     d.rows.map((r) => {
-      const reach = [];
-      if (r.email) reach.push('<span class="pill ok" title="' + esc(r.email) + '">email</span>');
-      if (r.ai_dialable) reach.push('<span class="pill info">callable</span>');
-      else if (r.line_type === 'mobile' || r.line_type === 'nonFixedVoip') reach.push('<span class="pill">texts</span>');
-      if (r.suppressed) reach.push('<span class="pill bad">never</span>');
+      // Three glyphs, one per channel, distinguished by SHAPE and letter as well as colour so
+      // the row is readable without relying on hue. A dashed outline means the channel exists on
+      // this record but is currently refused; a solid fill means it will actually act.
+      const g = (letter, state, title) =>
+        '<span class="rch ' + state + '" title="' + esc(title) + '">' + letter + '</span>';
+      const reach = [
+        r.suppressed ? g('E', 'blocked', 'Suppressed: never contact on any channel')
+          : r.email ? g('E', 'on', 'Email ready: ' + r.email)
+          : g('E', 'blocked', 'No email address on file'),
+        r.suppressed ? g('C', 'blocked', 'Suppressed')
+          : r.ai_dialable
+            ? (facets.callable_now ? g('C', 'on', 'Fixed business line, callable now')
+                                   : g('C', 'wait', facets.callable_blocked_because || 'Waiting on clearance'))
+            : g('C', 'blocked', (r.line_type || 'unknown') + ': an artificial voice may not cold-call this'),
+        r.suppressed ? g('T', 'blocked', 'Suppressed')
+          : (r.line_type === 'mobile' || r.line_type === 'nonFixedVoip')
+            ? g('T', 'wait', 'The line accepts texts; the carrier campaign is not approved yet')
+            : g('T', 'blocked', (r.line_type || 'unknown') + ' does not receive texts'),
+      ];
       return '<tr class="click" data-contact="' + esc(r.id) + '">' +
         // No stopPropagation here: this page delegates every click from the document, so stopping
         // propagation on the cell silently killed the very handler meant to read the checkbox. The
@@ -730,7 +925,7 @@ VIEWS.crm = async () => {
         '<td class="dim">' + esc(r.trade || '—') + '</td>' +
         '<td class="dim">' + esc([r.city, r.state].filter(Boolean).join(', ') || '—') + '</td>' +
         '<td class="mono">' + esc(r.line_type || 'unknown') + '</td>' +
-        '<td>' + (reach.join(' ') || '<span class="muted">no channel</span>') + '</td>' +
+        '<td><span class="reach">' + reach.join('') + '</span></td>' +
         '<td><span class="pill">' + esc(String(r.disposition).replace(/_/g, ' ')) + '</span></td>' +
         '<td class="num">' + n(r.call_count) + '</td>' +
         '<td class="muted">' + esc(r.last_contacted_at ? when(r.last_contacted_at) : 'never') + '</td>' +
@@ -1690,7 +1885,7 @@ function palGo() {
 // ── events. One delegated listener, so nothing is bound to a node a repaint will replace. ──
 function wire() {
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],.pal-i');
+    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],[data-clearf],.pal-i');
     if (!t) return;
 
     // ── CRM ────────────────────────────────────────────────────────────────────────────────
@@ -1699,6 +1894,17 @@ function wire() {
       if (t.checked) S.selected.add(id); else S.selected.delete(id);
       go('crm', { quiet: true });
       return;
+    }
+    if (t.dataset.clearf) {
+      const k = t.dataset.clearf, f = S.filters.crm;
+      if (k === 'all') {
+        S.filters.crm = { lane:null, disposition:null, state:null, trade:null, line_type:null,
+                          reach:null, enriched:null, suppressed:null, sort:f.sort, offset:0 };
+        S.q = '';
+      } else if (k === 'q') { S.q = ''; }
+      else { f[k] = null; f.offset = 0; }
+      S.selected.clear();
+      go('crm'); return;
     }
     if (t.dataset.crmfilter) {
       const k = t.dataset.crmfilter, v = t.dataset.value;
@@ -1755,6 +1961,7 @@ function wire() {
     if (act === 'refund-go') { doRefund(t.dataset.charge, +t.dataset.max); return; }
     if (act === 'export-accounts') { exportAccounts(); return; }
     if (act === 'crm-clear-sel') { S.selected.clear(); go('crm'); return; }
+    if (act === 'crm-density') { S.dense = !S.dense; go('crm'); return; }
     if (act === 'crm-sort') { S.filters.crm.sort = t.dataset.value; S.filters.crm.offset = 0; go('crm'); return; }
     if (act === 'crm-sel-all') {
       $$('[data-sel]').forEach((cb) => { if (t.checked) S.selected.add(cb.dataset.sel); else S.selected.delete(cb.dataset.sel); });
@@ -1791,6 +1998,35 @@ function wire() {
     const map = { g:'overview', d:'crm', c:'customers', l:'calls', u:'usage', b:'billing', p:'parley',
       e:'events', k:'compliance', a:'audit', s:'system' };
     if (map[e.key]) { e.preventDefault(); go(map[e.key]); }
+  });
+
+  // ── the filter bar ────────────────────────────────────────────────────────────────────────
+  // A <select> fires 'change', never 'click', so the delegated click handler above cannot see it.
+  // This is delegated on the document so it survives every repaint of the view.
+  document.addEventListener('change', (e) => {
+    const el = e.target.closest('select[data-fsel]');
+    if (!el) return;
+    const key = el.dataset.fsel;
+    const raw = el.value;
+    const f = S.filters.crm;
+    if (key === 'sort') f.sort = raw || 'recent';
+    else f[key] = raw === '' ? null : raw;
+    f.offset = 0;
+    S.selected.clear();
+    go('crm');
+  });
+
+  let cq;
+  document.addEventListener('input', (e) => {
+    if (!e.target.matches || !e.target.matches('#crmq')) return;
+    clearTimeout(cq);
+    const v = e.target.value;
+    cq = setTimeout(() => {
+      S.q = v.trim(); S.filters.crm.offset = 0;
+      // quiet, so the caret is not disturbed: paint() already refuses to replace a region that
+      // owns a text field, and this keeps the skeleton from flashing under the operator's hands.
+      go('crm', { quiet: true });
+    }, 280);
   });
 
   let qt;
@@ -2057,11 +2293,7 @@ async function doCall(contactId, to) {
 async function exportLeads() {
   try {
     const f = S.filters.crm;
-    const qs = new URLSearchParams({ q: S.q || '', sort: f.sort, limit: 200, offset: 0 });
-    for (const k of ['lane','disposition','state','trade','line_type']) if (f[k]) qs.set(k, f[k]);
-    if (f.dialable != null) qs.set('dialable', String(f.dialable));
-    if (f.has_email != null) qs.set('has_email', String(f.has_email));
-    const d = await api('crm?' + qs);
+    const d = await api('crm?' + crmQuery(f, 200, 0));
     const cols = ['id','name','phone','line_type','ai_dialable','trade','city','state','website',
                   'email','contact_name','disposition','lane','call_count','last_contacted_at'];
     const csv = [cols.join(',')].concat(d.rows.map((r) => cols.map((c) => {
@@ -2127,4 +2359,25 @@ if (!/return \{ boot \};\s*\}\)\(\);\s*$/.test(APP_JS)) {
   throw new Error(
     'admin-ui: APP_JS is truncated. It does not end with its own closing lines, which means a ' +
     'stray backtick closed the template literal early. Length is ' + APP_JS.length + ' chars.');
+}
+
+// ★ THE SAME GUARD FOR THE STYLESHEETS, BECAUSE IT HAPPENED TWICE.
+// The first time a stray backtick was inside a code comment in APP_JS. The second time it was
+// inside a CSS comment in TOKENS — I wrote `font-src 'self'` with backticks for emphasis, in a
+// file where a backtick ends the world. Both times the symptom was a parse error, which is the
+// LUCKY outcome; the dangerous one is a shorter but valid string that ships a half-written
+// stylesheet and looks merely ugly rather than broken.
+//
+// Each sheet is asserted to reach its own last rule. A cheap check for a defect that has now
+// cost two debugging cycles.
+for (const [name, css, sentinel] of [
+  ['TOKENS', TOKENS, '/* TOKENS-END */'],
+  ['CONSOLE_CSS', CONSOLE_CSS, '/* CONSOLE-CSS-END */'],
+]) {
+  if (!css.includes(sentinel)) {
+    throw new Error(
+      'admin-ui: ' + name + ' is truncated at ' + css.length + ' chars. It does not contain its ' +
+      'own end sentinel, which means a stray backtick closed the template early. Backticks are ' +
+      'not allowed anywhere inside these strings, including inside comments.');
+  }
 }
