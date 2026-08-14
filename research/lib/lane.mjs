@@ -451,3 +451,119 @@ export function gateAll(records, policy = DEFAULT_POLICY, suppress = new Set(), 
     reasons: [...byReason.entries()].sort((a, b) => b[1] - a[1]),
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// EMAIL
+//
+// ★ THIS EXISTS BECAUSE "EMAIL IS THE OPEN CHANNEL" WAS REFUTED, AND I HAD ALMOST BUILT ON IT.
+//
+// The phone program is gated hard, so the tempting move was to reach the same contractors by email
+// while Twilio and the registry are blocked. The operator console said, in as many words, that this
+// channel "needs no carrier, no registry and no state clearance", and reported 531 emailable off
+// `email is not null and not suppressed` — permission equal to property, with no gate anywhere.
+//
+// Verified from primary text instead, and the answer is that email is a DIFFERENT regime, not a
+// permissive one:
+//
+//   CAN-SPAM REACHES US IN FULL. 15 USC 7702(2)(A) — our message is a "commercial electronic mail
+//   message". The transactional/relationship escape is unavailable AS A MATTER OF LAW: all five
+//   16 CFR 316.3(c) categories presuppose a pre-existing relationship and a cold first touch
+//   satisfies none. The free week is commercial content, not a neutraliser. There is no "it is only
+//   a question" framing that escapes it.
+//
+//   WHAT SURVIVES IS NARROWER THAN "EASIER". CAN-SPAM itself has no private right of action
+//   (15 USC 7706: FTC, state AGs, and IAS providers only), and there is no email do-not-call
+//   registry. That is real. But:
+//
+//   CAL. B&P 17529.5 CARRIES $1,000 PER EMAIL WITH A PRIVATE RIGHT OF ACTION, and 17529.5(b)(1)(A)
+//   (iii) says "a recipient" with nothing limiting it to natural persons — A BUSINESS CAN SUE.
+//   Fee-shifting to prevailing plaintiffs. The due-care provision only FLOORS damages at $100/email:
+//   it is a reduction, not a defence.
+//   WASH. RCW 19.190 (CEMA): $500 per message, per se CPA linkage under RCW 19.86. 3,617 of our
+//   records are Washington and nobody has read it.
+//   CAL. B&P 17529.4(a) BANS THE COLLECTION ITSELF, and 434 of our addresses were read from
+//   California websites.
+//
+// So the trade is not "easier". It swaps a registry you can subscribe to for a private right of
+// action that no subscription immunises. Phone risk is gateable; email risk is litigation risk
+// turning on facts about our own infrastructure.
+//
+// This gate therefore refuses by default and every flag below is false until someone has done the
+// work and can say so. It is the same fail-closed posture as the call gate, for the same reason.
+
+export const EMAIL_DEFAULT_POLICY = {
+  // 16 CFR 316.2(p): a current street address, a USPS-registered PO box, or a private mailbox at a
+  // USPS-established CMRA with an accurate PS Form 1583 on file. A registered-agent address, a
+  // coworking desk, or a non-CMRA forwarding service does NOT satisfy it.
+  physicalPostalAddressVerified: false,
+  // 15 USC 7704(a)(3)-(4): a mechanism that actually works, stays live at least 30 days after the
+  // last send, and is honoured within 10 business days. Present in a template is not implemented.
+  workingOptOut: false,
+  // A separate list. The phone suppression file is E.164 numbers only, so an email opt-out has
+  // nowhere to land today, which means we could not honour one even if we received it.
+  emailSuppressionListLive: false,
+  // 15 USC 7704(a)(1): real domain, aligned SPF/DKIM/DMARC, no relay that disguises origin. Also
+  // the Google/Yahoo bulk-sender floor, because recipients cannot sue under CAN-SPAM but their
+  // PROVIDERS can, under 7706(g).
+  authenticatedSendingDomain: false,
+  // The sender must be identifiable by one of the two routes the California cases recognise:
+  // public WHOIS on the sending domain (the Balsam v. Trancos traceability point), or the legal
+  // entity name and physical address readily ascertainable in the body.
+  senderIdentifiable: false,
+  // States whose surviving falsity-based email statutes have actually been read. Same discipline as
+  // VERIFIED_STATES, and for the same reason: three of the first four states read for the phone
+  // program carried a real blocker.
+  emailVerifiedStates: new Set(),
+};
+
+/**
+ * May we send a commercial email to this contact? Refuses unless every condition is proven.
+ *
+ * @param {object} rec     { email, state, emailSuppressed, noTransferNotice }
+ * @param {object} policy  see EMAIL_DEFAULT_POLICY
+ */
+export function classifyEmail(rec, policy = EMAIL_DEFAULT_POLICY) {
+  const reasons = [];
+  const deny = (r) => { reasons.push(r); return { sendable: false, reasons }; };
+
+  if (!rec.email || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(String(rec.email))) {
+    return deny('no usable email address on this record');
+  }
+  // Presence, never truthiness, for a control whose absence would mean permission.
+  if (rec.emailSuppressed !== false) {
+    return deny('this address is not confirmed absent from the email suppression list, and unanswerable is not permission');
+  }
+  // 15 USC 7704(b)(1)(A)(i) makes an address harvested from a site carrying a no-transfer notice an
+  // AGGRAVATED violation. Our collector never looked for that notice, so the honest value here is
+  // unknown, and unknown is a refusal until the corpus has been re-checked.
+  if (rec.noTransferNotice !== false) {
+    return deny('the source site was never checked for a no-transfer notice, which is the third element of 15 USC 7704(b)(1)(A)(i) and the difference between an ordinary and an aggravated violation');
+  }
+  if (!policy.physicalPostalAddressVerified) return deny('no 16 CFR 316.2(p)-valid physical postal address is on file, and every commercial message must carry one');
+  if (!policy.workingOptOut) return deny('no opt-out mechanism has been exercised end to end; present in a template is not implemented');
+  if (!policy.emailSuppressionListLive) return deny('there is no email suppression list, so an opt-out would have nowhere to land and could not be honoured');
+  if (!policy.authenticatedSendingDomain) return deny('the sending domain is not authenticated (SPF/DKIM/enforcing DMARC); recipients cannot sue under CAN-SPAM but their providers can, under 15 USC 7706(g)');
+  if (!policy.senderIdentifiable) return deny('the sender is not identifiable by public WHOIS or by an entity name and address in the body, which is the Balsam v. Trancos traceability point');
+
+  const st = String(rec.state || '').toUpperCase();
+  if (!st) return deny('no state on the record, so its email law cannot be established');
+  if (!policy.emailVerifiedStates.has(st)) {
+    return deny(`${st}: nobody has read this state's surviving falsity-based email statute. CA carries $1,000 per message with a private right of action a BUSINESS may bring, and WA carries $500; an unread state is a refusal here exactly as it is for calls`);
+  }
+
+  reasons.push(`${st}: CAN-SPAM kit implemented, address verified, opt-out live, state read`);
+  return {
+    sendable: true,
+    reasons,
+    obligations: [
+      'truthful_header',              // 7704(a)(1)
+      'non_deceptive_subject',        // 7704(a)(2)
+      'identify_as_advertisement',    // 7704(a)(5)(A)(ii)
+      'physical_postal_address',      // 7704(a)(5)(A)(iii)
+      'working_opt_out',              // 7704(a)(3)
+      'honour_opt_out_in_10_business_days', // 7704(a)(4)
+      'no_unmeasured_claim_about_the_recipient',
+      'imply_no_prior_relationship',
+    ],
+  };
+}
