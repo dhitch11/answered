@@ -1407,10 +1407,15 @@
   /* ── STATE 1: your number is not in yet ────────────────────────────────*/
   function setForm(v) {
     var me = v.me, them = v.them;
-    /* If tr_view ever grows them.direction, the second mover is locked to the
-       opposite and the trap below cannot be sprung. Until then both parties
-       answer the SAME question about the SAME two named people, which at least
-       makes the two answers comparable instead of independent. */
+    /* THE SECOND MOVER IS LOCKED TO THE OPPOSITE DIRECTION. tr_view now carries
+       them.direction (@ANSWERED-RESEARCH, 2026-08-14), so the bad pair is
+       UNPICKABLE rather than rejected after typing: the server refuses two
+       'min' either way, but a control you cannot press beats an error you read
+       after committing to a number.
+       If the field is ever renamed or dropped, `theirs` goes null and both
+       buttons stay live: the lock disappears rather than silently claiming to
+       hold, which is the failure direction to prefer. Verified with a positive
+       control, because an absence-only check cannot tell sealed from renamed. */
     var theirs = them.direction || null;
     var forced = theirs ? (theirs === 'min' ? 'max' : 'min') : null;
 

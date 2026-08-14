@@ -87,6 +87,26 @@ const CEILING = 1700;    // Ryan will not pay more
     assert(view.them.opening != null, 'the public opening should be visible');
     assert(view.them.limit === undefined, 'a limit key must not exist on `them` at all');
   });
+  // ★ THE POSITIVE HALF, ADDED AFTER AN ABSENCE-ONLY SUITE SLEPT THROUGH A RENAME.
+  //
+  // Every assertion above is of the form "this key is not there", and that shape gets MORE green
+  // as the payload gets more broken: it passes identically whether the limit is correctly sealed,
+  // renamed, misspelled, or the function was deleted outright. On 2026-08-14 me.limit silently
+  // became me.amount, all fourteen tests stayed green, and parley.html — which reads me.limit to
+  // decide whether this party has committed a number — put the set-your-number form back in front
+  // of somebody who had just set one, beside a status strip reading "YOUR NUMBER IS NOT SET" next
+  // to "ONE SIDE IS IN". A second submit would have overwritten a sealed limit they thought had
+  // never been taken. It was caught by a lane diffing two live curls 21 minutes apart, not here.
+  //
+  // So the seal is proved from both directions now: their limit must be ABSENT, and mine must be
+  // PRESENT and EQUAL to what I set. A rename fails the second one immediately.
+  test('MY OWN limit comes back under the documented key, with the value I set', () => {
+    assert(view.me.limit !== undefined, 'me.limit is missing — a renamed key reads to the page as an unset limit');
+    // `view` is Ryan's — runDeal returns the response to Ryan's own set_limit — so his own
+    // ceiling is exactly what me.limit must carry.
+    assert.equal(Number(view.me.limit), CEILING,
+      'me.limit came back, but not as the number this party actually committed');
+  });
   const lc = await api({ op: 'leak_check', token: b });
   const lcA = await api({ op: 'leak_check', token: a });
   test('leak_check reports zero for both limits, from BOTH sides', () => {

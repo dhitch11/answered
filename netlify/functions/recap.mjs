@@ -268,8 +268,15 @@ export async function deliverRecap(input, { site = 'https://answered.reddenda.co
     const reason = `this call came from ${input.from}, which ANSWERED_RECAP_SKIP_FROM lists as one of our own automated probes rather than a customer. The transcript was stored in full; no recap was sent.`;
     for (const ch of wanted) {
       result.delivery[ch] = { ok: false, skipped: true, reason };
-      if (key) await store.settleDelivery(key, ch, { status: 'skipped', reason, lines: lines.length })
-        .catch(() => { /* the ledger note is not worth failing the request over */ });
+      // ★ CLAIM BEFORE SETTLING, even though nothing is being sent. sv_recap_settle only UPDATES,
+      // so settling a row that was never claimed writes nothing at all and the skip becomes
+      // invisible: the operator sees no delivery and no record of why there was none, which is
+      // indistinguishable from the bug this whole file exists to fix.
+      if (key) {
+        await store.claimDelivery(key, ch, input.conversation_id).catch(() => {});
+        await store.settleDelivery(key, ch, { status: 'skipped', reason, lines: lines.length })
+          .catch(() => { /* the ledger note is not worth failing the request over */ });
+      }
     }
     result.ok = true;
     result.probe = true;
