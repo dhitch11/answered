@@ -573,6 +573,34 @@ table.dense th{padding:7px 12px}
   .ln-bar i{transition:none}
 }
 
+/* ── the conversation ──────────────────────────────────────────────────────
+   A thread, not a table. Outbound sits right and inbound sits left, which is the convention every
+   messaging app has trained every operator on for fifteen years; fighting it would cost a beat of
+   reading time on every single message.
+   A BLOCKED SEND IS RENDERED, NOT HIDDEN, and it is styled as its own third thing rather than as a
+   red outbound bubble, because "we chose not to send this" is a different event from "we sent this
+   and it went badly". The hatch survives greyscale and colour-blindness, so the distinction does
+   not rest on hue alone. */
+.thread{display:flex;flex-direction:column;gap:10px;padding:14px 16px;max-height:min(46vh,420px);
+  overflow-y:auto;overscroll-behavior:contain}
+.bub{max-width:min(86%,560px);border:1px solid var(--line);border-radius:12px;padding:9px 11px;
+  background:var(--surface)}
+.bub-out{align-self:flex-end;border-color:var(--line-2);background:var(--info-bg)}
+.bub-in{align-self:flex-start}
+.bub-bad{align-self:flex-end;border-color:var(--bad);background:var(--bad-bg);
+  background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.045) 0 4px,transparent 4px 8px)}
+.bub-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;margin-bottom:5px}
+.bub-s{font-weight:650;font-size:13px;margin-bottom:3px}
+.bub-t{font-size:13.5px;line-height:var(--lh-base);white-space:pre-wrap;overflow-wrap:anywhere}
+.bub-f{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:11.5px;
+  color:var(--bad-2)}
+.composer{border-top:1px solid var(--line);padding:12px 16px;background:var(--bg)}
+/* A channel that cannot send is not hidden and not merely dimmed: it keeps its full hit area and
+   its tooltip carries the gate's own sentence, so the operator learns WHY rather than that
+   something is broken. */
+.composer .btn[data-blocked]{opacity:.72;border-style:dashed}
+@media (max-width:640px){ .bub{max-width:94%} .thread{max-height:52vh} }
+
 /* CONSOLE-CSS-END */
 `;
 
@@ -1402,8 +1430,8 @@ function channelRow(label, state, action, contactId, to) {
 
 function renderContact(d, pre) {
   const c = d.contact;
-  const tabs = [['summary','Summary'],['reach','Reach out'],['calls','Calls'],['notes','Notes'],
-                ['tasks','Tasks'],['timeline','Timeline']];
+  const tabs = [['summary','Summary'],['reach','Reach out'],['thread','Conversation'],
+                ['calls','Calls'],['notes','Notes'],['tasks','Tasks'],['timeline','Timeline']];
   const head =
     '<div class="drawer-h"><div style="flex:1;min-width:0">' +
       '<div class="row" style="align-items:center;gap:9px">' +
@@ -1498,12 +1526,116 @@ function renderContact(d, pre) {
     timeline: () => '<div class="card pad0"><div class="card-h"><h2>Everything that has happened</h2>' +
       '<span class="sp muted">one feed, whatever produced it</span></div>' +
       '<div id="tl" class="tw"><div style="padding:16px"><div class="skel" style="width:60%"></div></div></div></div>',
+
+    // THE CONVERSATION. Deliberately not the timeline: only what was said between us and them, in
+    // the order it was said, so an operator can read the room before adding to it.
+    thread: () => '<div class="card pad0"><div class="card-h"><h2>What has been said</h2>' +
+      '<span class="sp muted" id="thmeta">reading</span></div>' +
+      '<div id="th" class="tw"><div style="padding:16px"><div class="skel" style="width:70%"></div>' +
+      '<div class="skel" style="width:45%;margin-top:8px"></div></div></div>' +
+      threadComposer(c, pre) + '</div>',
   };
 
   const dr = $('#drawer');
   dr.innerHTML = head + '<div class="drawer-b" id="dbody">' + panes[leadTab]() + '</div>';
   dr.__panes = panes; dr.__contact = c; dr.__pre = pre;
   if (leadTab === 'timeline') loadTimeline(c.id);
+  if (leadTab === 'thread') loadThread(c.id);
+}
+
+/**
+ * The composer sits under the thread and answers the operator's real question before they type:
+ * CAN I SEND, ON WHICH CHANNEL, AND IF NOT, WHY NOT. A disabled button with no explanation is the
+ * thing this console exists not to do.
+ *
+ * Every channel is rendered whether or not it is available. A missing button reads as a missing
+ * feature; a present button carrying the gate's own refusal reads as a system that knows its own
+ * state and will re-arm itself the moment the condition clears.
+ */
+function threadComposer(c, pre) {
+  const p = pre || {};
+  const ch = (key, label, gate, to, act) => {
+    const ok = gate && gate.ok;
+    const why = (gate && gate.why) || 'This channel has not reported its state.';
+    return '<button class="btn ' + (ok ? 'primary' : 'ghost') + ' sm" ' +
+      'data-act="' + act + '" data-contact="' + esc(c.id) + '" data-to="' + esc(to || '') + '"' +
+      (ok ? '' : ' data-blocked="1" data-why="' + esc(why) + '"') +
+      ' title="' + esc(why) + '">' +
+      (ok ? '' : '<span aria-hidden="true">·</span> ') + esc(label) + '</button>';
+  };
+  const anyOpen = [p.email, p.sms, p.call].some((g) => g && g.ok);
+  return '<div class="composer">' +
+    '<div class="row" style="gap:8px;flex-wrap:wrap">' +
+      ch('email', 'Write an email', p.email, c.email, 'do-email') +
+      ch('sms',   'Send a text',    p.sms,   c.phone, 'do-sms') +
+      ch('call',  'Place a call',   p.call,  c.phone, 'do-call') +
+    '</div>' +
+    '<div class="sm muted" style="margin-top:8px">' +
+      (anyOpen
+        ? 'A channel shown plain is not available right now. Hover it to read the gate’s own reason. ' +
+          'Nothing here is hardcoded off: each one re-arms itself when its condition clears, with no deploy.'
+        : 'No channel is open to this business right now. Each button carries the reason it is closed. ' +
+          'That is a live reading, not a setting, so this panel changes on its own when the condition does.') +
+    '</div>' +
+  '</div>';
+}
+
+/**
+ * ★ A THREAD THAT HIDES THE BLOCKED SENDS WOULD LIE BY OMISSION. If we tried three times to text a
+ * business and the gate refused all three, "no messages" is the wrong answer to "why have we not
+ * heard back". Blocked and failed sends are rendered as first-class entries carrying their reason.
+ */
+async function loadThread(contactId) {
+  try {
+    const d = await api('crm/thread?contact=' + encodeURIComponent(contactId) + '&limit=200');
+    const el = $('#th'); if (!el) return;
+    const msgs = (d && d.messages) || [];
+    const counts = (d && d.counts) || {};
+
+    const meta = $('#thmeta');
+    if (meta) {
+      const inb = Object.entries(counts).filter(([k]) => k.endsWith('_inbound')).reduce((a, [, n]) => a + n, 0);
+      const out = Object.entries(counts).filter(([k]) => k.endsWith('_outbound')).reduce((a, [, n]) => a + n, 0);
+      meta.textContent = msgs.length
+        ? (out + ' sent, ' + inb + ' received' + (d.truncated ? ' · showing the most recent ' + d.returned + ' of ' + d.total : ''))
+        : 'nothing yet';
+    }
+
+    paint(el, msgs.length
+      ? '<div class="thread">' + msgs.map(threadBubble).join('') + '</div>'
+      : '<div style="padding:4px">' + emptyState('No messages yet',
+          'This is a measured zero: the query ran and this business has never been emailed or texted ' +
+          'from here. Blocked attempts would appear too, so an empty thread means none were made.') + '</div>');
+    // Newest last, so land the operator at the bottom the way every messaging app does.
+    if (msgs.length) el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    paint($('#th'), errState('The conversation could not load', e.message));
+  }
+}
+
+function threadBubble(m) {
+  const inbound = m.direction === 'inbound';
+  const bad = m.status === 'blocked' || m.status === 'failed';
+  const cls = 'bub ' + (bad ? 'bub-bad' : (inbound ? 'bub-in' : 'bub-out'));
+  const head =
+    '<div class="bub-h">' +
+      '<span class="pill">' + esc(m.channel) + '</span> ' +
+      '<span class="muted mono">' + esc(stamp(m.sent_at || m.created_at)) + '</span>' +
+      (m.ai_assisted
+        // Never let a drafted-by-model message pass as hand-written. The operator sent it, but they
+        // are entitled to know later which ones a model helped write, and with which model.
+        ? ' <span class="pill" title="' + esc(m.ai_model || 'model not recorded') + '">AI drafted</span>' : '') +
+      (m.sent_by ? ' <span class="muted">' + esc(m.sent_by) + '</span>' : '') +
+    '</div>';
+  const body =
+    (m.subject ? '<div class="bub-s">' + esc(m.subject) + '</div>' : '') +
+    '<div class="bub-t">' + esc(m.body || '') + '</div>';
+  const foot = bad
+    ? '<div class="bub-f">' + esc(m.status === 'blocked' ? 'Blocked' : 'Failed') + ': ' +
+        esc(m.failure_reason || 'no reason was recorded, which is itself a defect worth reporting') + '</div>'
+    : (m.status && m.status !== 'sent' && m.status !== 'delivered'
+        ? '<div class="bub-f">' + esc(m.status) + '</div>' : '');
+  return '<div class="' + cls + '">' + head + body + foot + '</div>';
 }
 
 async function loadTimeline(contactId) {
@@ -2409,8 +2541,11 @@ function wire() {
       go('crm'); return;
     }
     if (act === 'crm-export') { exportLeads(); return; }
-    if (act === 'do-email') { emailComposer(t.dataset.contact, t.dataset.to); return; }
-    if (act === 'do-sms') { smsComposer(t.dataset.contact, t.dataset.to); return; }
+    // The gate's reason travels WITH the click, so the composer can state it before the operator
+    // writes four hundred characters and then learns it was never sendable. The server still
+    // refuses independently: this is courtesy, not the control.
+    if (act === 'do-email') { emailComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return; }
+    if (act === 'do-sms') { smsComposer(t.dataset.contact, t.dataset.to, t.dataset.why || null); return; }
     if (act === 'do-call') { doCall(t.dataset.contact, t.dataset.to); return; }
     if (act === 'add-note') { addNote(t.dataset.contact); return; }
     if (act === 'add-task') { addTask(t.dataset.contact); return; }
@@ -2645,8 +2780,14 @@ async function taskSet(id, status) {
 
 // ── the composers ────────────────────────────────────────────────────────────────────────────
 
-function emailComposer(contactId, to) {
+function emailComposer(contactId, to, blockedWhy) {
   modal('<h3>Email this business</h3>' +
+    (blockedWhy
+      ? '<div class="alert warn"><strong>This channel cannot send right now.</strong><br>' +
+        esc(blockedWhy) +
+        '<br><span class="sm">Draft it anyway if it is worth having ready. The send button stays off ' +
+        'until the gate clears, and it clears on its own with no deploy.</span></div>'
+      : '') +
     '<p>Sending to <strong>' + esc(to) + '</strong>. It goes out from our real sending domain and is ' +
     'logged against this record.</p>' +
     '<div class="field"><label for="esubj">Subject</label><input class="input" id="esubj"></div>' +
@@ -2657,7 +2798,8 @@ function emailComposer(contactId, to) {
     '<div class="row"><button class="btn ghost" data-act="ai-draft" data-contact="' + esc(contactId) + '">Draft it with AI</button>' +
       '<span class="sp" style="margin-left:auto"></span>' +
       '<button class="btn ghost" data-act="close-modal">Cancel</button>' +
-      '<button class="btn" id="esend" data-to="' + esc(to) + '" data-contact="' + esc(contactId) + '">Send</button></div>');
+      '<button class="btn" id="esend" data-to="' + esc(to) + '" data-contact="' + esc(contactId) + '"' +
+        (blockedWhy ? ' disabled title="' + esc(blockedWhy) + '"' : '') + '>Send</button></div>');
   $('#esend').addEventListener('click', async () => {
     const subject = $('#esubj').value.trim(), body = $('#ebody').value.trim();
     if (!subject || !body) { $('#ewarn').textContent = 'A subject and a message are both required.'; $('#ewarn').style.display = 'block'; return; }
@@ -2699,13 +2841,24 @@ async function aiDraft(contactId) {
   } finally { if (btn) { btn.disabled = false; btn.textContent = 'Draft it with AI'; } }
 }
 
-function smsComposer(contactId, to) {
+function smsComposer(contactId, to, blockedWhy) {
   modal('<h3>Text this business</h3>' +
+    // ★ THE REFUSAL COMES FIRST, BEFORE THE TEXTAREA. Letting someone compose into a channel that
+    // cannot send is not a neutral act: it spends their attention and then throws the work away.
+    // The draft box stays open on purpose, because a message worth writing is worth keeping for
+    // when the channel clears, and the AI draft button still works here.
+    (blockedWhy
+      ? '<div class="alert warn"><strong>This channel cannot send right now.</strong><br>' +
+        esc(blockedWhy) +
+        '<br><span class="sm">Write it anyway if it is worth having ready. The send button stays off ' +
+        'until the gate clears, and it clears on its own with no deploy.</span></div>'
+      : '') +
     '<p>Sending to <strong>' + esc(phone(to)) + '</strong>.</p>' +
     '<div class="field"><label for="sbody">Message</label><textarea class="input" id="sbody" rows="4" maxlength="450"></textarea></div>' +
     '<div class="alert warn" id="swarn2" style="display:none"></div>' +
     '<div class="row end"><button class="btn ghost" data-act="close-modal">Cancel</button>' +
-    '<button class="btn" id="ssend">Send text</button></div>');
+    '<button class="btn" id="ssend"' + (blockedWhy ? ' disabled title="' + esc(blockedWhy) + '"' : '') +
+      '>Send text</button></div>');
   $('#ssend').addEventListener('click', async () => {
     const body = $('#sbody').value.trim();
     if (!body) return;

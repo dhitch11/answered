@@ -71,6 +71,7 @@ export const config = {
     '/api/admin/crm/task',
     '/api/admin/crm/tasks',
     '/api/admin/crm/timeline',
+    '/api/admin/crm/thread',
     '/api/admin/crm/preflight',
     '/api/admin/crm/email',
     '/api/admin/crm/sms',
@@ -493,6 +494,16 @@ async function apiRoute(req, url, name) {
         p_contact_id: nz(q.get('contact')), p_account_id: nz(q.get('account')),
         p_limit: num(q.get('limit'), 100), p_before: nz(q.get('before')),
       }));
+
+    // The conversation, as opposed to the timeline. Same business, different question: the timeline
+    // is everything that happened to them, this is only what was said between us, in order.
+    case 'crm/thread': {
+      const id = nz(q.get('contact'));
+      if (!id) return json(400, { error: 'a contact id is required' });
+      return json(200, await rpc('sv_crm_thread', {
+        p_contact_id: id, p_limit: num(q.get('limit'), 200),
+      }));
+    }
 
     case 'crm/preflight': {
       const id = nz(q.get('id'));
