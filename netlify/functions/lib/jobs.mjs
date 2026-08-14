@@ -1,564 +1,682 @@
-// lib/jobs.mjs — the single door to the JOB RECORD: the queryable, joined copy of a booked job.
+// jobs.mjs : the customer's side of a booked job. Links, prices, channels, and the void.
 //
-// WHY THIS FILE EXISTS. Until today a booked job went to three places and belonged to nobody: a
-// blob, an email, and a HubSpot note. All three worked. None of them could answer the one question
-// the customer portal is built to answer, which is "show me MY jobs". That is the same orphan
-// defect this estate already found one layer up in billing, where a panel printed "No billing
-// accounts yet, this is a measured zero" underneath a tile reading "97 charges, $492 open": the
-// charges existed, they just had no parent, so the query that walked the parent could not see them.
+// WHY THIS FILE EXISTS, IN ONE SENTENCE: a booked job is the only thing this company sells, so the
+// customer has to be able to see one, check it, and refuse it, and none of those three should
+// require a password.
 //
-// THE SHAPE, AND WHY IT IS THIS SHAPE:
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// THE ARCHITECTURE, AND THE TWO RULINGS THAT FORCED IT
 //
-//   THE RAW LOG IS THE SOURCE OF TRUTH.        /api/booking writes the blob and sends the email.
-//   THE JOB ROW IS THE SECOND WRITE.           It is deliberately NON-FATAL. A database outage may
-//                                              never fail a booking the customer has already been
-//                                              told about. This is the event-collector contract,
-//                                              applied to the artifact the whole product points at.
-//   THE LINK IS NOT A DATABASE READ.           /job/<signed token> already carries the whole job
-//                                              inside the URL and reads nothing (see lib/booking).
-//                                              This file adds a SECOND, shorter link, /j/<token>,
-//                                              which resolves a job BY REFERENCE so the portal can
-//                                              show live status, a void, a reschedule. The two are
-//                                              different tools: the booking token is a snapshot the
-//                                              customer can open forever, the job token is a key to
-//                                              the living record.
+// 1. LINK FIRST, LOGIN OPTIONAL. David's standing law is no gated processes and no lengthy
+//    processes. A login is a gate. So every notification carries a SIGNED LINK that opens that one
+//    job with no account and no password, and the login exists only to see everything at once.
+//    The token IS the credential, which is the same shape the Parley deal link already runs on.
 //
-// TWO REFUSALS THAT ARE NOT NEGOTIABLE:
+// 2. A CALL IS THE WRONG DEFAULT. "There's a reason they're hiring us. It's because they don't
+//    answer the phone." Our customer is definitionally the person who does not pick up, so the
+//    default channels are EMAIL (automatic, not a toggle) and TEXT (a default that a carrier is
+//    currently blocking). A phone call is opt-in and, by default, after hours only. That ordering
+//    is not copy in this file, it is the shape of `account_notify` and of `notifyBooked` below.
 //
-//   1. NOTHING HERE FABRICATES A ROW. If the database is unreachable, unconfigured, or refuses the
-//      write, every reader returns an HONEST EMPTY STATE that says WHY, and `measured` is false. A
-//      caller can always tell "we asked and the answer was zero" from "we could not ask". Those are
-//      different facts and this estate has already shipped a page that confused them.
-//   2. `after_hours` IS WRITTEN ONCE, AT CREATION, AS A FACT. It decides whether the booking is
-//      rated at $19 or $49 (lib/meter.mjs CATALOG.booked_job / booked_job_after_hours). Recomputing
-//      it at read time would silently restate a bill somebody already paid, because an owner can
-//      edit his posted hours tomorrow. So it is measured against the hours that were in force at the
-//      moment of booking and then frozen, and the basis for the measurement is stored beside it.
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// THREE THINGS THIS FILE REFUSES TO DO
 //
-// Env by NAME only: ANSWERED_JOB_KEY (preferred) | ANSWERED_BOOKING_KEY | ANSWERED_COCKPIT_KEY for
-// the link signature, and ANSWERED_DB_* for the record itself. Deliberately NEVER
-// ANSWERED_BRAIN_SECRET: that one is pasted into a third party's dashboard, and anyone holding it
-// could mint a link to any customer's job. Same reasoning as lib/booking.mjs, same refusal.
+//   A. INVENT A JOB. Every value on a receipt comes from a row that a caller actually created.
+//      Where a field was never captured, the reader is told it was never captured. There is no
+//      sample job, no placeholder row and no demo customer anywhere in this lane.
+//   B. PROMISE A TEXT. `notifyBooked` builds the SMS completely and hands it to lib/outbox.mjs,
+//      which refuses to send while the A2P 10DLC campaign is unapproved and says so in words.
+//      Turning texting on is a change to ANSWERED_SMS_ENABLED, not a change to this code.
+//   C. RE-SUM MONEY THAT THE LEDGER ALREADY DECIDED. If a job carries a billing_event, the
+//      receipt prints THAT, because it is the stored vetted figure. Only when no charge exists
+//      does it print the published price, and then it says which one it is printing and why.
 
 import crypto from 'node:crypto';
+import * as bk from './booking.mjs';
+import * as meter from './meter.mjs';
+import * as out from './outbox.mjs';
 import { rpc, dbConfigured } from './db.mjs';
+import { accountForNumber } from './accounts.mjs';
+// The facts that decide what a job IS and what it COSTS, settled once at creation. Owned by
+// @LANE-JOBREC so the two lanes that met on this filename do not have to hold each other's file
+// open. See the repair note on recordJob below for the four defects this import closes.
+import * as facts_ from './job-facts.mjs';
 
 export { dbConfigured };
 
-// ── the values the database will actually accept ─────────────────────────────────────────────
+// ── the signed link ──────────────────────────────────────────────────────────────────────────
 //
-// ★ MEASURED, NOT ASSUMED. `jobs_source_check` is CHECK (source IN ('voice','form','operator','api'))
-// and `jobs_status_check` is CHECK (status IN ('booked','voided','completed','no_show','rescheduled')).
-// /api/booking accepts a FREE-TEXT `source` field and defaults it to 'api', so a caller posting
-// source:"elevenlabs" or source:"demo-line" would have failed the insert with a constraint
-// violation, and it would have failed as an HTTP 200 with ok:false, which is the quietest possible
-// way for a write to not happen. The raw string the caller sent is kept in `details.source_raw`, so
-// nothing is lost by categorising it.
-
-export const SOURCES = Object.freeze(['voice', 'form', 'operator', 'api']);
-export const STATUSES = Object.freeze(['booked', 'voided', 'completed', 'no_show', 'rescheduled']);
-
-const VOICE_WORDS = /voice|call|phone|agent|elevenlabs|twilio|inbound|line|riley/i;
-const FORM_WORDS = /form|web|site|page|widget|chat/i;
-const OPERATOR_WORDS = /operator|admin|console|cockpit|manual|human|staff/i;
-
-/**
- * Turn whatever the caller claimed into one of the four values the column allows, keeping the raw
- * claim. A booking that carries a call sid came off a phone call by definition, and that beats any
- * label a caller typed.
- */
-export function normalizeSource(raw, { hasCallSid = false } = {}) {
-  const s = String(raw == null ? '' : raw).trim().slice(0, 120);
-  const lower = s.toLowerCase();
-  if (SOURCES.includes(lower)) return { source: lower, source_raw: s, categorised: false };
-  if (hasCallSid) return { source: 'voice', source_raw: s, categorised: true };
-  if (VOICE_WORDS.test(lower)) return { source: 'voice', source_raw: s, categorised: true };
-  if (FORM_WORDS.test(lower)) return { source: 'form', source_raw: s, categorised: true };
-  if (OPERATOR_WORDS.test(lower)) return { source: 'operator', source_raw: s, categorised: true };
-  return { source: 'api', source_raw: s, categorised: Boolean(s) };
-}
-
-// ── after hours, decided once, with its reasoning attached ────────────────────────────────────
-
-const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-
-/** Wall-clock weekday key and minutes-past-midnight in one Intl pass. Throws on an unusable zone. */
-function localDayMinutes(tz, at) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).formatToParts(at).map((p) => [p.type, p.value]),
-  );
-  const day = String(parts.weekday || '').slice(0, 3).toLowerCase();
-  const minutes = (Number(parts.hour) % 24) * 60 + Number(parts.minute);
-  return { day, minutes };
-}
-
-const hhmm = (s) => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '').trim());
-  if (!m) return null;
-  const v = Number(m[1]) * 60 + Number(m[2]);
-  return Number.isFinite(v) && v >= 0 && v <= 1440 ? v : null;
-};
-
-const clock = (mins) => {
-  const h24 = Math.floor(mins / 60) % 24;
-  const mm = String(mins % 60).padStart(2, '0');
-  const h = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h}:${mm}${h24 >= 12 ? 'pm' : 'am'}`;
-};
-
-/**
- * Was this booking taken outside the hours the OWNER posted for his own business?
- *
- * ★ THE THRESHOLD IS THE OWNER'S, NOT OURS. /terms prices "a job booked after hours, nights and
- * weekends" at $49 and never publishes a cutoff, so this module does not invent one, exactly as
- * lib/meter.mjs refuses to invent the Recover day-bands it was never given. The only non-arbitrary
- * definition available is the hours the business wrote down itself in account_config.hours, and
- * that is the one used here.
- *
- * ★ WHEN IT CANNOT BE ESTABLISHED, IT IS FALSE. No account, no posted hours, or a timezone this
- * platform cannot format in, and the answer is `determined:false, after_hours:false`. That is the
- * same direction lib/meter.mjs already takes in writing: "an unproved upgrade must fall toward the
- * customer, not toward us." Undercharging on an unknown is a cost. Overcharging on a guess is a
- * bill nobody can defend.
- *
- * @returns {{after_hours:boolean, determined:boolean, basis:string, tz:string, local:string}}
- */
-export function afterHoursFact({ at = new Date(), tz = 'America/Los_Angeles', hours = null } = {}) {
-  const when = at instanceof Date ? at : new Date(at);
-  const zone = String(tz || '').trim() || 'America/Los_Angeles';
-  const undetermined = (basis) => ({ after_hours: false, determined: false, basis, tz: zone, local: '' });
-
-  if (Number.isNaN(when.getTime())) return undetermined('the booking carried no usable timestamp, so after hours could not be established and it is recorded as standard hours');
-  if (!hours || typeof hours !== 'object' || Array.isArray(hours)) {
-    return undetermined('this business has not posted its hours, so after hours could not be established and it is recorded as standard hours');
-  }
-
-  let day; let minutes;
-  try { ({ day, minutes } = localDayMinutes(zone, when)); }
-  catch { return undetermined(`"${zone}" is not a timezone this platform recognises, so after hours could not be established and it is recorded as standard hours`); }
-
-  if (!DAY_KEYS.includes(day)) return undetermined('the local weekday could not be read, so after hours could not be established and it is recorded as standard hours');
-
-  const spans = Array.isArray(hours[day]) ? hours[day] : null;
-  const local = `${clock(minutes)} ${zone}`;
-
-  // A day with no spans is a day the business posted as closed. That is a determined fact, not a
-  // missing one, and it is the whole reason a Sunday booking costs more.
-  if (!spans || !spans.length) {
-    return {
-      after_hours: true,
-      determined: true,
-      basis: `booked at ${local}, and this business posts ${day} as closed`,
-      tz: zone,
-      local,
-    };
-  }
-
-  for (const span of spans) {
-    const open = hhmm(Array.isArray(span) ? span[0] : null);
-    const close = hhmm(Array.isArray(span) ? span[1] : null);
-    if (open === null || close === null) continue;      // an unreadable span proves nothing
-    const inside = close > open
-      ? (minutes >= open && minutes < close)
-      : (minutes >= open || minutes < close);           // a span that crosses midnight: 22:00-02:00
-    if (inside) {
-      return {
-        after_hours: false,
-        determined: true,
-        basis: `booked at ${local}, inside this business's posted ${day} hours of ${clock(open)} to ${clock(close)}`,
-        tz: zone,
-        local,
-      };
-    }
-  }
-
-  const readable = spans
-    .map((s) => (hhmm(s && s[0]) !== null && hhmm(s && s[1]) !== null ? `${clock(hhmm(s[0]))} to ${clock(hhmm(s[1]))}` : null))
-    .filter(Boolean);
-  if (!readable.length) return undetermined(`this business's posted ${day} hours could not be read, so after hours could not be established and it is recorded as standard hours`);
-
-  return {
-    after_hours: true,
-    determined: true,
-    basis: `booked at ${local}, outside this business's posted ${day} hours of ${readable.join(' and ')}`,
-    tz: zone,
-    local,
-  };
-}
-
-// ── the per-job link: the token IS the credential ────────────────────────────────────────────
+// The receipt token is a CAPABILITY over one job reference. It deliberately does not carry the
+// job's contents, unlike the /job/<token> link the homeowner gets, and the reason is the whole
+// point of this surface: a receipt has to show the LIVE status. A job that was voided an hour ago
+// must open as voided. A payload baked into a URL cannot do that, so this one names the row and
+// the row is read on every open.
 //
-// The same pattern as the Parley deal link (netlify/functions/truce.mjs) and for the same reason
-// David gave: no gated processes, no lengthy processes. A notification carries a link that opens
-// THAT job with no password and no account. A login exists only to see everything at once.
-//
-// THE KEY IS DOMAIN-SEPARATED, DELIBERATELY. The signing key is not used raw: it is run through
-// HMAC with a fixed label to derive a subkey used for nothing else. So even when the base secret is
-// shared with another surface, a job link can never be replayed as a session cookie and a session
-// cookie can never be replayed as a job link. lib/account-auth.mjs refuses to share a key across a
-// trust boundary; this achieves the same separation without needing a new environment variable.
-//
-// THE TOKEN IS DETERMINISTIC ON THE REFERENCE, ON PURPOSE. A job has ONE link, forever. Resend the
-// email, text it later, print it on the invoice: same URL. A random per-send token would mean a
-// customer holding two emails sees two different links to the same job and cannot tell which is
-// real, and it would mean storing a credential in a database, which lib/account-auth.mjs exists to
-// avoid. Nothing is stored: the link is recomputed from the reference and the key on every read.
+// ★ DOMAIN SEPARATION IS NOT DECORATION. The same HMAC key signs the homeowner's /job/ token, and
+// those tokens are handed to members of the public. Mixing the two label spaces would let a
+// homeowner's booking link be replayed as a contractor's receipt link, which carries a control
+// that can void a charge. The label goes INSIDE the MAC input, so a token minted for one purpose
+// cannot verify for another even with the key in hand.
 
-const LINK_VERSION = 'j1';
-const LINK_LABEL = 'answered:job-link:v1';
-export const MAX_REF_CHARS = 64;
+const RECEIPT_LABEL = 'answered.receipt.v1';
+const FEED_LABEL = 'answered.feed.v1';
+const MAX_TOKEN_CHARS = 900;
 
-function baseSecret() {
-  for (const name of ['ANSWERED_JOB_KEY', 'ANSWERED_BOOKING_KEY', 'ANSWERED_COCKPIT_KEY']) {
-    const v = String(process.env[name] || '').trim();
-    if (v) return { key: v, name };
-  }
-  return { key: '', name: '' };
+const b64u = (buf) => Buffer.from(buf).toString('base64url');
+const key = () => bk.signingKey();
+
+/** No key means no links at all. An unsigned receipt link is a forged void with extra steps. */
+export const canSign = () => Boolean(key());
+
+const mac = (label, payload) =>
+  b64u(crypto.createHmac('sha256', key()).update(`${label}|${payload}`).digest());
+
+function mintToken(label, prefix, claims) {
+  if (!canSign()) throw new Error('jobs: no signing key (set ANSWERED_BOOKING_KEY)');
+  const payload = b64u(Buffer.from(JSON.stringify(claims), 'utf8'));
+  const token = `${prefix}.${payload}.${mac(label, payload)}`;
+  if (token.length > MAX_TOKEN_CHARS) throw new Error(`jobs: token is ${token.length} characters, cap is ${MAX_TOKEN_CHARS}`);
+  return token;
 }
 
-/** Which env var is signing job links, by NAME. Useful in a health probe; never returns a value. */
-export const linkKeyName = () => baseSecret().name;
-export const canLink = () => Boolean(baseSecret().key);
-
-const subkey = () => {
-  const { key } = baseSecret();
-  if (!key) return null;
-  return crypto.createHmac('sha256', key).update(LINK_LABEL).digest();
-};
-
-const refOk = (ref) => /^[A-Za-z0-9._-]{4,64}$/.test(String(ref || ''));
-
-/**
- * A signed, stable link token for one job reference, or '' when no key is configured.
- * Returning '' rather than throwing is deliberate: a missing link must degrade the notification to
- * "call us and quote job AJ...", never fail the booking.
- */
-export function linkToken(ref) {
-  const k = subkey();
-  if (!k || !refOk(ref)) return '';
-  const payload = Buffer.from(String(ref), 'utf8').toString('base64url');
-  const mac = crypto.createHmac('sha256', k).update(`${LINK_VERSION}|${payload}`).digest('base64url').slice(0, 43);
-  return `${LINK_VERSION}.${payload}.${mac}`;
-}
-
-/** The job reference this token proves, or null. Never throws, never partially trusts. */
-export function readLinkToken(token) {
-  const k = subkey();
-  if (!k) return null;
+function readToken(label, prefix, token) {
+  if (!canSign()) return null;
   const t = String(token || '');
-  if (!t || t.length > 256) return null;
+  if (!t || t.length > MAX_TOKEN_CHARS) return null;
   const parts = t.split('.');
-  if (parts.length !== 3 || parts[0] !== LINK_VERSION) return null;
+  if (parts.length !== 3 || parts[0] !== prefix) return null;
   const [, payload, sig] = parts;
   if (!/^[A-Za-z0-9_-]+$/.test(payload) || !/^[A-Za-z0-9_-]+$/.test(sig)) return null;
-  const want = Buffer.from(crypto.createHmac('sha256', k).update(`${LINK_VERSION}|${payload}`).digest('base64url').slice(0, 43));
+  const want = Buffer.from(mac(label, payload));
   const got = Buffer.from(sig);
   if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return null;
-  let ref = '';
-  try { ref = Buffer.from(payload, 'base64url').toString('utf8'); } catch { return null; }
-  return refOk(ref) ? ref : null;
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return claims && typeof claims === 'object' && claims.v === 1 ? claims : null;
+  } catch { return null; }
 }
-
-export function siteOrigin() {
-  const raw = String(process.env.ANSWERED_SITE_URL || process.env.URL || 'https://answered.reddenda.com').trim();
-  return raw.replace(/\/+$/, '');
-}
-
-/** The living-record link for a job, or '' when it cannot be signed. */
-export function jobLink(ref) {
-  const t = linkToken(ref);
-  return t ? `${siteOrigin()}/j/${t}` : '';
-}
-
-// ── who this job belongs to ───────────────────────────────────────────────────────────────────
 
 /**
- * Resolve the owning account from the number that was DIALLED, never the customer's number.
- *
- * ★ NULL IS AN ANSWER, AND IT IS ALLOWED. The demo line is owned by no account, and a booking taken
- * on it must still be recorded. What is NOT allowed is a null that nobody notices: an unassigned
- * job is invisible to sv_jobs_for_account, which walks account_id, so this returns `reason` and the
- * caller reports it. That is the orphan defect, named at the point where it is created rather than
- * discovered later underneath a confident empty state.
+ * The link that goes in every notification.
+ * @param {string} ref        jobs.job_ref
+ * @param {string} [accountId] bind the receipt to the account that owned the job at mint time
  */
-export async function resolveAccount(lineNumber) {
-  const phone = String(lineNumber || '').trim();
-  if (!/^\+\d{8,15}$/.test(phone)) {
-    return { account_id: null, business_name: '', config: null, reason: 'no usable line number on this booking, so it could not be matched to an account' };
-  }
-  if (!dbConfigured()) {
-    return { account_id: null, business_name: '', config: null, reason: 'the account directory is not reachable from this deploy (ANSWERED_DB_* not set), so this booking could not be matched to an account' };
-  }
-  try {
-    const acct = await rpc('sv_account_for_number', { p_phone: phone });
-    if (!acct || !acct.id) {
-      return { account_id: null, business_name: '', config: null, reason: `no live account owns ${phone}, so this job is recorded without an owner and will not appear in any customer portal` };
-    }
-    return {
-      account_id: String(acct.id),
-      business_name: String(acct.business_name || ''),
-      trade: String(acct.trade || ''),
-      config: (acct.config && typeof acct.config === 'object') ? acct.config : null,
-      reason: '',
-    };
-  } catch (e) {
-    return { account_id: null, business_name: '', config: null, reason: `the account directory could not be read (${String((e && e.message) || e).slice(0, 120)}), so this booking could not be matched to an account` };
-  }
-}
+export const mintReceipt = (ref, accountId) => mintToken(RECEIPT_LABEL, 'r1', {
+  v: 1, r: String(ref), ...(accountId ? { a: String(accountId) } : {}), i: Date.now(),
+});
 
-// ── the four doors ────────────────────────────────────────────────────────────────────────────
+/** { r, a?, i } or null. Never throws. A forged token and a typo land in the same place. */
+export const readReceipt = (token) => {
+  const c = readToken(RECEIPT_LABEL, 'r1', token);
+  return c && typeof c.r === 'string' && c.r ? c : null;
+};
+
+/**
+ * The calendar feed key. A calendar app cannot carry a session cookie, so the URL is the
+ * credential, exactly like Google Calendar's own secret address. It names an account and nothing
+ * else: no customer names, no addresses, nothing that reads as data on its own.
+ */
+export const mintFeedKey = (accountId) => mintToken(FEED_LABEL, 'f1', { v: 1, a: String(accountId) });
+
+export const readFeedKey = (token) => {
+  const c = readToken(FEED_LABEL, 'f1', token);
+  return c && /^[0-9a-f-]{36}$/i.test(String(c.a || '')) ? c.a : null;
+};
+
+export const siteOrigin = () => bk.siteOrigin();
+export const receiptUrl = (token) => `${siteOrigin()}/j/${token}`;
+export const feedUrl = (token) => `${siteOrigin()}/portal/feed.ics?k=${encodeURIComponent(token)}`;
+
+// ── the rows ─────────────────────────────────────────────────────────────────────────────────
 //
-// ★ EVERY ONE OF THESE RPCs ANSWERS HTTP 200 WHEN IT REFUSES. Measured against production:
-// sv_job_create with no job_ref returns 200 {"ok":false,"error":"a job needs a reference the
-// customer can quote back"}, and sv_job_void on a missing reference returns 200 {"ok":false,...}.
-// A caller that trusts the status code reports a write that never happened, which is defect two in
-// seams.test.mjs wearing different clothes. So every function below reads the body's own `ok`.
+// Signatures verified against the live database on 2026-08-14 rather than against the handoff
+// note, which described `sv_jobs_for_account(account_id)` with one argument. It takes three.
 
-const short = (e) => String((e && e.message) || e).slice(0, 160);
+export const createJob = (row) => rpc('sv_job_create', { p_row: row });
+
+export const jobsForAccount = (accountId, status = null, limit = 200) =>
+  rpc('sv_jobs_for_account', { p_account_id: accountId, p_status: status, p_limit: limit });
+
+export const jobByRef = (ref) => rpc('sv_job_by_ref', { p_ref: ref });
 
 /**
- * Write the queryable copy of a booked job. NON-FATAL BY CONTRACT: the caller has already told a
- * customer a van is coming, and no database may take that back.
+ * ★ REPAIRED 2026-08-14 by @LANE-JOBREC. This was `rpc('sv_job_void', { p_reason: reason || '' })`,
+ * a straight pass-through, and MEASURED against the live database an empty reason is ACCEPTED:
+ * sv_job_void does `nullif(p_reason,'')` and voids the row anyway, leaving status='voided' with
+ * void_reason NULL. A booking somebody was charged for, cancelled by nobody, for nothing.
+ * portal.mjs never sends an empty reason, but a rule only one caller keeps is not a rule, so it is
+ * enforced at the door now. The return shape is unchanged: portal.mjs's reads of `r.ok`,
+ * `r.replay` and `r.error` all still work, and this no longer throws.
+ */
+export const voidJob = (ref, reason, actor) => facts_.voidChecked(ref, reason, actor);
+
+export const notifyPrefs = (accountId) => rpc('sv_account_notify', { p_account_id: accountId });
+
+export const saveNotifyPrefs = (accountId, patch, author) =>
+  rpc('sv_account_notify_save', { p_account_id: accountId, p_patch: patch, p_author: author || 'owner' });
+
+/**
+ * The defaults, in code, for the one case the database cannot answer: it is unreachable. Printing
+ * these while saying the account could not be read is honest; printing them as if they were the
+ * customer's saved choices would not be, so every caller of this passes `stored:false` through to
+ * the page and the page says so.
+ */
+export const DEFAULT_PREFS = Object.freeze({
+  stored: false, email_extra: [], sms_on: true, sms_to: null,
+  call_on: false, call_after_hours_only: true, call_to: null,
+});
+
+// ── what a job is worth, and to whom ─────────────────────────────────────────────────────────
+
+/**
+ * The four pieces, quoted from /terms through lib/meter.mjs: "A job is booked when it has a name,
+ * an address, a callback number and a confirmed window. Anything less is free."
  *
- * @returns {{ok:boolean, landed:boolean, replay:boolean, job:object|null, reason:string}}
- *   landed=true means a row exists in the database with this reference, whether this call created
- *   it or found it. replay=true means it already existed, which is the correct answer to a retry.
+ * This is the single most useful thing on a receipt, because it is the definition the customer is
+ * being billed against, checked against the row in front of him, with the missing ones named.
  */
-export async function create(row) {
-  const ref = String((row && row.job_ref) || '').trim();
-  if (!refOk(ref)) {
-    console.error('jobs.create: refusing to write a job with no usable reference');
-    return { ok: false, landed: false, replay: false, job: null, reason: 'a job needs a reference the customer can quote back, and this one had none' };
-  }
-  if (!dbConfigured()) {
-    console.error(`jobs.create ${ref}: NOT RECORDED. ANSWERED_DB_* is not configured on this deploy, so the booking exists only in the raw log and the email.`);
-    return { ok: false, landed: false, replay: false, job: null, reason: 'the job record is not reachable from this deploy (ANSWERED_DB_* not set), so the booking exists only in the raw log and the email' };
-  }
-
-  // Only send keys that carry a value. The RPC casts window_start/window_end straight to
-  // timestamptz and account_id/contact_id/call_id straight to uuid, so an empty string is a cast
-  // error that would take the whole write down, and a null is a field that is honestly absent.
-  const payload = {};
-  for (const [k, v] of Object.entries(row || {})) {
-    if (v === null || v === undefined || v === '') continue;
-    payload[k] = v;
-  }
-  payload.job_ref = ref;
-  if (!SOURCES.includes(payload.source)) payload.source = 'api';
-  payload.after_hours = payload.after_hours === true;
-
-  try {
-    const res = await rpc('sv_job_create', { p_row: payload });
-    if (!res || res.ok !== true) {
-      const why = (res && res.error) || 'the database refused the write without saying why';
-      console.error(`jobs.create ${ref}: REFUSED by sv_job_create: ${why}`);
-      return { ok: false, landed: false, replay: false, job: null, reason: why };
-    }
-    const job = (res.job && typeof res.job === 'object') ? res.job : null;
-    if (res.replay) console.warn(`jobs.create ${ref}: already recorded, returning the existing row (idempotent on job_ref)`);
-    return {
-      ok: true,
-      landed: true,
-      replay: Boolean(res.replay),
-      job,
-      reason: res.replay ? 'this job was already recorded, so the existing row was returned rather than a second one created' : 'recorded',
-    };
-  } catch (e) {
-    console.error(`jobs.create ${ref}: NOT RECORDED. ${short(e)} — the booking succeeded and exists in the raw log and the email; the queryable copy did not land.`);
-    return { ok: false, landed: false, replay: false, job: null, reason: short(e) };
-  }
-}
-
-/**
- * Every job for one account, newest first.
- *
- * ★ `measured` IS THE WHOLE POINT OF THIS RETURN SHAPE. `measured:true, count:0` means we asked the
- * database and it said zero, which is a true statement a portal may print as "no jobs yet".
- * `measured:false` means we could not ask, and a portal that prints "no jobs yet" on that is lying
- * to a customer whose jobs exist. This estate has already shipped that page once.
- */
-export async function listForAccount(accountId, { status = null, limit = 200 } = {}) {
-  const id = String(accountId || '').trim();
-  const empty = (reason) => ({ ok: false, measured: false, count: 0, jobs: [], reason });
-
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return empty('that is not an account id, so no jobs were looked up');
-  if (!dbConfigured()) return empty('the job record is not reachable from this deploy, so we cannot say whether there are jobs. This is not the same as having none.');
-
-  const st = status && STATUSES.includes(String(status)) ? String(status) : null;
-  try {
-    const rows = await rpc('sv_jobs_for_account', {
-      p_account_id: id,
-      p_status: st,
-      p_limit: Math.max(1, Math.min(Number(limit) || 200, 500)),
-    });
-    const jobs = Array.isArray(rows) ? rows : [];
-    return {
-      ok: true,
-      measured: true,
-      count: jobs.length,
-      jobs,
-      reason: jobs.length ? '' : 'we asked and this account has no jobs recorded yet',
-    };
-  } catch (e) {
-    console.error(`jobs.listForAccount ${id}: read failed: ${short(e)}`);
-    return empty(`the job record could not be read (${short(e)}), so we cannot say whether there are jobs`);
-  }
-}
-
-/**
- * One job by its reference, with whatever the database can join to it: the owning account, the call
- * it came from, and the charge attached to it. `found:false` is not an error.
- */
-export async function byRef(ref) {
-  const r = String(ref || '').trim();
-  const miss = (reason, found = false) => ({ ok: false, found, job: null, account: null, call: null, charge: null, reason });
-
-  if (!refOk(r)) return miss('that is not a job reference');
-  if (!dbConfigured()) return miss('the job record is not reachable from this deploy, so this job could not be looked up');
-
-  try {
-    const res = await rpc('sv_job_by_ref', { p_ref: r });
-    if (!res || !res.job) return { ok: true, found: false, job: null, account: null, call: null, charge: null, reason: 'no job is recorded under that reference' };
-    return {
-      ok: true,
-      found: true,
-      job: res.job,
-      account: res.account || null,
-      call: res.call || null,
-      charge: res.charge || null,
-      reason: '',
-    };
-  } catch (e) {
-    console.error(`jobs.byRef ${r}: read failed: ${short(e)}`);
-    return miss(`the job record could not be read (${short(e)})`);
-  }
-}
-
-/**
- * Void a job. A VOID IS A STATUS CHANGE WITH A REASON, NEVER A DELETE: the row stays, the reason
- * stays, and who did it stays, because a job somebody was charged for is evidence and evidence is
- * not deleted. The charge attached to it is voided separately through the billing ledger so the two
- * facts stay independently auditable, and sv_job_void says so in its own note.
- */
-export async function voidJob(ref, reason, actor) {
-  const r = String(ref || '').trim();
-  if (!refOk(r)) return { ok: false, job: null, reason: 'that is not a job reference' };
-  if (!dbConfigured()) return { ok: false, job: null, reason: 'the job record is not reachable from this deploy, so nothing was voided' };
-  const why = String(reason || '').trim().slice(0, 500);
-  if (!why) return { ok: false, job: null, reason: 'a void needs a reason, because a status change nobody can explain is worse than the booking it replaced' };
-
-  try {
-    const res = await rpc('sv_job_void', { p_ref: r, p_reason: why, p_actor: String(actor || 'customer').slice(0, 60) });
-    if (!res || res.ok !== true) {
-      const err = (res && res.error) || 'the database refused the void without saying why';
-      console.error(`jobs.voidJob ${r}: REFUSED: ${err}`);
-      return { ok: false, job: null, reason: err };
-    }
-    return { ok: true, replay: Boolean(res.replay), job: res.job || null, reason: String(res.note || 'voided') };
-  } catch (e) {
-    console.error(`jobs.voidJob ${r}: failed: ${short(e)}`);
-    return { ok: false, job: null, reason: short(e) };
-  }
-}
-
-// ── the one function /api/booking calls ───────────────────────────────────────────────────────
-
-/**
- * Take a normalised booking (lib/booking.mjs `job`) and make it a joined, queryable job row.
- *
- * Everything decided here is decided ONCE and stored: which account owns it, whether it was after
- * hours and why, and which of the four source categories it belongs to. Nothing is derived later.
- *
- * @param {object} job   the object lib/booking.mjs normalize() produced
- * @returns {Promise<object>}  a delivery report, never a throw
- */
-export async function recordBooking(job) {
-  if (!job || typeof job !== 'object') {
-    return { ok: false, landed: false, reason: 'no job was passed to the recorder' };
-  }
-
-  // The number that was DIALLED. An explicit line number beats the shop's published number, because
-  // on a real Answered line they are usually the same and where they differ the explicit one is the
-  // one a caller actually rang.
-  const line = String(job.ln || job.sp || '');
-  const acct = await resolveAccount(line);
-
-  const bookedAt = job.at ? new Date(job.at) : new Date();
-  const ah = afterHoursFact({ at: bookedAt, tz: job.tz, hours: acct.config && acct.config.hours });
-  const src = normalizeSource(job.src, { hasCallSid: Boolean(job.cs) });
-
-  const startsAt = job.t ? new Date(job.t) : null;
-  const endsAt = (startsAt && !Number.isNaN(startsAt.getTime()))
-    ? new Date(startsAt.getTime() + (Number(job.d) || 60) * 60000)
-    : null;
-
-  const res = await create({
-    job_ref: job.id,
-    account_id: acct.account_id,
-    caller_name: job.c,
-    address: job.a,
-    callback: job.cp,
-    window_start: startsAt && !Number.isNaN(startsAt.getTime()) ? startsAt.toISOString() : null,
-    window_end: endsAt ? endsAt.toISOString() : null,
-    trade: acct.trade || '',
-    after_hours: ah.after_hours,
-    source: src.source,
-    call_sid: job.cs,
-    details: {
-      // The audit trail for every decision above, so a bill can be explained a year from now
-      // without re-deriving anything from fields that will have changed by then.
-      mode: job.m === 'live' ? 'live' : 'demo',
-      after_hours_determined: ah.determined,
-      after_hours_basis: ah.basis,
-      booked_at: bookedAt.toISOString(),
-      tz: ah.tz,
-      source_raw: src.source_raw,
-      source_categorised: src.categorised,
-      shop_name: job.s,
-      shop_phone: job.sp,
-      line_number: line,
-      customer_email: job.ce,
-      service: job.w,
-      minutes: Number(job.d) || null,
-      notes: job.n,
-      account_match: acct.account_id ? 'matched on the dialled number' : (acct.reason || 'not matched'),
+export function fourPieces(job) {
+  const j = job || {};
+  const has = (v) => v !== undefined && v !== null && String(v).trim() !== '';
+  return [
+    { key: 'name', label: 'A name', value: j.caller_name || '', ok: has(j.caller_name) },
+    { key: 'address', label: 'An address', value: j.address || '', ok: has(j.address) },
+    { key: 'callback', label: 'A callback number', value: j.callback || '', ok: has(j.callback) },
+    {
+      key: 'window',
+      label: 'A confirmed window',
+      value: j.window_start || '',
+      ok: has(j.window_start) && has(j.window_end),
     },
-  });
+  ];
+}
 
-  // The four pieces lib/meter.mjs requires before a booking is billable at all. Reported here so an
-  // operator can see WHY a job was free without opening the ledger. /terms: "Anything less is free.
-  // That is the whole definition."
-  const pieces = {
-    name: Boolean(job.c), address: Boolean(job.a), callback: Boolean(job.cp),
-    window: Boolean(startsAt && !Number.isNaN(startsAt.getTime())),
+/**
+ * What this one job costs, and the sentence that explains it.
+ *
+ * ★ THE LEDGER WINS. `charge` arrives from sv_job_by_ref and is the stored, vetted figure that
+ * billing actually recorded. When it exists this returns it verbatim. Only when it does not does
+ * this fall back to the published price book, and then `source` says 'published' so the page can
+ * say out loud that no charge is on the record yet. The two must never be printed as if they were
+ * the same kind of fact.
+ */
+export function priceOf(job, charge) {
+  const j = job || {};
+  if (charge && Number.isFinite(Number(charge.cents))) {
+    return {
+      source: 'ledger',
+      cents: Number(charge.cents),
+      billable: Number(charge.cents) > 0,
+      state: String(charge.state || ''),
+      label: meter.CATALOG[charge.kind] ? meter.CATALOG[charge.kind].label : String(charge.kind || 'charge'),
+      reason: String(charge.reason || ''),
+      missing_pieces: [],
+    };
+  }
+
+  const pieces = fourPieces(j);
+  const evidence = {};
+  for (const p of pieces) evidence[p.key] = p.ok ? (p.value || 'recorded') : '';
+  const kind = j.after_hours ? 'booked_job_after_hours' : 'booked_job';
+  const r = meter.rate({ kind, evidence, booked_at: j.created_at }, {});
+  return {
+    source: 'published',
+    cents: r.cents,
+    billable: Boolean(r.billable),
+    state: '',
+    label: r.label || '',
+    reason: r.reason || '',
+    missing_pieces: r.missing_pieces || [],
   };
-  const missingPieces = Object.entries(pieces).filter(([, v]) => !v).map(([k]) => k);
+}
 
-  const link = jobLink(job.id);
+export const usd = meter.usd;
+export const CAP_CENTS = meter.DEFAULT_CAP_CENTS;
+
+// ── time, said the way a person says it ──────────────────────────────────────────────────────
+
+export const DEFAULT_TZ = bk.DEFAULT_TZ;
+
+const usableZone = (tz) => {
+  const z = String(tz || '').trim();
+  if (!z) return '';
+  try { new Intl.DateTimeFormat('en-US', { timeZone: z }).format(new Date()); return z; } catch { return ''; }
+};
+
+const fmt = (date, tz, opts) => {
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, ...opts }).format(date); }
+  catch { return new Intl.DateTimeFormat('en-US', opts).format(date); }
+};
+
+/**
+ * { day, window, zone, start, end, known } for a job's arrival window.
+ *
+ * `known:false` is a first class answer and it is common: a message taken at 2am often has no
+ * agreed time yet. The page prints "no window was agreed" rather than inventing one, and the
+ * price engine independently rates that job as free, because a window is one of the four pieces.
+ */
+export function windowParts(job, tz) {
+  const zone = usableZone(tz) || usableZone((job && job.details && job.details.tz)) || DEFAULT_TZ;
+  const s = job && job.window_start ? new Date(job.window_start) : null;
+  const e = job && job.window_end ? new Date(job.window_end) : null;
+  if (!s || Number.isNaN(s.getTime())) {
+    return { known: false, day: '', window: '', zone: '', start: null, end: null };
+  }
+  const end = e && !Number.isNaN(e.getTime()) ? e : new Date(s.getTime() + 3600000);
+  let abbr = '';
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'short' }).formatToParts(s);
+    abbr = (p.find((x) => x.type === 'timeZoneName') || {}).value || '';
+  } catch { abbr = ''; }
+  return {
+    known: true,
+    day: fmt(s, zone, { weekday: 'long', month: 'long', day: 'numeric' }),
+    window: `${fmt(s, zone, { hour: 'numeric', minute: '2-digit' })} to ${fmt(end, zone, { hour: 'numeric', minute: '2-digit' })}`,
+    zone: abbr,
+    start: s,
+    end,
+  };
+}
+
+export const prettyPhone = bk.prettyPhone;
+export const e164 = bk.e164;
+
+/** Whether a job's window has already passed. Used for filtering, never for changing a price. */
+export const isPast = (job) => {
+  const w = job && (job.window_end || job.window_start);
+  if (!w) return false;
+  const t = new Date(w).getTime();
+  return Number.isFinite(t) && t < Date.now();
+};
+
+// ── the void ─────────────────────────────────────────────────────────────────────────────────
+//
+// ★ A VOID IS A STATUS CHANGE WITH A REASON, NEVER A DELETE. sv_job_void sets the status, records
+// the reason and the actor, and writes a crm_activity row. The job stays readable forever, which
+// is the point: a customer who disputed a charge and a customer who never had the job both look
+// identical in a table that deletes.
+//
+// ★ AND THE PROMISE STOPS EXACTLY WHERE THE CODE DOES. sv_job_void's own return note says the
+// attached charge is voided separately through the billing ledger, and no trigger does it today
+// (measured: zero triggers on public.jobs). So this lane emails a person, and the receipt says a
+// person settles the charge. It does not say "you will not be charged", because nothing in this
+// system would make that true.
+
+export const VOID_REASONS = Object.freeze([
+  { key: 'not_a_job', label: 'This was not a real job' },
+  { key: 'duplicate', label: 'We already had this one' },
+  { key: 'wrong_details', label: 'The details are wrong' },
+  { key: 'customer_cancelled', label: 'The customer cancelled' },
+  { key: 'outside_area', label: 'It is outside our area' },
+  { key: 'not_our_work', label: 'It is not work we do' },
+  { key: 'other', label: 'Something else' },
+]);
+
+export const voidReasonLabel = (k) => {
+  const hit = VOID_REASONS.find((r) => r.key === k);
+  return hit ? hit.label : '';
+};
+
+// ── the seam booking.mjs is waiting on ───────────────────────────────────────────────────────
+
+/**
+ * Turn a signed booking into a row in `jobs`, owned by the account whose LINE was dialled.
+ *
+ * lib/booking.mjs now carries `ln`, the number the caller actually rang, with a comment pointing
+ * at this function. This is that function. One import and one call in netlify/functions/booking.mjs
+ * fills every portal in the product:
+ *
+ *     import { recordJob } from './lib/jobs.mjs';
+ *     const owned = await recordJob(job, token).catch((e) => ({ ok: false, reason: e.message }));
+ *
+ * ★ IT NEVER GUESSES AN OWNER. With no `ln`, or with a number no account owns, the job is recorded
+ * with a null account_id and `owned:false` comes back. An unowned job is a true and useful state:
+ * it exists, it is auditable, and it simply does not appear in anybody's portal. Guessing would
+ * put one business's customer list in another business's login.
+ */
+/*
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ * ★ REPAIRED 2026-08-14 by @LANE-JOBREC, ADDITIVELY. Everything above and below is the portal
+ *   lane's; this function now delegates its FACTS to lib/job-facts.mjs. Four defects, all silent,
+ *   all measured against the live schema rather than inferred:
+ *
+ *   1. `source: j.src || 'voice'` fed FREE TEXT at a CHECK constraint. `jobs_source_check` allows
+ *      only voice|form|operator|api, and /api/booking's `src` is whatever the caller typed
+ *      (measured live: "lane-jobrec-baseline"). The violation comes back as an HTTP 200 with
+ *      ok:false, so the row silently never existed. Now categorised, with the raw claim kept in
+ *      details.source_raw so nothing is lost.
+ *
+ *   2. `after_hours: Boolean(j.after_hours)` read a field lib/booking.mjs normalize() NEVER SETS.
+ *      It was therefore false on every job ever written, so the $49 after-hours price could not be
+ *      recorded at all. It is now a measured fact against the owner's posted hours, on the owner's
+ *      own clock, frozen at creation, with the reasoning stored beside it.
+ *
+ *   3. `trade: j.trade || null` read another field normalize() never sets. The trade comes from
+ *      the account.
+ *
+ *   4. `const saved = await createJob(row); return { ok: true, ... }` reported SUCCESS for a
+ *      refused write, because sv_job_create answers its refusals with HTTP 200 and {ok:false}.
+ *      `landed` is now read out of the body.
+ *
+ *   The return shape is unchanged and additive: ok / owned / account_id / job / receipt / reason
+ *   all still mean what they meant. `recordBooking` is exported as an alias at the end of this
+ *   file because netlify/functions/booking.mjs was committed calling that name.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────
+ */
+export async function recordJob(job, token) {
+  // ★ EVERY RETURN PATH CARRIES THE SAME KEYS. A function whose shape changes with its outcome
+  // makes its caller read `undefined` on exactly the paths that matter most, which is how
+  // booking.mjs came to fire its "no owning account" warning on every booking today.
+  const bail = (reason) => ({
+    ok: false, landed: false, replay: false, owned: false, account_id: null, job: null,
+    receipt: '', reason, orphan_warning: reason,
+    after_hours: false, after_hours_determined: false, after_hours_basis: reason,
+    after_hours_tz: '', after_hours_tz_source: '', source: '', source_raw: '',
+    billable_pieces_missing: [], billable_note: '',
+  });
+  if (!dbConfigured()) return bail('the jobs database is not configured on this deploy, so this booking has no queryable record and will not appear in any portal');
+  const j = job || {};
+  if (!j.id) return bail('a job needs its reference before it can be recorded');
+
+  const facts = await facts_.factsFor(j);
+  const row = { ...facts.row };
+  // The homeowner's snapshot link, which is the portal lane's field and stays theirs.
+  row.details = { ...row.details, customer_link: token ? bk.jobUrl(token) : '' };
+
+  const saved = await facts_.createChecked(row);
+  const owned = Boolean(facts.account.account_id);
+
+  // An unowned job is invisible to sv_jobs_for_account, which walks account_id. Say it at the
+  // moment it is created rather than letting somebody find it later underneath a confident empty
+  // state, which is the orphan defect that already cost this estate a billing panel.
+  if (saved.landed && !owned) console.warn(`jobs.recordJob ${j.id}: recorded with NO OWNING ACCOUNT. ${facts.account.reason}`);
 
   return {
-    ok: res.ok,
-    landed: res.landed,
-    replay: res.replay,
-    reason: res.reason,
-    job_ref: job.id,
-    account_id: acct.account_id,
-    account_matched: Boolean(acct.account_id),
-    orphan_warning: acct.account_id
-      ? ''
-      : `This job has no owning account, so it will NOT appear in any customer portal: ${acct.reason}`,
-    after_hours: ah.after_hours,
-    after_hours_determined: ah.determined,
-    after_hours_basis: ah.basis,
-    source: src.source,
-    source_raw: src.source_raw,
-    billable_pieces_missing: missingPieces,
-    billable_note: missingPieces.length
-      ? `Missing ${missingPieces.join(', ')}. A job is booked when it has a name, an address, a callback number and a confirmed window, so this one is free.`
+    ok: saved.ok,
+    landed: saved.landed,
+    replay: saved.replay,
+    owned,
+    account_id: facts.account.account_id,
+    job: saved.job,
+    receipt: canSign() ? receiptUrl(mintReceipt(j.id, facts.account.account_id || undefined)) : '',
+    reason: saved.ok
+      ? (owned ? saved.reason : 'no account owns the number this call came in on, so the job is recorded unowned')
+      : saved.reason,
+    orphan_warning: owned ? '' : `This job has no owning account, so it will not appear in any customer portal: ${facts.account.reason}`,
+    after_hours: facts.after_hours.after_hours,
+    after_hours_determined: facts.after_hours.determined,
+    after_hours_basis: facts.after_hours.basis,
+    after_hours_tz: facts.after_hours.tz,
+    after_hours_tz_source: facts.tz_source,
+    source: facts.source.source,
+    source_raw: facts.source.source_raw,
+    billable_pieces_missing: facts.pieces,
+    billable_note: facts.pieces.length
+      ? `Missing ${facts.pieces.join(', ')}. A job is booked when it has a name, an address, a callback number and a confirmed window, so this one is free.`
       : 'All four pieces recorded.',
-    link: link || '',
-    link_note: link ? '' : 'no signing key is configured, so this job has no portal link. Set ANSWERED_JOB_KEY.',
   };
+}
+
+/**
+ * The name netlify/functions/booking.mjs imports. Two lanes built this seam on the same afternoon
+ * and published two names for it; both resolve to one implementation so neither caller can break.
+ */
+export const recordBooking = recordJob;
+
+// ── telling the customer ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Can this deploy place a phone call at all? Measured from the environment, no network calls, so
+ * it is safe to render into a settings page.
+ *
+ * ★ THIS IS WHY THE CALL TOGGLE IS ALLOWED TO EXIST. A control that cannot act must never render
+ * as if it can. The estate has already paid for that lesson twice, with a play button over a
+ * missing mp4 and with a dial control that survived a dead line. So the settings page asks this
+ * function and renders the call option disabled, with the reason in words, whenever it says no.
+ * When @ANSWERED-RESEARCH lifts ANSWERED_AUTOPILOT_KILL the control turns itself on with no deploy.
+ */
+export function callChannelStatus() {
+  const killed = String(process.env.ANSWERED_AUTOPILOT_KILL || '').trim() !== '';
+  const creds = Boolean(process.env.TWILIO_API_SID && process.env.TWILIO_API_SECRET && process.env.TWILIO_ACCOUNT_SID);
+  // ★ DELIBERATELY NOT ANSWERED_DEMO_NUMBER. That line answers as Riley, the public demo
+  // receptionist. Using it as the caller ID for a customer's private booking call would mean the
+  // number in his recent-calls list, the one he rings back at 2am, is a demo. An explicit
+  // notify-from or nothing.
+  const from = String(process.env.ANSWERED_NOTIFY_FROM || process.env.ANSWERED_SMS_FROM || '').trim();
+  let reason = '';
+  if (killed) reason = 'Calling is switched off on this deploy, so nothing can dial. That is a safety switch an operator sets, not a fault with your account.';
+  else if (!creds) reason = 'The phone credentials are not set on this deploy, so nothing can dial.';
+  else if (!from) reason = 'We do not have a number to call you from yet, so nothing can dial. Setting one up is a step a person does by hand.';
+  return { ready: !killed && creds && Boolean(from), killed, has_credentials: creds, from, reason };
+}
+
+/** Does this job qualify for a call under the customer's own rule? */
+export function wantsCall(job, prefs) {
+  const p = prefs || DEFAULT_PREFS;
+  if (!p.call_on) return { want: false, why: 'a call is switched off for this account' };
+  if (p.call_after_hours_only && !(job && job.after_hours)) {
+    return { want: false, why: 'this account only wants a call after hours, and this job was booked in normal hours' };
+  }
+  return { want: true, why: '' };
+}
+
+const lines = (job, account, url, price) => {
+  const w = windowParts(job, account && account.timezone);
+  const service = (job.details && job.details.service) || 'a job';
+  return {
+    what: service,
+    who: job.caller_name || 'no name was given',
+    where: job.address || 'no address was given',
+    call: job.callback || '',
+    when: w.known ? `${w.day}, ${w.window}${w.zone ? ` ${w.zone}` : ''}` : 'no window was agreed on the call',
+    money: price.cents > 0 ? usd(price.cents) : 'nothing',
+    url,
+  };
+};
+
+/**
+ * Tell the business a job was booked, on the channels it actually asked for.
+ *
+ * Returns one result per channel, each saying what happened, because a fan-out that reports a
+ * single boolean is how a silently dead channel survives for months. Email is awaited and is the
+ * one that decides `ok`. The others are reported and never fatal.
+ */
+export async function notifyBooked({ job, account, prefs, receipt }) {
+  const p = prefs || DEFAULT_PREFS;
+  const token = receipt || (canSign() ? mintReceipt(job.job_ref, account && account.id) : '');
+  const url = token ? receiptUrl(token) : '';
+  const price = priceOf(job, null);
+  const L = lines(job, account, url, price);
+
+  // ── EMAIL: automatic, and deliberately not a preference ───────────────────────────────────
+  const to = [account && account.owner_email, ...(Array.isArray(p.email_extra) ? p.email_extra : [])]
+    .map((s) => String(s || '').trim()).filter((s) => s.includes('@'));
+
+  const rows = [
+    ['What', L.what],
+    ['When', L.when],
+    ['Who', L.who],
+    ['Where', L.where],
+    ['Call them on', L.call || 'no callback number was given'],
+    ['What it costs you', price.cents > 0 ? usd(price.cents) : 'nothing, and the page says why'],
+    ['Job number', job.job_ref],
+  ];
+
+  const emailRes = await out.email({
+    to,
+    subject: `Job booked: ${L.what} for ${L.who}`,
+    html: out.shell({
+      title: 'A job was booked on your line.',
+      intro: `We answered your phone and booked this. Open it to check it, and to say no if it is wrong.`,
+      rows,
+      cta: url ? { href: url, label: 'Open this job' } : null,
+      footer: 'The link opens without a password. If anything on it is wrong, there is a button on that page that voids the job and tells us why.',
+    }),
+    text: [
+      'A job was booked on your line.',
+      '',
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      '',
+      url ? `Open it: ${url}` : '',
+      'The link opens without a password. If anything is wrong, void it on that page and tell us why.',
+    ].filter(Boolean).join('\n'),
+  });
+
+  // ── TEXT: built in full, dark behind the carrier ──────────────────────────────────────────
+  // Nothing about this path is a stub. outbox.sms does the suppression check, picks the sender,
+  // and refuses while ANSWERED_SMS_ENABLED is off, with the A2P sentence as the reason.
+  const smsTo = e164(p.sms_to || (account && account.owner_phone) || '');
+  const smsRes = p.sms_on === false
+    ? { ok: false, skipped: true, reason: 'this account switched text messages off' }
+    : await out.sms({
+      to: smsTo,
+      transactional: true,
+      body: `Answered booked you a job. ${L.what} for ${L.who}. ${L.when}. ${url}`,
+    });
+
+  // ── CALL: opt-in, and gated on whether a call can happen at all ───────────────────────────
+  const want = wantsCall(job, p);
+  const gate = callChannelStatus();
+  const callRes = !want.want
+    ? { ok: false, skipped: true, reason: want.why }
+    : !gate.ready
+      ? { ok: false, skipped: true, reason: gate.reason }
+      : await callBooked({ job, account, prefs: p, url });
+
+  return {
+    ok: emailRes.ok,
+    receipt: url,
+    channels: { email: { ...emailRes, to }, sms: smsRes, call: callRes },
+  };
+}
+
+/**
+ * Place the opt-in call. Reached only when callChannelStatus().ready is true, which today it is
+ * not, because ANSWERED_AUTOPILOT_KILL is set on this project.
+ *
+ * ★ THE WORDS ARE SPOKEN BEFORE ANY <Gather> EXISTS ON THE DOCUMENT. @ANSWERED-RESEARCH measured
+ * the failure this avoids: a <Say> nested inside a <Gather> is silenced the instant the other
+ * party speaks, and their entire spoken output on a real call was the word "Hi" while the AI
+ * disclosure and the recording notice never happened. Everything that must be heard here is in
+ * bare <Say> elements and there is no <Gather> in the document at all.
+ */
+export async function callBooked({ job, account, prefs, url }) {
+  const to = e164((prefs && prefs.call_to) || (account && account.owner_phone) || '');
+  if (!to) return { ok: false, skipped: true, reason: 'no number to call you on is on file' };
+
+  // Do not contact, fail closed, exactly as the text path does it.
+  try {
+    const db = await import('./db.mjs');
+    const ctx = await db.dialContext(to);
+    if (ctx && ctx.suppressed) return { ok: false, skipped: true, suppressed: true, reason: 'this number is on the do-not-contact list, so nothing was dialled' };
+  } catch (e) {
+    return { ok: false, skipped: true, reason: 'the do-not-contact list could not be read, so nothing was dialled' };
+  }
+
+  const gate = callChannelStatus();
+  if (!gate.ready) return { ok: false, skipped: true, reason: gate.reason };
+
+  try {
+    const twilio = await import('./twilio-rest.mjs');
+    const call = await twilio.createCall({
+      To: to,
+      From: gate.from,
+      // ★ A SIGNED CAPABILITY, NOT A BARE REFERENCE. lib/twilio-webhook.mjs degrades to an
+      // AccountSid cross-check when TWILIO_AUTH_TOKEN is absent, and it is absent on this project,
+      // so Twilio's own signature cannot guard this URL. A receipt token can: only this server
+      // holds the key that mints one, and the endpoint refuses anything else.
+      Url: `${siteOrigin()}/api/portal/job-call?k=${encodeURIComponent(mintReceipt(job.job_ref, account && account.id))}`,
+      Method: 'GET',
+      Timeout: 20,
+      MachineDetection: 'Enable',
+    });
+    return { ok: true, sid: call.sid, status: call.status || '', to, note: 'Twilio accepted the call. Acceptance is not an answer.' };
+  } catch (e) {
+    const why = String((e && e.message) || e).slice(0, 200);
+    console.error(`jobs: booked-call failed: ${why}`);
+    return { ok: false, reason: why };
+  }
+}
+
+/**
+ * The words that call speaks. Bare <Say> only, disclosure first, no <Gather> anywhere.
+ * Exported so it can be asserted on directly: the estate's rule is to assert WHERE the words sit,
+ * not merely that they exist somewhere in the file.
+ */
+export function jobCallTwiml(job, account) {
+  const w = windowParts(job, account && account.timezone);
+  const service = (job && job.details && job.details.service) || 'a job';
+  const esc = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  const say = [
+    'This is an automated call from Answered. You are listening to a recorded assistant, not a person.',
+    `A job was booked on your line. ${service}, for ${job.caller_name || 'a caller who did not give a name'}.`,
+    w.known ? `The window is ${w.day}, ${w.window}.` : 'No window was agreed on the call.',
+    job.address ? `The address is ${job.address}.` : 'No address was given.',
+    'The full details and a button to cancel it are in the email and text we just sent you.',
+    'You asked us to call you about booked jobs. You can switch that off in your portal at any time. Goodbye.',
+  ];
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n${
+    say.map((s) => `  <Say voice="Polly.Matthew">${esc(s)}</Say>`).join('\n')
+  }\n  <Hangup/>\n</Response>\n`;
+}
+
+// ── the calendar feed ────────────────────────────────────────────────────────────────────────
+
+const icsEsc = (s) => String(s == null ? '' : s)
+  .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+const stamp = (d) => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+/**
+ * Every booked job on one account as a subscribable calendar.
+ *
+ * Voided jobs are included with STATUS:CANCELLED rather than dropped, because a calendar that
+ * silently loses an event leaves a stale copy on the phone forever. CANCELLED is how a calendar
+ * app is told to take it off the day.
+ */
+export function feedIcs(jobs, account) {
+  const list = Array.isArray(jobs) ? jobs : [];
+  const name = (account && account.business_name) || 'Answered';
+  const head = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Answered//Booked jobs//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsEsc(`${name} jobs`)}`,
+    'X-PUBLISHED-TTL:PT30M',
+    'REFRESH-INTERVAL;VALUE=DURATION:PT30M',
+  ];
+  const body = [];
+  for (const j of list) {
+    const w = windowParts(j, account && account.timezone);
+    if (!w.known) continue;   // an event with no time is not an event; it stays on the web page
+    const service = (j.details && j.details.service) || 'Job';
+    const voided = j.status === 'voided';
+    body.push(
+      'BEGIN:VEVENT',
+      `UID:${icsEsc(j.job_ref)}@answered.reddenda.com`,
+      `DTSTAMP:${stamp(j.created_at || new Date())}`,
+      `DTSTART:${stamp(w.start)}`,
+      `DTEND:${stamp(w.end)}`,
+      `SUMMARY:${icsEsc(`${voided ? 'VOIDED: ' : ''}${service}${j.caller_name ? ` for ${j.caller_name}` : ''}`)}`,
+      `DESCRIPTION:${icsEsc([
+        `Booked by Answered. Job ${j.job_ref}.`,
+        j.caller_name ? `Who: ${j.caller_name}` : '',
+        j.callback ? `Call them on: ${prettyPhone(j.callback)}` : 'No callback number was given.',
+        j.address ? `Where: ${j.address}` : 'No address was given.',
+        (j.details && j.details.notes) ? `Notes: ${j.details.notes}` : '',
+        voided ? `This job was voided${j.void_reason ? `: ${j.void_reason}` : ''}.` : '',
+      ].filter(Boolean).join('\n'))}`,
+      j.address ? `LOCATION:${icsEsc(j.address)}` : '',
+      `STATUS:${voided ? 'CANCELLED' : 'CONFIRMED'}`,
+      'SEQUENCE:0',
+      'TRANSP:OPAQUE',
+      'END:VEVENT',
+    );
+  }
+  const all = [...head, ...body.filter(Boolean), 'END:VCALENDAR'];
+  return `${all.map(bk.foldLine).join('\r\n')}\r\n`;
 }

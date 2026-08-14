@@ -285,16 +285,23 @@ export default async (req) => {
     // customer has already been emailed by the time this line runs. lib/jobs.mjs never throws, and
     // this .catch() is the belt on top of the braces because a booking that already succeeded must
     // not be able to 500 on the way out of the building.
-    jobs.recordBooking(job).catch((e) => ({
-      ok: false, landed: false, reason: String((e && e.message) || e).slice(0, 160),
+    // `recordBooking` is an alias for lib/jobs.mjs `recordJob`. Two lanes met on that file and
+    // published two names for one function; both resolve to the same implementation so neither
+    // caller can break. It passes the signed token so the row can carry the customer's snapshot
+    // link in `details.customer_link`.
+    jobs.recordBooking(job, token).catch((e) => ({
+      ok: false, landed: false, owned: false, reason: String((e && e.message) || e).slice(0, 160),
     })),
   ]);
 
-  // A job that landed with no owner is invisible to every query that walks accounts, so it is said
-  // out loud at the moment it is created rather than discovered later underneath a confident empty
-  // state. This is the orphan defect that already cost this estate a billing panel.
-  if (jobRes && jobRes.landed && !jobRes.account_matched) {
-    console.warn(`booking ${job.id}: recorded with NO OWNING ACCOUNT. ${jobRes.orphan_warning}`);
+  // ★ THE FIELD IS `owned`, NOT `account_matched`. The first version of this line read a field the
+  // merged recordJob does not return, so `!undefined` was true and the warning fired on EVERY
+  // booking, including the owned ones. An alarm that fires every time is an alarm nobody reads, and
+  // this one exists to catch the orphan defect that already cost this estate a billing panel:
+  // a job with no account_id is invisible to sv_jobs_for_account, which walks account_id.
+  // recordJob logs the orphan itself, so this line only adds the booking's own reference to it.
+  if (jobRes && jobRes.landed && !jobRes.owned) {
+    console.warn(`booking ${job.id}: the job row landed with NO OWNING ACCOUNT, so no customer portal will show it. ${jobRes.orphan_warning || jobRes.reason}`);
   }
   if (jobRes && !jobRes.landed) {
     console.error(`booking ${job.id}: the queryable job row did NOT land (${jobRes.reason}). The booking itself succeeded: the customer has the link and the shop has the email.`);

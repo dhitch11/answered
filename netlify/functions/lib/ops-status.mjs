@@ -98,6 +98,16 @@ export const ROUTES = [
   { path: '/api/hold/hear',        kind: 'api', expect: [405, 403, 200], what: 'Twilio hands back what it heard on a held call.' },
   { path: '/api/hold/status',      kind: 'api', expect: [405, 403, 200], what: 'Call state changes on a held call.' },
   { path: '/api/agent-config',     kind: 'api', expect: [405, 400, 401, 200], what: 'Per customer agent configuration.' },
+
+  // ── notifications and the calendar feed (@LANE-NOTIFY, 2026-08-14) ──
+  // /api/notify answers a GET 200 to a STRANGER on purpose: the public half is the model, which
+  // belongs to nobody, so a page can explain how this works before anybody signs in. It carries no
+  // account data without a session, and the sweep reading 200 here is the correct pass, not a leak.
+  // /api/notify/send is POST only behind lib/bearer, so 405 to this GET is what proves it deployed.
+  // The feed itself is /api/calendar/* and cannot be swept: probing it needs a real signed token,
+  // and a made up one would be a fabricated test.
+  { path: '/api/notify',           kind: 'api', expect: [200, 405, 503], what: 'What we tell you and how you want to hear it. Public to read, session to change.' },
+  { path: '/api/notify/send',      kind: 'api', expect: [405, 401, 503], what: 'Telling one customer one thing, over every channel they asked for that can deliver.' },
   { path: '/account/signout',      kind: 'page', expect: [200, 302, 303, 405], what: 'Customer sign out. Harmless to probe with no cookie.' },
   { path: '/api/call-me/twiml',    kind: 'api', expect: [405, 403, 200], what: 'What Twilio asks for when a person picks up an activation call.' },
   { path: '/api/call-me/status',   kind: 'api', expect: [405, 403, 200], what: 'Activation call state changes.' },
