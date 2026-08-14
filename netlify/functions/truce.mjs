@@ -51,6 +51,63 @@ async function open(fn, args) {
   return text ? JSON.parse(text) : null;
 }
 
+// ── telling both people it settled ───────────────────────────────────────────
+//
+// WHY THIS EXISTS. David created a real deal, sent the link to somebody, and the product did
+// nothing a person could perceive: she opened a page, and when a number was finally agreed
+// NOBODY WAS TOLD. A negotiation that never tells you it finished is not a negotiation, it is a
+// page you have to keep reopening and hope.
+//
+// Each side leaves their own email if they want one, so this sends what it can and says so
+// honestly when it cannot. It never texts: texting is not switched on, and implying otherwise
+// would be a promise the system cannot keep.
+async function notifySettled(dealId) {
+  const notice = await rpc('tr_settlement_notice', { p_deal: dealId });
+  // Claimed exactly once, in Postgres, so a retry or a race cannot send a second copy.
+  if (!notice || notice.claimed !== true) return;
+
+  const key = (process.env.RESEND_API_KEY || '').trim();
+  const parties = Array.isArray(notice.parties) ? notice.parties : [];
+  if (!key) {
+    if (parties.length) console.error(`truce ${dealId}: settled and ${parties.length} party(ies) asked to be told, but RESEND_API_KEY is not set.`);
+    return;
+  }
+  const site = process.env.URL || 'https://answered.reddenda.com';
+  const money = (n) => '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+  for (const p of parties) {
+    const html = `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.6;color:#111">
+<p>Hi ${escapeHtml(p.name || 'there')},</p>
+<p><b>You have a number.</b> ${escapeHtml(notice.subject || 'Your negotiation')} settled at <b>${money(notice.settled_value)}</b>.</p>
+<p>It sits between what you were each willing to do. <b>Neither of you was shown the other's number, and neither of you ever will be.</b></p>
+<p><a href="${site}/truce/${p.token}" style="display:inline-block;background:#0B0C0E;color:#E3FF4F;padding:12px 20px;border-radius:8px;text-decoration:none"><b>Open the agreement</b></a></p>
+<p style="color:#555;font-size:14px">That link is yours. Anyone who opens it can act as you, so keep it to yourself. It stops working when the deal expires.</p>
+<p style="color:#555;font-size:14px">Sent by Parley because you asked to be told how this one ended. We did not text anyone about it.</p>
+</div>`;
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Parley <info@reddenda.com>',
+          to: [p.contact],
+          subject: `Settled at ${money(notice.settled_value)}: ${notice.subject || 'your negotiation'}`,
+          html,
+        }),
+        signal: AbortSignal.timeout(8000),
+      });
+      // A send that failed must never read as sent.
+      if (!r.ok) console.error(`truce ${dealId}: Resend refused the ${p.side} notice (${r.status}).`);
+    } catch (e) {
+      console.error(`truce ${dealId}: the ${p.side} notice did not send:`, String(e && e.message).slice(0, 120));
+    }
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') return bad(405, 'POST only');
   if (!dbConfigured()) return bad(503, 'not configured');
@@ -66,7 +123,7 @@ export const handler = async (event) => {
 
   // Every token-authenticated op validates the shape first, so a malformed token never reaches
   // the database and a scan gets a 400 rather than a timing signal.
-  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms'];
+  const needsToken = ['view', 'set_limit', 'sign', 'leak_check', 'terms', 'set_contact'];
   if (needsToken.includes(op) && !TOKEN.test(token)) return bad(400, 'that link is not valid');
 
   try {
@@ -87,11 +144,26 @@ export const handler = async (event) => {
           return bad(400, 'an opening needs a number');
         }
         const musts = Array.isArray(body.must_haves) ? body.must_haves.slice(0, 8).map((s) => String(s).slice(0, 120)) : [];
-        return ok(await open('tr_set_limit', {
+        const res = await open('tr_set_limit', {
           p_token: token, p_direction: body.direction, p_amount: amount,
           p_must_haves: musts, p_opening: opening,
-        }));
+        });
+        // Setting the second limit is what settles a deal, so this is the moment both people need
+        // to hear about. It is deliberately AFTER the limit is stored and it never blocks the
+        // answer: a mail outage must not cost somebody their settlement.
+        if (res && res.deal && res.deal.status === 'settled') {
+          await notifySettled(res.deal.id).catch((e) => {
+            console.error('truce: settled but could not notify:', String(e && e.message).slice(0, 160));
+          });
+        }
+        return ok(res);
       }
+
+      // A party leaving THEIR OWN address so we can tell them how it ended. There is no path for
+      // one side to supply the other side's contact, here or anywhere: the token identifies one
+      // row, and the whole invitation model is that the sender passes the link on themselves.
+      case 'set_contact':
+        return ok(await open('tr_set_contact', { p_token: token, p_contact: String(body.contact || '') }));
 
       case 'sign': {
         const name = String(body.name || '').trim();

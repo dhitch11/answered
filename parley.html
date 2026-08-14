@@ -204,6 +204,38 @@
    carry a display of their own. */
 #hero[hidden], #deal[hidden] { display: none !important; }
 
+/* ★ A PARTY LINK IS NOT A MARKETING PAGE, AND HIDING THE HERO WAS NOT ENOUGH.
+   David sent a real deal link to somebody, and she reported that it "just went
+   to a web page". It did. The token branch hid #hero and revealed #deal, and
+   left the ENTIRE sales page standing underneath: the browser simulator with
+   its used car and its $600 couch, the five fight cards, the pricing, the
+   close. A stranger opening her own live negotiation got a thin strip of real
+   deal on top of somebody else's demo, and read the whole thing as an advert.
+
+   So this hides EVERY top-level block in main except the deal, by rule rather
+   than by a list of the sections that happened to exist today: a lane adding a
+   section next week cannot reintroduce this. The navigation goes too. The one
+   thing she is doing is the only thing on screen, and the brand mark stays so
+   the page still looks like it belongs to somebody. */
+body.deal-only main > *:not(#deal) { display: none !important; }
+body.deal-only .nav-links,
+body.deal-only .nav-cta,
+body.deal-only .burger,
+body.deal-only .sheet { display: none !important; }
+
+.pd-intro { margin-top: 18px; border-left: 2px solid var(--accent); padding: 2px 0 2px 16px; }
+.pd-intro p { color: var(--t2); margin-top: 8px; max-width: 54ch; }
+.pd-intro p:first-child { color: var(--t1); margin-top: 0; }
+.pd-intro b { color: var(--t1); }
+
+.pd-notify { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line2); }
+.pd-notifyrow { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.pd-in { flex: 1 1 200px; min-width: 0; background: var(--ink-900); border: 1px solid var(--line2);
+  border-radius: 10px; padding: 13px 14px; color: var(--t1); font: inherit; font-size: 16px; }
+.pd-in::placeholder { color: rgba(242,244,240,.42); }
+.pd-in:focus { outline: none; border-color: var(--accent); }
+.pd-notifyrow .pl-btn { flex: 0 0 auto; min-height: 46px; }
+
 .pd-card { border: 1px solid var(--line2); border-radius: 16px; background: var(--ink-900); padding: clamp(18px,2.4vw,26px); }
 .pd-card + .pd-card { margin-top: 16px; }
 .pd-k { font-family: var(--mono); font-size: 10px; letter-spacing: .18em; color: var(--bronze); }
@@ -313,11 +345,11 @@
   <div class="wrap">
     <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
     <nav class="nav-links" aria-label="Primary"><a href="/trades">Answered</a><a href="/hold">Hold</a><a href="/recover">Recover</a><a href="/pricing">Pricing</a><a href="/trust">Trust</a></nav>
-    <a class="nav-cta" href="/#early">Get on the list</a>
+    <a class="nav-cta" href="/setup">Set your rules</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Get on the list</a></div>
+<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/setup">Set your rules</a></div>
 <main id="main">
 
 <!-- ══ THE LIVE DEAL. ═══════════════════════════════════════════════════════
@@ -337,6 +369,19 @@
     <p class="eyebrow">Your negotiation</p>
     <h1 class="display" id="pd-subject" style="font-size:clamp(28px,3.6vw,46px);line-height:1.1;letter-spacing:-.018em;text-wrap:balance;margin-top:16px"></h1>
     <p class="lede" id="pd-who" style="margin-top:16px"></p>
+    <!-- ★ THE STRANGER'S FIRST FIVE SECONDS. Somebody receives this link from a
+         person, not from us, and has never heard of Parley. Before the fix
+         above she met a marketing page; after it she met a question about
+         which way money goes, with nothing telling her what this is or why
+         typing a private number here is safe. That is the moment a real person
+         closes the tab. So the deal explains itself, in plain words, above the
+         first thing it asks for. It is deliberately three short lines and not
+         a pitch: she came here to settle one number, not to read about us. -->
+    <div class="pd-intro" id="pd-intro">
+      <p><b>You each pick a private number. Parley finds one in between.</b></p>
+      <p>Whatever you type is <b>never shown to the other side</b>, and never hinted at. If your two numbers leave no room at all, it says so and nobody's number comes out.</p>
+      <p>No account, no app, nothing to install. It takes about a minute.</p>
+    </div>
     <div class="pd-strip" id="pd-strip"></div>
     <div id="pd-stage" style="margin-top:26px" aria-live="polite"></div>
     <p class="src" id="pd-expiry" style="margin-top:22px"></p>
@@ -1333,6 +1378,8 @@
   var hero = document.getElementById('hero');
   if (hero) hero.hidden = true;
   dealSec.hidden = false;
+  // Everything that is not this deal leaves the page. See the .deal-only rules.
+  document.body.classList.add('deal-only');
   var robots = document.createElement('meta');
   robots.name = 'robots';
   robots.content = 'noindex, nofollow';
@@ -1521,6 +1568,52 @@
     });
   }
 
+  /* ── BE TOLD HOW IT ENDED ──────────────────────────────────────────────
+     The poll only runs while this page is open, and nobody keeps a tab open
+     for a dresser. Without this the product finishes in silence: David's own
+     test settled at $354 and neither person was told a thing. You leave YOUR
+     OWN address; there is no field anywhere for the other person's, because
+     the sender passes the link on themselves. It says email and only email,
+     because texting is not switched on and implying otherwise would be a
+     promise the system cannot keep. */
+  function notifyHtml() {
+    return '<div class="pd-notify">'
+      + '<div class="pd-k">TELL ME HOW IT ENDS</div>'
+      + '<p class="pd-p" style="margin-top:8px">Leave your email and we will send you the number the moment it settles. You can close this page.</p>'
+      + '<div class="pd-notifyrow">'
+      +   '<label class="vh" for="pd-mail">Your email</label>'
+      +   '<input class="pd-in" id="pd-mail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com">'
+      +   '<button class="pl-btn" type="button" id="pd-mailgo">TELL ME</button>'
+      + '</div>'
+      + '<p class="pd-say" id="pd-mailsay" role="status"></p>'
+      + '<p class="pd-fine">Used for this one deal and nothing else. We never give it to the other side.</p>'
+      + '</div>';
+  }
+
+  function bindNotify() {
+    var input = document.getElementById('pd-mail');
+    var go = document.getElementById('pd-mailgo');
+    var say = document.getElementById('pd-mailsay');
+    if (!input || !go || !say) return;
+    go.addEventListener('click', function () {
+      var v = (input.value || '').trim();
+      if (!v) { say.textContent = 'Type an email first.'; return; }
+      go.disabled = true; say.textContent = 'Saving...';
+      post({ op: 'set_contact', token: TOKEN, contact: v })
+        .then(function (r) {
+          go.disabled = false;
+          // The server is the only thing that knows whether it stored. Never say
+          // "saved" because the request came back.
+          if (r && r.ok === true && r.saved === true) {
+            say.textContent = 'Done. We will email ' + v + ' the moment it settles.';
+          } else {
+            say.textContent = (r && r.reason) ? r.reason : 'That did not save. Try again.';
+          }
+        })
+        .catch(function () { go.disabled = false; say.textContent = 'That did not save. Check your connection and try again.'; });
+    });
+  }
+
   /* ── STATE 2: you are in, they are not ─────────────────────────────────*/
   function waiting(v) {
     var me = v.me, them = v.them;
@@ -1552,7 +1645,9 @@
       +   '<button class="pl-btn" type="button" id="pd-again">CHECK AGAIN</button>'
       +   '<span class="pd-busy" id="pd-watch">Checking every few seconds while this page is open.</span>'
       + '</div>'
+      + notifyHtml()
       + '</div>';
+    bindNotify();
     var say2 = document.getElementById('pd-copysay2');
     if (say2) {
       var c1 = stage.querySelector('[data-copy="them"]');
