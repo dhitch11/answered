@@ -1,8 +1,40 @@
-// dial.mjs — the ONLY way a call gets placed in this system.
+// dial.mjs — the only way a COLD PROSPECTING call gets placed. Not the only createCall in the tree.
 //
-// The console imports this. The autopilot imports this. There is deliberately no second path,
-// because the moment automated dialling has its own copy of the gate, the two drift, and the one
-// that drifts is always the one nobody is watching.
+// ★ THIS COMMENT USED TO READ "the ONLY way a call gets placed in this system." THAT WAS FALSE, and
+// it was falsified in about ten seconds by someone who grepped instead of reading it. There are
+// three separate createCall implementations and six origination sites that never touch this file:
+//
+//   lib/twilio-rest.mjs:43   the shared REST wrapper this file uses
+//   call-me.mjs:752          its own private implementation, for the person who asked to be called
+//   recover.mjs:302          its own private implementation, FDCPA-shaped
+//   call sites:  lib/jobs.mjs · lib/hold-runtime.mjs · hold.mjs · hold-status.mjs · call-me.mjs · recover.mjs
+//
+// The comment did real damage: a lane writing a document for external review took "there is exactly
+// one dial path" FROM THIS LINE, without grepping, and an adversarial reader falsified it. A
+// confident comment is load-bearing precisely because people stop checking. If you change what this
+// file is, change this paragraph in the same commit.
+//
+// ★ WHAT IS ACTUALLY TRUE IS STRONGER THAN THE FALSE VERSION, so say the true thing:
+// ONE gate runs for every console dial and every autopilot dial, with no operator override — and
+// each OTHER product surface carries its own separately written gate, shaped to the legal regime it
+// actually sits in, which is better engineering than forcing them through one gate would be:
+//
+//   this file          cold B2B research dials     TCPA/DNC/state-law gate, re-run live per call
+//   call-me.mjs        the person requested it     express request + kill switch asserted at the dial
+//   recover.mjs        debt recovery               FDCPA-shaped gate + its own kill switch
+//   hold.mjs           consumer's errand           policy.gateSession() on BOTH parties' states
+//   lib/hold-runtime   dials our own customer      dialContext suppression, fails closed if unreadable
+//   lib/jobs.mjs       job-status callback         dialContext suppression, fails closed if unreadable
+//
+// A TCPA cold-call gate on an FDCPA recovery call would be the wrong law applied confidently, so
+// uniformity here is not the goal. What matters is that no surface dials with NO gate. Audited
+// 2026-08-14: every site above carries one. The single gap found was hold-status.mjs's redial, which
+// inherits the verdict computed when its session was created rather than re-consulting it — narrow,
+// and owned by the Hold lane, reported to them rather than changed here.
+//
+// The console imports this. The autopilot imports this. Neither gets a second path into cold
+// dialling, because the moment automated dialling has its own copy of THIS gate, the two drift, and
+// the one that drifts is always the one nobody is watching.
 //
 // Every dial produces a row in `calls` whether or not it happened. A refusal is a record with
 // placed=false and the full gate verdict attached. Those rows are the evidence the gate ran, and
