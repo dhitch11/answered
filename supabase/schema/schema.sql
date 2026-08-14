@@ -1,5 +1,5 @@
 -- answered-prod, current database definition.
--- Exported 2026-08-14T22:07:06.980868+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
+-- Exported 2026-08-14T23:07:43.880271+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
 --
 -- STRUCTURE ONLY. This file contains no row data of any kind.
 -- This is what the database IS. supabase/migrations/ is how it got here. Both are kept
@@ -1039,7 +1039,9 @@ create table if not exists public.truce_parties (
   limit_set_at timestamp with time zone,
   signed_at timestamp with time zone,
   stripe_account text,
-  payouts_ready boolean default false not null
+  payouts_ready boolean default false not null,
+  claim_code text,
+  claimed_at timestamp with time zone
 );
 alter table public.truce_parties enable row level security;
 
@@ -1605,6 +1607,7 @@ CREATE UNIQUE INDEX truce_deals_pkey ON public.truce_deals USING btree (id);
 CREATE INDEX truce_messages_deal ON public.truce_messages USING btree (deal_id, seq);
 CREATE UNIQUE INDEX truce_messages_deal_id_seq_key ON public.truce_messages USING btree (deal_id, seq);
 CREATE UNIQUE INDEX truce_messages_pkey ON public.truce_messages USING btree (id);
+CREATE UNIQUE INDEX truce_parties_claim_code ON public.truce_parties USING btree (claim_code) WHERE (claim_code IS NOT NULL);
 CREATE INDEX truce_parties_deal ON public.truce_parties USING btree (deal_id);
 CREATE UNIQUE INDEX truce_parties_deal_id_side_key ON public.truce_parties USING btree (deal_id, side);
 CREATE UNIQUE INDEX truce_parties_pkey ON public.truce_parties USING btree (id);
@@ -5175,6 +5178,58 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.sv_crm_thread(p_secret text, p_contact_id uuid, p_limit integer DEFAULT 200)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_rows jsonb;
+  v_total int;
+  v_counts jsonb;
+begin
+  perform private.require(p_secret);
+
+  select count(*) into v_total from public.crm_messages where contact_id = p_contact_id;
+
+  -- Per-channel, per-direction and per-status counts, so the header can state what is in the thread
+  -- without the client re-deriving it from a windowed list. A count computed from a page of 200 is
+  -- a different number from the truth and would silently disagree with itself on the 201st message.
+  select coalesce(jsonb_object_agg(k, n), '{}'::jsonb) into v_counts from (
+    select channel || '_' || direction as k, count(*) as n
+      from public.crm_messages where contact_id = p_contact_id
+     group by 1
+    union all
+    select 'status_' || status, count(*)
+      from public.crm_messages where contact_id = p_contact_id
+     group by 1
+  ) s;
+
+  select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at asc), '[]'::jsonb) into v_rows
+    from (
+      select id, channel, direction, to_addr, from_addr, subject, body, status, failure_reason,
+             provider, provider_id, ai_assisted, ai_model, sent_by, sent_at, created_at, meta
+        from public.crm_messages
+       where contact_id = p_contact_id
+       order by created_at desc
+       limit greatest(1, least(coalesce(p_limit, 200), 500))
+    ) t;
+
+  return jsonb_build_object(
+    'ok', true,
+    'contact_id', p_contact_id,
+    'total', v_total,
+    'returned', jsonb_array_length(v_rows),
+    -- The client must never infer "this is everything" from a full page. Say it explicitly.
+    'truncated', v_total > jsonb_array_length(v_rows),
+    'counts', v_counts,
+    'messages', v_rows
+  );
+end;
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.sv_crm_timeline(p_secret text, p_contact_id uuid, p_account_id uuid, p_limit integer, p_before timestamp with time zone)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -6722,17 +6777,20 @@ CREATE OR REPLACE FUNCTION public.sv_truce_create(p_secret text, p_subject text,
  SECURITY DEFINER
  SET search_path TO 'public', 'private', 'extensions'
 AS $function$
-declare d uuid; ta text; tb text;
+declare d uuid; ta text; tb text; cb text;
 begin
   perform private.require(p_secret);
   insert into public.truce_deals (subject, kind) values (p_subject, coalesce(p_kind,'other')) returning id into d;
-  ta := encode(gen_random_bytes(24), 'hex');
+  ta := encode(gen_random_bytes(24), 'hex');   -- 48 hex: a real token
   tb := encode(gen_random_bytes(24), 'hex');
+  cb := encode(gen_random_bytes(12), 'hex');   -- 24 hex: an invitation code, deliberately shorter
+                                               -- so a token and an invitation are never confusable
   insert into public.truce_parties (deal_id, side, role, display_name, token, joined_at)
   values (d, 'a', p_a_role, p_a_name, ta, now());
-  insert into public.truce_parties (deal_id, side, role, display_name, token)
-  values (d, 'b', p_b_role, p_b_name, tb);
-  return jsonb_build_object('deal_id', d, 'a_token', ta, 'b_token', tb);
+  insert into public.truce_parties (deal_id, side, role, display_name, token, claim_code)
+  values (d, 'b', p_b_role, p_b_name, tb, cb);
+  -- b_token is created and deliberately NOT returned.
+  return jsonb_build_object('deal_id', d, 'a_token', ta, 'b_claim', cb);
 end $function$
 ;
 
@@ -6917,6 +6975,7 @@ CREATE OR REPLACE FUNCTION public.tr_agent_settle(p_secret text, p_deal uuid, p_
  SET search_path TO 'public', 'private', 'extensions', 'sealed'
 AS $function$
 declare d public.truce_deals; me public.truce_parties; lim record; other record;
+        other_side text; said boolean;
 begin
   perform private.require(p_secret);
   select * into d from public.truce_deals where id = p_deal;
@@ -6932,12 +6991,13 @@ begin
   end if;
 
   select * into me from public.truce_parties where deal_id = p_deal and side = p_side;
+  if me.id is null then return jsonb_build_object('ok', false, 'reason', 'unknown side'); end if;
   select l.amount, l.direction into lim from sealed.limits l where l.party_id = me.id;
   if lim.amount is null then
     return jsonb_build_object('ok', false, 'reason', 'that side has no limit set, so nothing can be agreed for them');
   end if;
 
-  -- THE HARD CHECK. min = the least they will take; max = the most they will pay.
+  -- The represented side's own number.
   if lim.direction = 'min' and p_amount < lim.amount then
     return jsonb_build_object('ok', false, 'reason', 'below the floor', 'refused', true);
   end if;
@@ -6945,10 +7005,15 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'above the ceiling', 'refused', true);
   end if;
 
-  -- If the OTHER side has also set a limit, the number must work for them too.
+  other_side := case when p_side = 'a' then 'b' else 'a' end;
+
+  -- The COUNTERPARTY's number, when they sealed one. @ANSWERED-RESEARCH pushed on this and was
+  -- right to: talking an agent UP past the other side's ceiling is the easier and more profitable
+  -- attack than talking it DOWN past its own floor, and a same-author test checks the direction its
+  -- author was defending.
   select l.amount as amount, l.direction as direction into other
     from sealed.limits l join public.truce_parties p on p.id = l.party_id
-   where p.deal_id = p_deal and p.side <> p_side;
+   where p.deal_id = p_deal and p.side = other_side;
   if other.amount is not null then
     if other.direction = 'min' and p_amount < other.amount then
       return jsonb_build_object('ok', false, 'reason', 'below the other floor', 'refused', true);
@@ -6956,17 +7021,59 @@ begin
     if other.direction = 'max' and p_amount > other.amount then
       return jsonb_build_object('ok', false, 'reason', 'above the other ceiling', 'refused', true);
     end if;
+  else
+    -- ★ AND WHEN THEY SEALED NOTHING, WHICH IS THE NORMAL CONVERSATIONAL CASE: the other side is
+    -- haggling in the open with no floor of their own, so there is no limit to check against and
+    -- the old guard simply waved it through. That is the real hole underneath the reported one.
+    -- NOBODY MAY BE BOUND TO A NUMBER THEY NEVER SAID. So the figure has to appear in something
+    -- that side actually wrote. Their own offer is their consent; anything else is our agent
+    -- inventing a price for a person who never named it.
+    select exists (
+      select 1 from public.truce_messages m
+       where m.deal_id = p_deal and m.speaker = other_side
+         and m.body ~ ('(^|[^0-9.])' || regexp_replace(trim_scale(p_amount)::text, '\.', '\.') || '([^0-9]|$)')
+    ) into said;
+    if not said then
+      return jsonb_build_object('ok', false, 'refused', true,
+        'reason', 'the other side never named that number, and nobody is bound to a figure they did not say');
+    end if;
   end if;
 
   update public.truce_deals
      set status = 'settled', settled_at = now(), settled_value = p_amount,
          settlement = jsonb_build_object(
            'value', p_amount,
-           'method', 'agreed in conversation between a party and the other side''s agent, then re-checked against both sealed limits',
-           'agreed_by_side', p_side,
-           'computed_at', now())
+           'method', 'agreed in conversation, re-checked against both sealed limits and against what the other side actually said',
+           'agreed_by_side', p_side, 'computed_at', now())
    where id = p_deal;
   return jsonb_build_object('ok', true, 'settled_value', p_amount);
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.tr_claim(p_secret text, p_code text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'private', 'extensions'
+AS $function$
+declare p public.truce_parties; d public.truce_deals;
+begin
+  perform private.require(p_secret);
+  -- The claim and the invalidation are ONE statement, so two people opening the link at the same
+  -- instant cannot both win it.
+  update public.truce_parties
+     set claimed_at = now(), joined_at = coalesce(joined_at, now()), claim_code = null
+   where claim_code = p_code and claimed_at is null
+  returning * into p;
+
+  if p.id is null then
+    -- Either it never existed or it is spent. Say the same thing for both, so a scanner cannot
+    -- tell a wrong code from a used one.
+    return jsonb_build_object('ok', false, 'reason', 'This invitation has already been opened, or it is not valid. Ask the person who sent it for a new one.');
+  end if;
+  select * into d from public.truce_deals where id = p.deal_id;
+  if d.expires_at < now() then return jsonb_build_object('ok', false, 'reason', 'this deal has expired'); end if;
+  return jsonb_build_object('ok', true, 'token', p.token);
 end $function$
 ;
 
