@@ -251,8 +251,21 @@ export const handler = async (event) => {
             const s = await rpc('tr_agent_settle', {
               p_deal: brief.deal.id, p_side: brief.represents.side, p_amount: answer.amount,
             });
-            if (s && s.ok) settled = s.settled_value;
-            else console.error(`truce say: agent tried to settle at ${answer.amount} and the database refused: ${(s && s.reason) || 'unknown'}`);
+            // ★ `ok` IS NOT `ACCEPTED`. An already-settled deal answers {ok:true, already:true}
+            // with the ORIGINAL figure, which is an idempotent acknowledgement and not an
+            // acceptance of what was just asked for. @ANSWERED-RESEARCH read that flag as a breach
+            // and filed a defect off it; the opposite misreading, treating it as "my number won",
+            // would be worse, because the agent's message would name one figure while the binding
+            // record holds another. So the settled value always comes from the DATABASE, never
+            // from what the model proposed, and a disagreement is said out loud.
+            if (s && s.ok) {
+              settled = s.settled_value;
+              if (s.already && Number(s.settled_value) !== Number(answer.amount)) {
+                console.error(`truce say: deal ${brief.deal.id} was ALREADY settled at ${s.settled_value}; the agent had just agreed ${answer.amount}. The record wins and the reply may name the wrong figure.`);
+              }
+            } else {
+              console.error(`truce say: agent tried to settle at ${answer.amount} and the database refused: ${(s && s.reason) || 'unknown'}`);
+            }
           }
           await rpc('tr_agent_say', {
             p_deal: brief.deal.id, p_side: brief.represents.side,
