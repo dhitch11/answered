@@ -433,7 +433,26 @@ export function summarize(s) {
 // durations, byte counts and ages: those change on every run and would make
 // every run look like a change, which is how an alert channel becomes noise
 // and then becomes ignored.
+// ★ A FINGERPRINT MUST NOT CONTAIN A CLOCK. Measured 2026-08-14 from David's inbox: six identical
+// "1 new, 1 cleared" alerts in one hour, ten minutes apart. The change detector was working
+// perfectly; what it hashed was not stable. Reasons are human prose and some of them count elapsed
+// time ("Twilio has been refusing every request for 13 minutes", "canary 814 min stale"), so the
+// number moved on every run and every run looked like a brand new problem. That is my own backoff
+// message doing it: it was written for a person reading a health page and became an input to a
+// hash. An alert that arrives every ten minutes is one nobody reads, which is the failure mode the
+// whole watch exists to avoid. So elapsed durations are normalised OUT of the identity of a
+// problem, while status codes and everything else stay in: 401 turning into 503 is a real change
+// and must still alert.
+const STABLE = (t) => String(t)
+  .replace(/\b\d+(?:\.\d+)?\s*(?:ms|s|sec|secs|second|seconds|min|mins|minute|minutes|hour|hours|h|day|days)\b/gi, '<elapsed>')
+  .replace(/\b\d{4}-\d{2}-\d{2}T[\d:.]+Z?\b/g, '<time>')
+  .trim();
+
 export function fingerprint(s) {
   const v = summarize(s);
-  return JSON.stringify({ level: v.level, reds: v.reds.slice().sort(), ambers: v.ambers.slice().sort() });
+  return JSON.stringify({
+    level: v.level,
+    reds: v.reds.map(STABLE).sort(),
+    ambers: v.ambers.map(STABLE).sort(),
+  });
 }
