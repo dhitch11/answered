@@ -61,7 +61,21 @@ while ([0, 6].includes(OPEN.getUTCDay())) OPEN.setUTCDate(OPEN.getUTCDate() + 1)
 // worthless leads when what it actually has is 4,000 leads and one missing federal subscription.
 // The DIAL-TIME gate in lib/dial.mjs applies the real, current program state on every call and is
 // the only thing that decides whether a call happens. This snapshot never authorises anything.
-const SNAPSHOT_POLICY = { ...DEFAULT_POLICY, dncScrubbed: true, dncProceduresInPlace: true };
+// ★ `subscribedAreaCodes: 'all'` belongs here for exactly the reason the two DNC flags do, and
+// leaving it out was measured breaking this: with the 16 CFR 310.8(a) fence added to the gate, the
+// snapshot came back **4,649 red out of 4,649** and the console would have shown a book of entirely
+// worthless leads. Whether we have bought an area code is a fact about our SUBSCRIPTION, not about
+// the contractor whose number it is, and this table is about the number's own merits.
+//
+// The dial-time gate in lib/dial.mjs is handed the REAL subscribed set on every call and is the only
+// thing that authorises anything, so nothing here can widen what actually gets dialled.
+const ALL_AREA_CODES = { has: () => true };
+const SNAPSHOT_POLICY = {
+  ...DEFAULT_POLICY,
+  dncScrubbed: true,
+  dncProceduresInPlace: true,
+  subscribedAreaCodes: ALL_AREA_CODES,
+};
 const gated = gateAll(joined.map((r) => ({ ...r, dncListed: false })), SNAPSHOT_POLICY, new Set(), OPEN);
 
 const rows = gated.records.map((r) => ({
