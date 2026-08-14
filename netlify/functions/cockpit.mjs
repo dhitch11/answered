@@ -13,7 +13,7 @@
 import * as db from './lib/db.mjs';
 import * as tw from './lib/twilio-rest.mjs';
 import { SCRIPTS } from './lib/scripts.mjs';
-import { gateFor, placeCall, site } from './lib/dial.mjs';
+import { gateFor, placeCall, site, dncReadiness } from './lib/dial.mjs';
 import { BASE_HEADERS, mintCookie, cookieValid, pinValid, configured, readCookie, setCookieHeader, slow } from './lib/gate-auth.mjs';
 import { PAGE, LOGIN } from './cockpit-ui.mjs';
 
@@ -29,9 +29,19 @@ async function run(op, body, operator) {
   switch (op) {
     case 'board': {
       const b = await db.board();
-      return { ...b, operator_number: OPERATOR_NUMBER() ? `…${OPERATOR_NUMBER().slice(-4)}` : null,
+      // ★ READINESS RIDES ON THE BOARD, because until now nothing outside lib/dial.mjs ever CALLED
+      // dncReadiness(). I had written that the 64.1200(b)(1) legal-entity gap was "surfaced to an
+      // operator screen"; it was computed and then read by nobody, which is a dormant instrument
+      // dressed as a control. A gap that reaches no screen is a comment. It reaches one now.
+      const readiness = await dncReadiness().catch(() => ({ read_failed: true }));
+      return { ...b, readiness,
+        operator_number: OPERATOR_NUMBER() ? `…${OPERATOR_NUMBER().slice(-4)}` : null,
         modes: Object.keys(SCRIPTS).filter((k) => k !== 'voicemail') };
     }
+    // The opening exactly as it will be SPOKEN, so an operator can read the words the callee hears
+    // without placing a call. Every legally operative sentence in this program lives in that string,
+    // and the only honest way to check it is to render it from the same function the dialler uses.
+    case 'opening': return { text: SCRIPTS.discovery.disclosure() };
     case 'contacts':   return db.contacts(body);
     case 'contact':    return db.contact(body.id);
     case 'transcript': return { lines: await db.transcript(body.call_sid, body.since || 0) };
