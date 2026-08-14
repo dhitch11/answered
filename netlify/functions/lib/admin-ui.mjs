@@ -391,7 +391,7 @@ export function consolePage({ admin, buildInfo = {} }) {
   <div class="main">
     <header class="top">
       <h1 id="title">Overview</h1>
-      <div class="search"><input class="input" id="q" type="search" placeholder="Search customers, calls, numbers" aria-label="Search"></div>
+      <div class="search"><input class="input" id="q" type="search" placeholder="Search leads, customers, calls, numbers" aria-label="Search"></div>
       <div class="who">
         <span class="hide-s"><span class="kbd">⌘K</span></span>
         <span class="pill" id="freshness" title="When the data on this page was last measured">measuring</span>
@@ -488,9 +488,35 @@ function toast(msg, tone) {
 // focus, we skip the paint and try again on the next tick instead of stealing the caret.
 function paint(el, html) {
   if (!el) return false;
-  if (el.contains(document.activeElement) && document.activeElement !== document.body) return false;
+  const a = document.activeElement;
+  if (a && a !== document.body && el.contains(a) && isTextEntry(a)) return false;
   el.innerHTML = html;
   return true;
+}
+
+/**
+ * ★ THE GUARD PROTECTS TYPING, NOT FOCUS, AND THE DIFFERENCE COST AN HOUR.
+ *
+ * The first version refused to repaint ANY region containing document.activeElement. That stopped
+ * the real defect it was written for — a poll wiping a half-typed field — and it also silently
+ * broke every button inside a repainted region, because clicking a button focuses it, and the
+ * repaint that click was supposed to cause was then skipped. Filter chips did nothing. Checkboxes
+ * did not raise the bulk bar. No error, no console message: the click handler ran, the state
+ * changed, and the paint was quietly refused.
+ *
+ * A button click is a REQUEST for a repaint. A caret in a text field is state the user owns and
+ * we must not destroy. Only the second is worth protecting, and conflating them turned a good
+ * guard into an invisible bug.
+ */
+function isTextEntry(el) {
+  if (!el || !el.tagName) return false;
+  if (el.isContentEditable) return true;
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'textarea') return true;
+  if (tag !== 'input') return false;
+  const type = (el.type || 'text').toLowerCase();
+  // Checkboxes, radios and buttons are actions, not text the user is in the middle of composing.
+  return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'color'].includes(type);
 }
 
 // ── state ─────────────────────────────────────────────────────────────────
@@ -499,7 +525,7 @@ const S = {
   q: '',
   overview: null,
   filters: { crm: { lane: null, disposition: null, state: null, trade: null, line_type: null,
-                    dialable: null, suppressed: null, sort: 'recent', offset: 0 },
+                    dialable: null, suppressed: null, has_email: null, sort: 'recent', offset: 0 },
              customers: { status: null, sort: 'recent', offset: 0 },
              calls: { recorded: null, direction: null, offset: 0 },
              events: { name: null, offset: 0 } },
@@ -596,6 +622,282 @@ function ladder(a) {
     '<td style="width:34%"><div class="bar" style="height:7px;border-radius:3px"><i style="width:' +
       Math.round(((a[k] || 0) / max) * 100) + '%;height:7px"></i></div></td>' +
     '<td class="num">' + n(a[k] || 0) + '</td></tr>').join('') + '</tbody></table></div>';
+}
+
+// ── LEADS. The CRM over 4,374 real classified contractor businesses. ─────────────────────────
+VIEWS.crm = async () => {
+  const f = S.filters.crm;
+  const qs = new URLSearchParams({ q: S.q || '', sort: f.sort, limit: 50, offset: f.offset });
+  for (const k of ['lane','disposition','state','trade','line_type']) if (f[k]) qs.set(k, f[k]);
+  if (f.dialable != null) qs.set('dialable', String(f.dialable));
+  if (f.suppressed != null) qs.set('suppressed', String(f.suppressed));
+  if (f.has_email != null) qs.set('has_email', String(f.has_email));
+
+  const [d, facets] = await Promise.all([
+    api('crm?' + qs),
+    S.facets ? Promise.resolve(S.facets) : api('crm/facets'),
+  ]);
+  S.facets = facets;
+  S.lastMeasuredAt = new Date().toISOString(); freshness();
+  const n0 = $('[data-count="leads"]'); if (n0) n0.textContent = facets.total || '';
+
+  const chip = (key, value, label, count, active) =>
+    '<button class="btn ghost sm" data-crmfilter="' + key + '" data-value="' + esc(value == null ? '' : value) + '"' +
+    (active ? ' style="border-color:var(--brand);color:var(--brand)"' : '') + '>' +
+    esc(label) + (count != null ? ' <span class="muted" style="margin-left:5px">' + n(count) + '</span>' : '') + '</button>';
+
+  const anyFilter = f.lane || f.disposition || f.state || f.trade || f.line_type ||
+                    f.dialable != null || f.suppressed != null || S.q;
+
+  const head =
+    '<div class="card"><div class="row" style="align-items:center;gap:8px;margin-bottom:10px">' +
+      '<span class="tile-k" style="margin:0">Who we can actually reach</span>' +
+      '<span class="sp" style="margin-left:auto"></span>' +
+      (anyFilter ? '<button class="btn ghost sm" data-crmfilter="clear" data-value="">Clear filters</button>' : '') +
+      '<button class="btn ghost sm" data-act="crm-export">Export CSV</button>' +
+    '</div>' +
+    '<div class="row">' +
+      chip('dialable', 'true', 'AI-callable lines', facets.ai_dialable, f.dialable === true) +
+      chip('line_type', 'mobile', 'Mobile', (facets.line_type.find((x) => x.k === 'mobile') || {}).n, f.line_type === 'mobile') +
+      chip('has_email', 'true', 'Has an email', facets.with_email, f.has_email === true) +
+      chip('suppressed', 'true', 'Suppressed', facets.suppressed, f.suppressed === true) +
+    '</div>' +
+    '<div class="tile-s" style="margin-top:10px">' +
+      n(facets.ai_dialable) + ' of ' + n(facets.total) + ' are verified fixed business lines, which is the ' +
+      'only pool an AI voice may cold-call. ' + n(facets.with_email) + ' have an email address on file, ' +
+      'read from what each business publishes on its own site. ' +
+      (facets.with_email < facets.with_website
+        ? '<strong>' + n(facets.with_website - facets.with_email) + '</strong> have a website that has not been read yet, so that number is still climbing.'
+        : '') +
+    '</div></div>' +
+
+    '<div class="grid g3">' +
+      '<div class="card pad0"><div class="card-h"><h2>Trade</h2></div><div style="padding:10px 12px" class="row">' +
+        facets.trade.slice(0, 12).map((x) => chip('trade', x.k, x.k, x.n, f.trade === x.k)).join('') + '</div></div>' +
+      '<div class="card pad0"><div class="card-h"><h2>State</h2></div><div style="padding:10px 12px" class="row">' +
+        facets.state.slice(0, 14).map((x) => chip('state', x.k, x.k, x.n, f.state === x.k)).join('') + '</div></div>' +
+      '<div class="card pad0"><div class="card-h"><h2>Stage</h2></div><div style="padding:10px 12px" class="row">' +
+        facets.disposition.map((x) => chip('disposition', x.k, String(x.k).replace(/_/g, ' '), x.n, f.disposition === x.k)).join('') + '</div></div>' +
+    '</div>';
+
+  if (!d.rows.length) {
+    return head + '<div class="card pad0">' +
+      (anyFilter
+        ? emptyState('Nothing matches that filter',
+            'Measured ' + esc(stamp(S.lastMeasuredAt)) + '. Clear the filters to see the whole book.')
+        : measuredZero('leads')) + '</div>';
+  }
+
+  const sel = S.selected;
+  const bulk = sel.size
+    ? '<div class="card" style="border-color:var(--brand);position:sticky;top:64px;z-index:15">' +
+      '<div class="row" style="align-items:center;gap:9px">' +
+        '<strong>' + n(sel.size) + ' selected</strong>' +
+        '<span class="sp" style="margin-left:auto"></span>' +
+        '<button class="btn ghost sm" data-bulk="disposition" data-value="interested">Mark interested</button>' +
+        '<button class="btn ghost sm" data-bulk="disposition" data-value="not_interested">Not interested</button>' +
+        '<button class="btn ghost sm" data-bulk="tag_add" data-value="shortlist">Tag shortlist</button>' +
+        '<button class="btn danger sm" data-bulk="suppress" data-value="operator">Never contact</button>' +
+        '<button class="btn ghost sm" data-act="crm-clear-sel">Clear</button>' +
+      '</div></div>'
+    : '';
+
+  return head + bulk + '<div class="card pad0">' +
+    '<div class="card-h"><h2>' + n(d.total) + ' leads</h2><span class="sp">' +
+      '<button class="btn ghost sm" data-act="crm-sort" data-value="recent">Newest</button>' +
+      '<button class="btn ghost sm" data-act="crm-sort" data-value="name">A to Z</button>' +
+      '<button class="btn ghost sm" data-act="crm-sort" data-value="touched">Last touched</button>' +
+    '</span></div>' +
+    '<div class="tw"><table><thead><tr>' +
+      '<th style="width:34px"><input type="checkbox" data-act="crm-sel-all" aria-label="Select this page"></th>' +
+      '<th>Business</th><th>Trade</th><th>Where</th><th>Line</th><th>Reachable</th>' +
+      '<th>Stage</th><th class="num">Calls</th><th>Last touched</th></tr></thead><tbody>' +
+    d.rows.map((r) => {
+      const reach = [];
+      if (r.email) reach.push('<span class="pill ok" title="' + esc(r.email) + '">email</span>');
+      if (r.ai_dialable) reach.push('<span class="pill info">callable</span>');
+      else if (r.line_type === 'mobile' || r.line_type === 'nonFixedVoip') reach.push('<span class="pill">texts</span>');
+      if (r.suppressed) reach.push('<span class="pill bad">never</span>');
+      return '<tr class="click" data-contact="' + esc(r.id) + '">' +
+        // No stopPropagation here: this page delegates every click from the document, so stopping
+        // propagation on the cell silently killed the very handler meant to read the checkbox. The
+        // row-open branch already returns early when the click originated on a [data-sel] control,
+        // which is the correct way to keep a checkbox from opening the drawer.
+        '<td><input type="checkbox" data-sel="' + esc(r.id) + '"' +
+          (sel.has(r.id) ? ' checked' : '') + ' aria-label="Select ' + esc(r.name || 'lead') + '"></td>' +
+        '<td><strong>' + esc(r.name || 'Unnamed') + '</strong>' +
+          (r.contact_name ? '<br><span class="muted">' + esc(r.contact_name) + '</span>' : '') + '</td>' +
+        '<td class="dim">' + esc(r.trade || '—') + '</td>' +
+        '<td class="dim">' + esc([r.city, r.state].filter(Boolean).join(', ') || '—') + '</td>' +
+        '<td class="mono">' + esc(r.line_type || 'unknown') + '</td>' +
+        '<td>' + (reach.join(' ') || '<span class="muted">no channel</span>') + '</td>' +
+        '<td><span class="pill">' + esc(String(r.disposition).replace(/_/g, ' ')) + '</span></td>' +
+        '<td class="num">' + n(r.call_count) + '</td>' +
+        '<td class="muted">' + esc(r.last_contacted_at ? when(r.last_contacted_at) : 'never') + '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></div>' + pager('crm', d) + '</div>';
+};
+
+// ── the lead record: a workspace, not a readout ──────────────────────────────────────────────
+let leadTab = 'summary';
+async function openContact(id) {
+  const dr = $('#drawer'); S.drawerContact = id; S.drawerAccount = null;
+  dr.classList.add('on'); dr.setAttribute('aria-hidden', 'false'); $('#scrim').classList.add('on');
+  dr.innerHTML = '<div class="drawer-h"><div style="flex:1"><div class="skel" style="width:50%"></div></div>' +
+    '<button class="btn ghost sm" data-act="close-drawer">Close</button></div>' +
+    '<div class="drawer-b"><div class="skel" style="width:70%"></div></div>';
+  let d, pre;
+  try {
+    [d, pre] = await Promise.all([api('crm/contact?id=' + encodeURIComponent(id)),
+                                  api('crm/preflight?id=' + encodeURIComponent(id))]);
+  } catch (e) {
+    dr.innerHTML = '<div class="drawer-h"><h2>Could not load</h2>' +
+      '<button class="btn ghost sm" style="margin-left:auto" data-act="close-drawer">Close</button></div>' +
+      '<div class="drawer-b">' + errState('This lead could not be loaded', e.message) + '</div>';
+    return;
+  }
+  renderContact(d, pre);
+}
+
+function channelRow(label, state, action, contactId, to) {
+  const ok = state && state.ok;
+  return '<div class="card" style="padding:12px 14px;border-color:' + (ok ? 'var(--ok)' : 'var(--line)') + '">' +
+    '<div class="row" style="align-items:center;gap:10px">' +
+      '<strong style="min-width:52px">' + label + '</strong>' +
+      (ok ? '<span class="pill ok">ready</span>' : '<span class="pill warn">blocked</span>') +
+      '<span class="sp" style="margin-left:auto"></span>' +
+      (ok
+        ? '<button class="btn sm" data-act="' + action + '" data-contact="' + esc(contactId) + '" data-to="' + esc(to || '') + '">' + label + '</button>'
+        : '') +
+    '</div>' +
+    '<div class="tile-s" style="margin-top:7px">' + esc(state ? state.why : 'unknown') + '</div>' +
+  '</div>';
+}
+
+function renderContact(d, pre) {
+  const c = d.contact;
+  const tabs = [['summary','Summary'],['reach','Reach out'],['calls','Calls'],['notes','Notes'],
+                ['tasks','Tasks'],['timeline','Timeline']];
+  const head =
+    '<div class="drawer-h"><div style="flex:1;min-width:0">' +
+      '<div class="row" style="align-items:center;gap:9px">' +
+        '<h2 style="font-size:18px;font-weight:650">' + esc(c.name || 'Unnamed') + '</h2>' +
+        '<span class="pill">' + esc(String(c.disposition).replace(/_/g,' ')) + '</span>' +
+        (c.suppressed ? '<span class="pill bad">never contact</span>' : '') +
+      '</div>' +
+      '<div class="muted mono" style="font-size:12.5px;margin-top:4px">' +
+        esc(phone(c.phone)) + ' · ' + esc(c.line_type || 'line type unknown') +
+        (c.city ? ' · ' + esc([c.city, c.state].filter(Boolean).join(', ')) : '') + '</div>' +
+    '</div><button class="btn ghost sm" data-act="close-drawer">Close</button></div>' +
+    '<div class="tabs">' + tabs.map(([k, l]) =>
+      '<button class="tab" data-leadtab="' + k + '" aria-selected="' + (leadTab === k) + '">' + l + '</button>').join('') + '</div>';
+
+  const panes = {
+    summary: () => '<div class="card"><h2 style="margin-bottom:12px">What we know</h2><dl class="kv">' +
+      kv('Business', c.name) + kv('Trade', c.trade) + kv('Phone', phone(c.phone)) +
+      kv('Line type', c.line_type ? c.line_type + (c.ai_dialable ? ' (an AI voice may call it)' : '') : 'never established') +
+      kv('Email', c.email || null) + kv('Person', c.contact_name) + kv('Role', c.contact_role) +
+      kv('Website', c.website ? '<a href="' + esc(c.website) + '" target="_blank" rel="noreferrer noopener">' + esc(c.website) + '</a>' : null) +
+      kv('Address', [c.street, c.city, c.state].filter(Boolean).join(', ') || null) +
+      kv('Compliance lane', c.lane ? c.lane + (c.lane_reasons && c.lane_reasons.length ? ' — ' + c.lane_reasons.join('; ') : '') : null) +
+      kv('Times called', n(c.call_count)) +
+      kv('Last touched', c.last_contacted_at ? stamp(c.last_contacted_at) : 'never') +
+      kv('Enrichment', c.enriched_at
+          ? 'Looked on ' + stamp(c.enriched_at) + (c.email ? '' : ', and this business does not publish an email')
+          : 'Not looked at yet') +
+      kv('Source', c.source) +
+      '</dl></div>' +
+      '<div class="card"><h2 style="margin-bottom:10px">Stage</h2><div class="row">' +
+        ['new','queued','attempted','reached','interested','callback','not_interested','bad_number','customer']
+          .map((s) => '<button class="btn ghost sm" data-setdisp="' + s + '"' +
+            (c.disposition === s ? ' style="border-color:var(--brand);color:var(--brand)"' : '') + '>' +
+            s.replace(/_/g,' ') + '</button>').join('') +
+      '</div></div>',
+
+    reach: () => '<div class="card"><div class="tile-k">Before you press anything</div>' +
+        '<div class="tile-s" style="font-size:13.5px;margin-top:4px">Each channel below is checked against ' +
+        'this record right now: the line type, any consent on file, the suppression list, the ' +
+        'do-not-call programme and the carrier campaign. <strong>A control that cannot act does not ' +
+        'render as though it can</strong>, and every blocked attempt is still recorded with its reason.</div></div>' +
+      channelRow('Email', pre.email, 'do-email', c.id, c.email) +
+      channelRow('Text',  pre.sms,   'do-sms',   c.id, c.phone) +
+      channelRow('Call',  pre.call,  'do-call',  c.id, c.phone) +
+      (pre.call.ok ? '' :
+        '<div class="card"><div class="tile-k">A person can always dial</div>' +
+        '<div class="tile-s" style="font-size:13.5px;margin-top:4px">The restrictions above are on an ' +
+        '<em>artificial voice</em>. A human picking up a handset is a different call class with different ' +
+        'obligations.</div><div style="margin-top:10px"><a class="btn ghost sm" href="tel:' + esc(c.phone) + '">' +
+        'Dial ' + esc(phone(c.phone)) + ' yourself</a></div></div>'),
+
+    calls: () => (d.calls || []).length
+      ? '<div class="card pad0"><div class="card-h"><h2>Calls</h2></div><div class="tw"><table>' +
+        '<thead><tr><th>When</th><th>Class</th><th>Result</th><th class="num">Length</th><th>Disclosure</th></tr></thead><tbody>' +
+        d.calls.map((x) => '<tr class="click" data-call="' + esc(x.call_sid || '') + '">' +
+          '<td class="muted">' + esc(when(x.created_at)) + '</td>' +
+          '<td class="mono">' + esc(x.call_class || 'unclassified') + '</td>' +
+          '<td>' + (x.placed ? esc(x.status || 'placed')
+                             : '<span class="pill bad" title="' + esc(x.refused_reason || '') + '">refused</span>') + '</td>' +
+          '<td class="num">' + dur(x.duration_seconds) + '</td>' +
+          '<td>' + (x.disclosure_verified === true ? '<span class="pill ok">verified</span>'
+                  : x.disclosure_verified === false ? '<span class="pill bad">failed</span>'
+                  : '<span class="pill warn">unchecked</span>') + '</td></tr>').join('') +
+        '</tbody></table></div></div>'
+      : emptyState('No calls to this business yet',
+          'A measured zero: the query ran against the call spine and returned nothing for this number.'),
+
+    notes: () => '<div class="card"><h2 style="margin-bottom:10px">Add a note</h2>' +
+        '<textarea class="input" id="notebody" rows="3" placeholder="What happened, in your own words"></textarea>' +
+        '<div class="row end" style="margin-top:9px"><button class="btn sm" data-act="add-note" data-contact="' + esc(c.id) + '">Save note</button></div></div>' +
+      ((d.notes || []).length
+        ? d.notes.map((x) => '<div class="card" style="padding:12px 14px">' +
+            '<div class="row" style="gap:8px;align-items:center">' +
+              (x.pinned ? '<span class="pill brand">pinned</span>' : '') +
+              '<span class="muted mono" style="font-size:12px">' + esc(x.author || 'operator') + ' · ' + esc(stamp(x.at)) + '</span>' +
+            '</div><div style="margin-top:7px;font-size:14px">' + esc(x.body) + '</div></div>').join('')
+        : emptyState('No notes yet', 'Nobody has written anything about this business.')),
+
+    tasks: () => '<div class="card"><h2 style="margin-bottom:10px">Add a task</h2>' +
+        '<input class="input" id="tasktitle" placeholder="What needs doing"><div class="row end" style="margin-top:9px">' +
+        '<button class="btn sm" data-act="add-task" data-contact="' + esc(c.id) + '">Add task</button></div></div>' +
+      ((d.tasks || []).length
+        ? '<div class="card pad0"><div class="tw"><table><thead><tr><th>Task</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>' +
+          d.tasks.map((t) => '<tr><td>' + esc(t.title) + '</td>' +
+            '<td class="muted">' + esc(t.due_at ? when(t.due_at) : '—') + '</td>' +
+            '<td><span class="pill ' + (t.status === 'done' ? 'ok' : t.status === 'cancelled' ? '' : 'warn') + '">' + esc(t.status) + '</span></td>' +
+            '<td>' + (t.status === 'open'
+              ? '<button class="btn ghost sm" data-task="' + esc(t.id) + '" data-status="done">Done</button>' : '') + '</td></tr>').join('') +
+          '</tbody></table></div></div>'
+        : emptyState('No tasks', 'Nothing is scheduled against this business.')),
+
+    timeline: () => '<div class="card pad0"><div class="card-h"><h2>Everything that has happened</h2>' +
+      '<span class="sp muted">one feed, whatever produced it</span></div>' +
+      '<div id="tl" class="tw"><div style="padding:16px"><div class="skel" style="width:60%"></div></div></div></div>',
+  };
+
+  const dr = $('#drawer');
+  dr.innerHTML = head + '<div class="drawer-b" id="dbody">' + panes[leadTab]() + '</div>';
+  dr.__panes = panes; dr.__contact = c; dr.__pre = pre;
+  if (leadTab === 'timeline') loadTimeline(c.id);
+}
+
+async function loadTimeline(contactId) {
+  try {
+    const rows = await api('crm/timeline?contact=' + encodeURIComponent(contactId) + '&limit=100');
+    const el = $('#tl'); if (!el) return;
+    paint(el, rows.length
+      ? '<table><tbody>' + rows.map((r) =>
+          '<tr><td style="width:150px" class="muted mono">' + esc(stamp(r.at)) + '</td>' +
+          '<td><span class="pill">' + esc(r.kind) + '</span></td>' +
+          '<td><strong>' + esc(r.title) + '</strong>' +
+            (r.body ? '<br><span class="muted">' + esc(String(r.body).slice(0, 200)) + '</span>' : '') + '</td>' +
+          '<td class="muted">' + esc(r.source || '') + '</td></tr>').join('') + '</tbody></table>'
+      : '<div style="padding:4px">' + emptyState('Nothing recorded yet',
+          'The timeline fills as this business is called, emailed, noted on or updated. It is one feed ' +
+          'over every table, so nothing has to be looked up in two places.') + '</div>');
+  } catch (e) {
+    paint($('#tl'), errState('The timeline could not load', e.message));
+  }
 }
 
 VIEWS.customers = async () => {
@@ -1388,8 +1690,41 @@ function palGo() {
 // ── events. One delegated listener, so nothing is bound to a node a repaint will replace. ──
 function wire() {
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-view],[data-account],[data-call],[data-rec],[data-act],[data-filter],[data-page],[data-tab],[data-status],[data-event],.pal-i');
+    const t = e.target.closest('[data-view],[data-account],[data-contact],[data-call],[data-rec],[data-act],[data-filter],[data-crmfilter],[data-page],[data-tab],[data-leadtab],[data-status],[data-event],[data-bulk],[data-setdisp],[data-task],[data-sel],.pal-i');
     if (!t) return;
+
+    // ── CRM ────────────────────────────────────────────────────────────────────────────────
+    if (t.dataset.sel != null) {                    // a row checkbox
+      const id = t.dataset.sel;
+      if (t.checked) S.selected.add(id); else S.selected.delete(id);
+      go('crm', { quiet: true });
+      return;
+    }
+    if (t.dataset.crmfilter) {
+      const k = t.dataset.crmfilter, v = t.dataset.value;
+      if (k === 'clear') {
+        S.filters.crm = { lane:null, disposition:null, state:null, trade:null, line_type:null,
+                          dialable:null, suppressed:null, has_email:null, sort:S.filters.crm.sort, offset:0 };
+        S.q = ''; const qi = $('#q'); if (qi) qi.value = '';
+      } else {
+        const cur = S.filters.crm[k];
+        const val = v === '' ? null : (v === 'true' ? true : v === 'false' ? false : v);
+        S.filters.crm[k] = (String(cur) === String(val)) ? null : val;   // click again to unset
+        S.filters.crm.offset = 0;
+      }
+      go('crm'); return;
+    }
+    if (t.dataset.contact) { openContact(t.dataset.contact); return; }
+    if (t.dataset.leadtab) {
+      leadTab = t.dataset.leadtab;
+      const dr = $('#drawer');
+      $$('.tab', dr).forEach((b) => b.setAttribute('aria-selected', String(b.dataset.leadtab === leadTab)));
+      if (dr.__panes) { paint($('#dbody'), dr.__panes[leadTab]()); if (leadTab === 'timeline') loadTimeline(dr.__contact.id); }
+      return;
+    }
+    if (t.dataset.bulk) { bulkAction(t.dataset.bulk, t.dataset.value); return; }
+    if (t.dataset.setdisp) { setDisposition(t.dataset.setdisp); return; }
+    if (t.dataset.task) { taskSet(t.dataset.task, t.dataset.status); return; }
 
     if (t.dataset.view) { go(t.dataset.view); return; }
     if (t.classList.contains('pal-i') && t.dataset.i != null) { palIndex = +t.dataset.i; palGo(); return; }
@@ -1419,6 +1754,19 @@ function wire() {
     if (act === 'refund') { refundModal(t.dataset.charge, +t.dataset.max, t.dataset.label); return; }
     if (act === 'refund-go') { doRefund(t.dataset.charge, +t.dataset.max); return; }
     if (act === 'export-accounts') { exportAccounts(); return; }
+    if (act === 'crm-clear-sel') { S.selected.clear(); go('crm'); return; }
+    if (act === 'crm-sort') { S.filters.crm.sort = t.dataset.value; S.filters.crm.offset = 0; go('crm'); return; }
+    if (act === 'crm-sel-all') {
+      $$('[data-sel]').forEach((cb) => { if (t.checked) S.selected.add(cb.dataset.sel); else S.selected.delete(cb.dataset.sel); });
+      go('crm'); return;
+    }
+    if (act === 'crm-export') { exportLeads(); return; }
+    if (act === 'do-email') { emailComposer(t.dataset.contact, t.dataset.to); return; }
+    if (act === 'do-sms') { smsComposer(t.dataset.contact, t.dataset.to); return; }
+    if (act === 'do-call') { doCall(t.dataset.contact, t.dataset.to); return; }
+    if (act === 'add-note') { addNote(t.dataset.contact); return; }
+    if (act === 'add-task') { addTask(t.dataset.contact); return; }
+    if (act === 'ai-draft') { aiDraft(t.dataset.contact); return; }
     if (act === 'backfill') { backfill(t); return; }
     if (act === 'status') { statusChange(t.dataset.value); return; }
   });
@@ -1558,6 +1906,175 @@ async function backfill(btn) {
       ' remain unattributed, which is correct for research, demo and canary traffic.', 'ok');
     go('overview');
   } catch (e) { toast(e.message, 'bad'); btn.disabled = false; btn.textContent = 'Repair attribution'; }
+}
+
+// ── CRM actions ──────────────────────────────────────────────────────────────────────────────
+
+async function refreshContact() {
+  if (S.drawerContact) await openContact(S.drawerContact);
+}
+
+async function bulkAction(action, value) {
+  const ids = Array.from(S.selected);
+  if (!ids.length) return;
+  const label = { disposition: 'set the stage to ' + value, tag_add: 'tag as ' + value,
+                  suppress: 'mark NEVER CONTACT' }[action] || action;
+  modal('<h3>' + esc(label) + '</h3>' +
+    '<p>This applies to <strong>' + n(ids.length) + '</strong> selected lead' + (ids.length === 1 ? '' : 's') + '. ' +
+    (action === 'suppress'
+      ? 'Suppression is permanent and covers every channel. It also writes the durable suppression ledger the dial gate reads, so nothing can call them again.'
+      : 'Rows that already have this value are left alone and reported as unchanged.') + '</p>' +
+    '<div class="alert warn" id="bwarn" style="display:none"></div>' +
+    '<div class="row end"><button class="btn ghost" data-act="close-modal">Cancel</button>' +
+    '<button class="btn' + (action === 'suppress' ? ' danger' : '') + '" id="bgo">Apply to ' + n(ids.length) + '</button></div>');
+  $('#bgo').addEventListener('click', async () => {
+    const b = $('#bgo'); b.disabled = true; b.textContent = 'Applying…';
+    try {
+      const r = await api('crm/bulk', { body: { ids, action, value } });
+      closeModal(); S.selected.clear();
+      toast(r.changed + ' changed, ' + r.unchanged + ' already had that value.', 'ok');
+      go('crm');
+    } catch (e) { b.disabled = false; b.textContent = 'Apply'; $('#bwarn').textContent = e.message; $('#bwarn').style.display = 'block'; }
+  });
+}
+
+async function setDisposition(d) {
+  if (!S.drawerContact) return;
+  try { await api('crm/update', { body: { id: S.drawerContact, patch: { disposition: d } } });
+    toast('Stage set to ' + d.replace(/_/g, ' '), 'ok'); refreshContact(); }
+  catch (e) { toast(e.message, 'bad'); }
+}
+
+async function addNote(contactId) {
+  const el = $('#notebody'); const body = el ? el.value.trim() : '';
+  if (!body) { toast('An empty note helps nobody.', 'bad'); return; }
+  try { await api('crm/note', { body: { contact_id: contactId, body } });
+    toast('Note saved', 'ok'); refreshContact(); }
+  catch (e) { toast(e.message, 'bad'); }
+}
+
+async function addTask(contactId) {
+  const el = $('#tasktitle'); const title = el ? el.value.trim() : '';
+  if (!title) { toast('A task needs a title.', 'bad'); return; }
+  try { await api('crm/task', { body: { contact_id: contactId, title } });
+    toast('Task added', 'ok'); refreshContact(); }
+  catch (e) { toast(e.message, 'bad'); }
+}
+
+async function taskSet(id, status) {
+  try { await api('crm/task', { body: { id, status } }); toast('Task ' + status, 'ok'); refreshContact(); }
+  catch (e) { toast(e.message, 'bad'); }
+}
+
+// ── the composers ────────────────────────────────────────────────────────────────────────────
+
+function emailComposer(contactId, to) {
+  modal('<h3>Email this business</h3>' +
+    '<p>Sending to <strong>' + esc(to) + '</strong>. It goes out from our real sending domain and is ' +
+    'logged against this record.</p>' +
+    '<div class="field"><label for="esubj">Subject</label><input class="input" id="esubj"></div>' +
+    '<div class="field"><label for="ebody">Message</label>' +
+      '<textarea class="input" id="ebody" rows="9"></textarea></div>' +
+    '<div id="edraftnote" class="tile-s" style="display:none;margin:-6px 0 12px"></div>' +
+    '<div class="alert warn" id="ewarn" style="display:none"></div>' +
+    '<div class="row"><button class="btn ghost" data-act="ai-draft" data-contact="' + esc(contactId) + '">Draft it with AI</button>' +
+      '<span class="sp" style="margin-left:auto"></span>' +
+      '<button class="btn ghost" data-act="close-modal">Cancel</button>' +
+      '<button class="btn" id="esend" data-to="' + esc(to) + '" data-contact="' + esc(contactId) + '">Send</button></div>');
+  $('#esend').addEventListener('click', async () => {
+    const subject = $('#esubj').value.trim(), body = $('#ebody').value.trim();
+    if (!subject || !body) { $('#ewarn').textContent = 'A subject and a message are both required.'; $('#ewarn').style.display = 'block'; return; }
+    const b = $('#esend'); b.disabled = true; b.textContent = 'Sending…';
+    try {
+      const r = await api('crm/email', { body: { contact_id: contactId, to, subject, body,
+        ai_assisted: Boolean(window.__lastDraftModel), ai_model: window.__lastDraftModel || null } });
+      closeModal(); window.__lastDraftModel = null;
+      toast(r.ok ? 'Email sent and logged against this lead.' : ('Not sent: ' + (r.reason || r.error)), r.ok ? 'ok' : 'bad');
+      refreshContact();
+    } catch (e) { b.disabled = false; b.textContent = 'Send'; $('#ewarn').textContent = e.message; $('#ewarn').style.display = 'block'; }
+  });
+  setTimeout(() => $('#esubj') && $('#esubj').focus(), 30);
+}
+
+/**
+ * ★ THE AI WRITES A DRAFT INTO A BOX A HUMAN THEN EDITS AND SENDS. It never sends anything.
+ * It is also required to report what it could NOT say, and that report is shown to the operator
+ * rather than hidden, because the useful part of an honest drafting tool is the list of things it
+ * refused to invent.
+ */
+async function aiDraft(contactId) {
+  const btn = $('[data-act="ai-draft"]'); if (btn) { btn.disabled = true; btn.textContent = 'Writing…'; }
+  try {
+    const r = await api('crm/draft', { body: { contact_id: contactId, intent: 'a first, brief outreach email' } });
+    $('#esubj').value = r.draft.subject;
+    $('#ebody').value = r.draft.body;
+    window.__lastDraftModel = r.ai.model;
+    const note = $('#edraftnote');
+    note.style.display = 'block';
+    note.innerHTML = '<strong>Drafted by ' + esc(r.ai.model) + '</strong> · ' +
+      n(r.ai.usage.input_tokens) + ' in / ' + n(r.ai.usage.output_tokens) + ' out · about $' +
+      (r.ai.cost_usd || 0).toFixed(4) + ' <span class="muted">(cost ESTIMATED from a local rate table; the token counts are measured)</span>' +
+      ((r.draft.could_not_say || []).length
+        ? '<br><span class="muted">It had no fact for: ' + esc(r.draft.could_not_say.join('; ')) + '</span>' : '') +
+      '<br><span class="muted">Read it before you send it. Nothing is sent automatically.</span>';
+  } catch (e) {
+    $('#ewarn').textContent = 'The draft failed: ' + e.message; $('#ewarn').style.display = 'block';
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Draft it with AI'; } }
+}
+
+function smsComposer(contactId, to) {
+  modal('<h3>Text this business</h3>' +
+    '<p>Sending to <strong>' + esc(phone(to)) + '</strong>.</p>' +
+    '<div class="field"><label for="sbody">Message</label><textarea class="input" id="sbody" rows="4" maxlength="450"></textarea></div>' +
+    '<div class="alert warn" id="swarn2" style="display:none"></div>' +
+    '<div class="row end"><button class="btn ghost" data-act="close-modal">Cancel</button>' +
+    '<button class="btn" id="ssend">Send text</button></div>');
+  $('#ssend').addEventListener('click', async () => {
+    const body = $('#sbody').value.trim();
+    if (!body) return;
+    const b = $('#ssend'); b.disabled = true; b.textContent = 'Sending…';
+    try {
+      const r = await api('crm/sms', { body: { contact_id: contactId, to, body } });
+      closeModal();
+      toast(r.ok ? 'Text sent and logged.' : ('Not sent: ' + (r.reason || r.error)), r.ok ? 'ok' : 'bad');
+      refreshContact();
+    } catch (e) { b.disabled = false; b.textContent = 'Send text'; $('#swarn2').textContent = e.message; $('#swarn2').style.display = 'block'; }
+  });
+}
+
+async function doCall(contactId, to) {
+  try {
+    const r = await api('crm/call', { body: { contact_id: contactId, to } });
+    if (r.ok) {
+      toast('Call intent recorded as ' + r.class + '. ' + r.note, 'ok');
+    } else {
+      toast('Not callable: ' + r.reason, 'bad');
+    }
+    refreshContact();
+  } catch (e) { toast(e.message, 'bad'); }
+}
+
+async function exportLeads() {
+  try {
+    const f = S.filters.crm;
+    const qs = new URLSearchParams({ q: S.q || '', sort: f.sort, limit: 200, offset: 0 });
+    for (const k of ['lane','disposition','state','trade','line_type']) if (f[k]) qs.set(k, f[k]);
+    if (f.dialable != null) qs.set('dialable', String(f.dialable));
+    if (f.has_email != null) qs.set('has_email', String(f.has_email));
+    const d = await api('crm?' + qs);
+    const cols = ['id','name','phone','line_type','ai_dialable','trade','city','state','website',
+                  'email','contact_name','disposition','lane','call_count','last_contacted_at'];
+    const csv = [cols.join(',')].concat(d.rows.map((r) => cols.map((c) => {
+      const v = r[c] == null ? '' : String(r[c]);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(','))).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'answered-leads-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click(); URL.revokeObjectURL(a.href);
+    toast('Exported ' + d.rows.length + ' of ' + n(d.total) + ' matching leads.' +
+      (d.total > d.rows.length ? ' The export is capped at 200 rows and says so rather than truncating silently.' : ''), 'ok');
+  } catch (e) { toast(e.message, 'bad'); }
 }
 
 async function exportAccounts() {

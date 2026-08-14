@@ -409,6 +409,7 @@ async function apiRoute(req, url, name) {
         p_state: nz(q.get('state')), p_trade: nz(q.get('trade')), p_line_type: nz(q.get('line_type')),
         p_owner: nz(q.get('owner')), p_tag: nz(q.get('tag')),
         p_suppressed: tri(q.get('suppressed')), p_dialable: tri(q.get('dialable')),
+        p_has_email: tri(q.get('has_email')),
         p_sort: nz(q.get('sort')) || 'recent',
         p_limit: num(q.get('limit'), 50), p_offset: num(q.get('offset'), 0),
       }));
