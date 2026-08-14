@@ -2776,3 +2776,37 @@ html.js .rung:not(.done):not(.hit) { opacity: .72; }
    selector that would do it in CSS, if the inline style ever goes away, is
    `html.js .pb.in:has(.tw):not(:has(.tw.on))` -- and `:has(.tw)` is
    load-bearing there, or a wordless bubble would hold forever. ── */
+
+/* ── THE STANDING CTA (mobile) ──────────────────────────────────────────────
+   Measured finding: 22,700px of page on a phone with nothing but a burger
+   between the mid-page CTA and the close. A visitor who decides at pixel
+   9,000 had nowhere to act. This bar appears once the hero is behind you,
+   hides itself while any form or the sheet is open (so it never covers the
+   thing it is asking you to do), and never renders on a pointer:fine
+   screen, where the nav CTA is always visible anyway.
+   The demo number never lives here: this is the honest list CTA, and the
+   health gate owns every call control on the page.
+   ────────────────────────────────────────────────────────────────────── */
+@media (max-width: 880px) {
+  .scta {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 300;
+    display: flex; gap: 10px; align-items: center; justify-content: space-between;
+    padding: 10px 10px 10px 16px; border-radius: 14px;
+    background: rgba(11,12,14,.86);
+    -webkit-backdrop-filter: saturate(1.2) blur(14px); backdrop-filter: saturate(1.2) blur(14px);
+    border: 1px solid rgba(242,244,240,.10);
+    box-shadow: 0 1px 0 rgba(255,255,255,.05) inset, 0 10px 30px rgba(0,0,0,.45);
+    transform: translate3d(0, 130%, 0); opacity: 0;
+    transition: transform .34s var(--e), opacity .2s var(--e);
+    pointer-events: none;
+  }
+  html.scrolled-past-hero .scta { transform: translate3d(0,0,0); opacity: 1; pointer-events: auto; }
+  html.sheet-open .scta, html.form-focus .scta { transform: translate3d(0,130%,0); opacity: 0; pointer-events: none; }
+  .scta-t { font-size: 13.5px; line-height: 1.25; color: var(--t2); max-width: 20ch; }
+  .scta-t b { color: var(--t1); font-weight: 600; display: block; }
+  .scta .btn { padding: 12px 16px; font-size: 14.5px; white-space: nowrap; min-height: 44px; }
+}
+@media (min-width: 881px) { .scta { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .scta { transition: none; }
+}

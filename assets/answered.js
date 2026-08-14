@@ -672,6 +672,13 @@
   var GHOST_SEL = '.turn, .pb, .sc-result, .hold-hit';
   var GHOST_BG = 'rgba(242,244,240,.055)';
   var GHOST_LINE = 'rgba(242,244,240,.09)';
+  // A pending slab must not reserve the full height of the message it is
+  // waiting for: two full-size empty bubbles read as content that failed to
+  // load (measured on the homepage handset, ~300px blank for 1.5-2s). The
+  // skeleton now collapses to a short bar and grows into its real height when
+  // the turn lands, so the panel always looks like it is filling rather than
+  // broken. CSS cannot do this alone: these are inline styles, so the sizing
+  // lives here with them.
   var ghostPending = function (host) {
     if (reduced.matches) return;
     [].slice.call(host.querySelectorAll(GHOST_SEL)).forEach(function (n) {
@@ -682,6 +689,9 @@
       n.style.borderColor = GHOST_LINE;
       n.style.boxShadow = 'none';
       n.style.color = 'transparent';
+      n.style.maxHeight = '34px';
+      n.style.overflow = 'hidden';
+      n.style.transition = 'max-height .26s var(--e, cubic-bezier(.2,.8,.2,1))';
       n.dataset.ghost = '1';
       [].slice.call(n.querySelectorAll('*')).forEach(function (k) { k.style.color = 'transparent'; });
     });
@@ -695,6 +705,10 @@
   var unghost = function (n) {
     n.style.opacity = ''; n.style.transform = '';
     if (n.dataset.ghost !== '1') return;
+    // grow out of the collapsed bar into the real height, then hand sizing
+    // back to the document so nothing stays capped
+    n.style.maxHeight = n.scrollHeight + 'px';
+    setTimeout(function () { n.style.maxHeight = ''; n.style.overflow = ''; n.style.transition = ''; }, 280);
     n.style.background = ''; n.style.borderColor = ''; n.style.boxShadow = ''; n.style.color = '';
     [].slice.call(n.querySelectorAll('*')).forEach(function (k) { k.style.color = ''; });
     n.dataset.ghost = '';
@@ -1739,4 +1753,41 @@
   document.addEventListener('pointerup', function () { if (dial) { sct = dial.classList.contains('hot') ? 1.35 : 1; wake(); } }, { passive: true });
   document.documentElement.addEventListener('mouseleave', function () { if (dial) { vis = false; dial.style.opacity = '0'; } });
   document.documentElement.addEventListener('mouseenter', function () { if (dial && shown) { vis = true; dial.style.opacity = '1'; } });
+})();
+
+/* ══ THE STANDING CTA ══════════════════════════════════════════════════════
+   Drives .scta: appears once the hero is behind you, retreats while the
+   sheet or a form is in use so it never covers the thing it asks for.
+   Class toggles only, one IntersectionObserver, no scroll handler.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var bar = document.querySelector('.scta');
+  if (!bar || !('IntersectionObserver' in window)) return;
+  var root = document.documentElement;
+  var hero = document.querySelector('.hero');
+  if (hero) {
+    new IntersectionObserver(function (es) {
+      root.classList.toggle('scrolled-past-hero', !es[0].isIntersecting);
+    }, { threshold: 0, rootMargin: '-40% 0px 0px 0px' }).observe(hero);
+  }
+  // the sheet already toggles body overflow; mirror it on the root for CSS
+  var burger = document.querySelector('.burger');
+  if (burger) {
+    burger.addEventListener('click', function () {
+      setTimeout(function () {
+        root.classList.toggle('sheet-open', burger.getAttribute('aria-expanded') === 'true');
+      }, 0);
+    });
+  }
+  document.addEventListener('focusin', function (e) {
+    if (e.target.closest('form, .iform')) root.classList.add('form-focus');
+  });
+  document.addEventListener('focusout', function () {
+    setTimeout(function () {
+      if (!document.activeElement || !document.activeElement.closest('form, .iform')) {
+        root.classList.remove('form-focus');
+      }
+    }, 0);
+  });
 })();
