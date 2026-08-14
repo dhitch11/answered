@@ -143,6 +143,14 @@ export async function gateFor(phone, { state, lineType, lookupOk } = {}) {
         : null,
       callCount30d: Number(ctx.calls_30d || 0),
       dncListed: ctx.dnc_listed,   // true | false | null, and null is a refusal
+      // ★ BUSINESS USE, which is a different question from line type and cannot be answered by a
+      // carrier lookup. It is true only for a number that came from a published business listing
+      // and still carries its provenance. A hand-typed number in the console therefore has NO such
+      // evidence and is refused — deliberately, because a fixed line at a sole proprietor's home is
+      // a residential subscriber under Mo. Rev. Stat. 407.1095(2) and every B2B carve-out we rely
+      // on fails on it. `=== true` rather than a truthy check: presence, never truthiness, for a
+      // control whose absence means permission.
+      businessVerified: contact?.source === 'openstreetmap' || Boolean(contact?.source && contact?.source_id),
     },
     policy,
     new Set(ctx.suppressed ? [phone] : []),

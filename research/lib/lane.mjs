@@ -291,6 +291,26 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
         ? `${rec.lineType}: an artificial voice to a mobile needs prior express consent, 47 CFR 64.1200(a)(1). A human-dialled, human-voiced call to this number is a separate lane and is permitted there`
         : `${rec.lineType}: not a verified fixed business line`);
     }
+
+    // ★ A FIXED LINE PROVES THE TECHNOLOGY, NOT THE USE — AND THE STATUTES TURN ON THE USE.
+    //
+    // This gate had been treating "landline" as a synonym for "business line". It is not. Missouri
+    // defines a residential subscriber by USE: Mo. Rev. Stat. sec. 407.1095(2), "a person who, for
+    // primarily personal and familial use, has subscribed to residential telephone service", and
+    // sec. 407.1085.1(4)(d) exempts only calls "Between a telemarketer and any business". So a
+    // perfectly ordinary landline sitting in a sole proprietor's kitchen is a RESIDENTIAL
+    // SUBSCRIBER, fully protected, and every B2B carve-out we rely on evaporates on that number.
+    // The same logic reaches the federal side: 16 CFR 310.6(b)(7) turns on the call being between
+    // businesses, not on what the carrier calls the line.
+    //
+    // A Twilio line-type lookup cannot answer this. It is a different question needing a different
+    // source: a public business listing, an NPPES practice phone, or the account holder's own
+    // attestation. Our corpus rows carry one (each was built from a published business listing with
+    // its source id); a number hand-typed into the console carries none, and that is exactly the
+    // case that must fail closed, the same way an asserted state is carried as an assertion.
+    if (rec.businessVerified !== true) {
+      return deny('this number has not been independently verified as a BUSINESS number, and a fixed line proves the technology rather than the use; a landline at a sole proprietor\'s home is a residential subscriber and every B2B exemption we rely on fails on it');
+    }
   }
 
   if (policy.promotional && !(consentValid && consent.written)) {

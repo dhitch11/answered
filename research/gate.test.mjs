@@ -32,7 +32,10 @@ const WEEKEND = new Date('2026-08-15T18:00:00Z');
 // had nothing to do with what they were testing. The fixture state is now the one state of the
 // four verified from primary text that a clean number actually passes, so each test below fails
 // only for its own reason.
-const base = { phone: '+15125550142', state: 'OR', lookupOk: true, callCount30d: 0, dncListed: false };
+// `businessVerified` is on the base fixture for the same reason the DNC flags are on READY: it is
+// a property the corpus supplies for every real row, and without it every case below would fail for
+// a reason unrelated to what it tests. The business gate has its own section.
+const base = { phone: '+15125550142', state: 'OR', lookupOk: true, callCount30d: 0, dncListed: false, businessVerified: true };
 
 // ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
 // not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
@@ -430,6 +433,31 @@ test('the human lane does NOT quietly widen anything else', () => {
   }
   assert.equal(classify({ ...base, lineType: 'landline', lookupOk: false }, HUMAN, new Set(), OPEN).dialable, false);
   assert.equal(classify({ ...base, lineType: 'tollFree' }, HUMAN, new Set(), OPEN).dialable, false);
+});
+
+console.log('\nBUSINESS USE IS A DIFFERENT QUESTION FROM LINE TYPE');
+test('a perfect fixed line that is NOT verified as a business is refused', () => {
+  // Mo. Rev. Stat. 407.1095(2) defines a residential subscriber by USE. A landline in a sole
+  // proprietor's kitchen is residential, and every B2B carve-out we rely on fails on it.
+  const v = classify({ ...base, lineType: 'landline', businessVerified: undefined }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /BUSINESS number|technology rather than the use/);
+});
+test('a MISSING businessVerified is a refusal, not a default yes', () => {
+  const rec = { ...base, lineType: 'landline' };
+  delete rec.businessVerified;
+  assert.equal(classify(rec, READY, new Set(), OPEN).dialable, false);
+});
+test('businessVerified false is refused as firmly as absent', () => {
+  assert.equal(classify({ ...base, lineType: 'landline', businessVerified: false }, READY, new Set(), OPEN).dialable, false);
+});
+test('a truthy-but-not-true value does not satisfy it', () => {
+  // presence, never truthiness, for a control whose absence means permission
+  assert.equal(classify({ ...base, lineType: 'landline', businessVerified: 'yes' }, READY, new Set(), OPEN).dialable, false);
+});
+test('the business gate binds on the HUMAN lane too', () => {
+  const HUMAN2 = { ...READY, humanDialed: true };
+  assert.equal(classify({ ...base, lineType: 'mobile', businessVerified: false }, HUMAN2, new Set(), OPEN).dialable, false);
 });
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

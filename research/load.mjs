@@ -76,7 +76,20 @@ const SNAPSHOT_POLICY = {
   dncProceduresInPlace: true,
   subscribedAreaCodes: ALL_AREA_CODES,
 };
-const gated = gateAll(joined.map((r) => ({ ...r, dncListed: false })), SNAPSHOT_POLICY, new Set(), OPEN);
+// ★ THE BUSINESS-USE EVIDENCE, carried explicitly rather than assumed from the line type.
+// Every corpus row was built from a PUBLISHED BUSINESS LISTING and keeps that listing's id, which
+// is one of the sources Missouri's analysis names as sufficient: the entry exists because the
+// business published itself as a business, under a trade, usually under a business name. That is
+// evidence about USE, which a carrier line-type lookup cannot supply. A row that somehow lacks its
+// provenance is NOT waved through — `businessVerified` is only ever true where the evidence is.
+const gated = gateAll(
+  joined.map((r) => ({
+    ...r,
+    dncListed: false,
+    businessVerified: Boolean(r.source && r.sourceId),
+  })),
+  SNAPSHOT_POLICY, new Set(), OPEN,
+);
 
 const rows = gated.records.map((r) => ({
   phone: r.phone, name: r.name, trade: r.trade, state: r.state, city: r.city, street: r.street,
