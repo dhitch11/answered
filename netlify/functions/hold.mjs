@@ -712,9 +712,16 @@ async function draw(){
   const {status,body}=await call('list',{limit:60});
   const el=document.getElementById('list');
   if(status===401){el.innerHTML='<p class="err">This console is not signed in.</p>';return;}
-  const rows=body.sessions||[];
-  if(!rows.length){el.innerHTML='<p class="note">No hold sessions yet. This is a measured zero, not a loading state.</p>';return;}
-  el.innerHTML=rows.map(s=>{
+  const all=body.sessions||[];
+  if(!all.length){el.innerHTML='<p class="note">No hold sessions yet. This is a measured zero, not a loading state and not a failure.</p>';return;}
+  // ★ LIVE FIRST, AND THE FINISHED ONES TRIMMED. This console is read while somebody is on hold,
+  // so the running errands are the whole job and a finished one from yesterday is history. An
+  // unsorted list of everything pushed the only card anyone needed below thirty five others.
+  const live=all.filter(s=>s.status!=='ended');
+  const done=all.filter(s=>s.status==='ended');
+  const rows=live.concat(done.slice(0,8));
+  el.innerHTML='<p class="note">'+live.length+' running, '+done.length+' finished'
+    +(done.length>8?' (showing the last 8)':'')+'.</p>'+rows.map(s=>{
     const live=s.status!=='ended';
     const waiting=s.status==='queued'&&!s.call_sid;
     return '<div class="card"><p><b>'+esc(s.target_label)+'</b> <span class="pill">'+esc(s.status)+'</span></p>'
