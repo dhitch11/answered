@@ -7,7 +7,7 @@
 // the positive ones: this file exists to prove that uncertainty resolves to RED, never to "dial".
 
 import assert from 'node:assert/strict';
-import { classify, DEFAULT_POLICY, LANES } from './lib/lane.mjs';
+import { classify, DEFAULT_POLICY, LANES, LICENSING_REQUIRED_STATES, BIOMETRIC_RISK_STATES } from './lib/lane.mjs';
 import { withinWindow, STATE_ZONES, MULTI_ZONE_STATES } from './lib/geo.mjs';
 import { suppress, suppression, paths } from './lib/store.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -25,16 +25,23 @@ const SHUT = new Date('2026-08-11T10:00:00Z');
 // A Saturday.
 const WEEKEND = new Date('2026-08-15T18:00:00Z');
 
-const base = { phone: '+15125550142', state: 'TX', lookupOk: true, callCount30d: 0 };
+// Ohio: single-timezone, no solicitor licensing gate, no biometric gate. The neutral state for
+// testing everything that is not itself about geography.
+const base = { phone: '+15125550142', state: 'OH', lookupOk: true, callCount30d: 0 };
+
+// ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
+// not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
+// two programs stood up, which is what the line-type and clock cases are actually about.
+const READY = { ...DEFAULT_POLICY, dncScrubbed: true, dncProceduresInPlace: true };
 
 console.log('\nLINE TYPE');
 test('a verified landline is dialable', () => {
-  const v = classify({ ...base, lineType: 'landline' }, DEFAULT_POLICY, new Set(), OPEN);
+  const v = classify({ ...base, lineType: 'landline' }, READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.AMBER);
   assert.equal(v.dialable, true);
 });
 test('fixed VoIP is a business line and is dialable', () => {
-  const v = classify({ ...base, lineType: 'fixedVoip' }, DEFAULT_POLICY, new Set(), OPEN);
+  const v = classify({ ...base, lineType: 'fixedVoip' }, READY, new Set(), OPEN);
   assert.equal(v.dialable, true);
 });
 test('a mobile is REFUSED without consent', () => {
@@ -78,13 +85,13 @@ console.log('\nSUPPRESSION AND FREQUENCY');
 test('a suppressed number is RED even with consent on file', () => {
   const v = classify(
     { ...base, lineType: 'landline', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'form' } },
-    DEFAULT_POLICY, new Set(['+15125550142']), OPEN,
+    READY, new Set(['+15125550142']), OPEN,
   );
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /suppression/);
 });
 test('the frequency cap blocks a second call inside 30 days', () => {
-  const v = classify({ ...base, lineType: 'landline', callCount30d: 1 }, DEFAULT_POLICY, new Set(), OPEN);
+  const v = classify({ ...base, lineType: 'landline', callCount30d: 1 }, READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
 });
 test('the cap stays inside the three-per-30-days ceiling in the regulation', () => {
@@ -115,7 +122,7 @@ test('consent for a different purpose does not', () => {
   assert.equal(v.dialable, false);
 });
 test('promotional content needs WRITTEN consent, not just consent', () => {
-  const policy = { ...DEFAULT_POLICY, promotional: true };
+  const policy = { ...READY, promotional: true };
   const v = classify(
     { ...base, lineType: 'landline', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'form', written: false } },
     policy, new Set(), OPEN,
@@ -125,13 +132,13 @@ test('promotional content needs WRITTEN consent, not just consent', () => {
 
 console.log('\nTHE CLOCK');
 test('a good number at a bad hour is HOLD, not RED', () => {
-  const v = classify({ ...base, lineType: 'landline' }, DEFAULT_POLICY, new Set(), SHUT);
+  const v = classify({ ...base, lineType: 'landline' }, READY, new Set(), SHUT);
   assert.equal(v.lane, LANES.HOLD);
   assert.equal(v.dialable, false);
   assert.ok(v.retryAt instanceof Date);
 });
 test('the weekend is closed', () => {
-  assert.equal(classify({ ...base, lineType: 'landline' }, DEFAULT_POLICY, new Set(), WEEKEND).lane, LANES.HOLD);
+  assert.equal(classify({ ...base, lineType: 'landline' }, READY, new Set(), WEEKEND).lane, LANES.HOLD);
 });
 test('a split state must clear the window in BOTH of its zones', () => {
   // 09:15 Central is inside the window, but the same instant is 08:15 Mountain, which is not.
@@ -161,9 +168,44 @@ test('every mapped zone is a real IANA zone the runtime accepts', () => {
   }
 });
 
+console.log('\nTHE PRECONDITIONS MANUAL DIALLING DOES NOT CURE');
+test('with no DNC program, nothing non-consented is dialable at all', () => {
+  const v = classify({ ...base, lineType: 'landline' }, DEFAULT_POLICY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /do-not-call registry|64\.1200\(d\)/);
+});
+test('64.1200(d) procedures are a condition precedent, not a mitigation', () => {
+  const scrubbedOnly = { ...DEFAULT_POLICY, dncScrubbed: true };
+  const v = classify({ ...base, lineType: 'landline' }, scrubbedOnly, new Set(), OPEN);
+  assert.equal(v.dialable, false);
+  assert.match(v.reasons.join(' '), /condition precedent/);
+});
+for (const st of ['TX', 'WA', 'FL']) {
+  test(`${st} is refused: registration and bond bind before the first call`, () => {
+    const v = classify({ ...base, state: st, lineType: 'landline' }, READY, new Set(), OPEN);
+    assert.equal(v.lane, LANES.RED);
+    assert.match(v.reasons.join(' '), /registration and bond/);
+  });
+}
+test('IL is refused while a voiceprint cannot be ruled out', () => {
+  const v = classify({ ...base, state: 'IL', lineType: 'landline' }, READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.RED);
+  assert.match(v.reasons.join(' '), /WRITTEN release/);
+});
+test('consent still clears the licensing states, because it is a different basis', () => {
+  const v = classify(
+    { ...base, state: 'TX', lineType: 'mobile', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'ring_test' } },
+    READY, new Set(), OPEN);
+  assert.equal(v.lane, LANES.GREEN);
+});
+test('the licensing and biometric lists are the verified ones, not guesses', () => {
+  assert.deepEqual([...LICENSING_REQUIRED_STATES].sort(), ['FL', 'TX', 'WA']);
+  assert.deepEqual([...BIOMETRIC_RISK_STATES], ['IL']);
+});
+
 console.log('\nOBLIGATIONS');
 test('a dialable call always carries the four legal obligations', () => {
-  const v = classify({ ...base, lineType: 'landline' }, DEFAULT_POLICY, new Set(), OPEN);
+  const v = classify({ ...base, lineType: 'landline' }, READY, new Set(), OPEN);
   for (const o of ['identify_caller_at_open', 'state_callback_number', 'disclose_ai_at_open', 'announce_recording_if_recorded']) {
     assert.ok(v.obligations.includes(o), `missing ${o}`);
   }
@@ -187,7 +229,7 @@ console.log('\nSUPPRESSION ROUND TRIP (write it, then read it back through the g
     }))();
 
     await (async () => test('a suppressed number is RED through the real gate', () => {
-      const v = classify({ ...base, phone: num, lineType: 'landline' }, DEFAULT_POLICY, set, OPEN);
+      const v = classify({ ...base, phone: num, lineType: 'landline' }, READY, set, OPEN);
       assert.equal(v.lane, LANES.RED);
       assert.match(v.reasons.join(' '), /suppression/);
     }))();

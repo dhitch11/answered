@@ -47,6 +47,29 @@ const LINE_TYPES = {
   unknown:         { fixed: false, personal: false },
 };
 
+/**
+ * ★ STATES THAT REQUIRE A TELEPHONE-SOLICITOR REGISTRATION AND/OR A BOND BEFORE THE FIRST CALL.
+ *
+ * These are LICENSING gates, not conduct rules: no script, no disclosure and no dialing technique
+ * cures them, and they bind before dial #1 rather than after some threshold.
+ *   TX  Bus. & Com. Code 302.101 + 302.107 ($10,000 security). 302.251(b) makes each unregistered
+ *       call a Class A misdemeanour and 302.252 extends that PERSONALLY to the individual rep.
+ *   WA  RCW 19.158.050 — an unregistered solicitor may not "maintain OR DEFEND a lawsuit" in state.
+ *   FL  Telemarketing Act 501.605 (FDACS licence, $1,500) + 501.611(2) ($50,000 minimum security).
+ *
+ * Texas and Florida are two of the largest contractor markets in the country, so suppressing them
+ * is a revenue decision and not a footnote. It is recorded here as a decision rather than buried.
+ */
+export const LICENSING_REQUIRED_STATES = new Set(['TX', 'WA', 'FL']);
+
+/**
+ * ★ ILLINOIS: BIPA 740 ILCS 14/15(b) requires a WRITTEN release before a voiceprint is collected,
+ * and no spoken call-open disclosure can supply one. Blocked until the transcription stack can
+ * demonstrably prove it performs no voice-based speaker modelling (channel separation is fine;
+ * a persisted voice embedding is not).
+ */
+export const BIOMETRIC_RISK_STATES = new Set(['IL']);
+
 export const DEFAULT_POLICY = {
   // Tighter than the 8am-9pm TCPA telemarketing window on purpose: we are calling businesses
   // and we want them at a desk, not at breakfast.
@@ -58,6 +81,20 @@ export const DEFAULT_POLICY = {
   // by artificial voice needs prior express WRITTEN consent. Research scripts carry no offer of
   // sale; the free Shadow Week is framed and logged as a research incentive, not a sale.
   promotional: false,
+
+  // ★ ADDED AFTER ADVERSARIAL VERIFICATION, 2026-08-14. Six independent lenses attacked the
+  // position that a manually dialled human-voice call is lawful for cold B2B prospecting. All six
+  // conceded the narrow statutory reading and all six rejected the conclusion, because the two
+  // regimes that actually govern this program contain NO dialing-technology element at all:
+  // 47 USC 227(c) / 47 CFR 64.1200(c)-(d) (the do-not-call program) and state all-party wiretap
+  // law. Manual dialing buys nothing against either.
+  //
+  // 47 CFR 64.1200(d) is a CONDITION PRECEDENT: "No person or entity shall initiate any call for
+  // telemarketing purposes ... UNLESS such person or entity has instituted procedures". A company
+  // with no written procedures has no safe harbour to invoke, so its first wrong call is
+  // unmitigated. These two flags are false because those programs do not exist yet.
+  dncScrubbed: false,          // national DNC registry, snapshot no older than 31 days
+  dncProceduresInPlace: false, // the six elements of 64.1200(d), written, trained, retained
 };
 
 /**
@@ -98,6 +135,27 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
   // --- frequency ----------------------------------------------------------------------------
   const cap = policy.maxCallsPer30Days ?? DEFAULT_POLICY.maxCallsPer30Days;
   if ((rec.callCount30d || 0) >= cap) return deny(`already called ${rec.callCount30d} time(s) in the last 30 days (cap ${cap})`);
+
+  // --- the preconditions manual dialling does NOT cure ---------------------------------------
+  // Six adversarial lenses attacked "a human dials and speaks, therefore it is lawful". All six
+  // conceded the narrow 227(b) reading and all six rejected the conclusion, because the regimes
+  // that actually govern have no dialling-technology element. These run for every non-consented
+  // call, AI-voiced or human-voiced, because none of them care which it is.
+  const st = String(rec.state || '').toUpperCase();
+  if (!consentValid) {
+    if (LICENSING_REQUIRED_STATES.has(st)) {
+      return deny(`${st} requires a telephone-solicitor registration and bond before the first call; a licensing gate no script or dialling method cures`);
+    }
+    if (BIOMETRIC_RISK_STATES.has(st)) {
+      return deny(`${st}: BIPA 740 ILCS 14/15(b) needs a WRITTEN release before any voiceprint, which a spoken disclosure cannot supply`);
+    }
+    if (!policy.dncScrubbed) {
+      return deny('the national do-not-call registry has not been scrubbed; 47 CFR 64.1200(c)(2) has no business exemption and the FCC expressly refused to create one in 2005');
+    }
+    if (!policy.dncProceduresInPlace) {
+      return deny('47 CFR 64.1200(d) is a condition precedent: without the written policy, training, internal list, identification, affiliate scope and five-year retention there is no safe harbour to invoke');
+    }
+  }
 
   // --- hour of day. Not a refusal, a deferral. ----------------------------------------------
   if (!rec.state) return deny('no source state on the record, so the local time cannot be established');
