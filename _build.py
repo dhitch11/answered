@@ -94,7 +94,36 @@ def _pretty_number(e164: str) -> str:
 # ★ DERIVED, NOT A SECOND ENV VAR. A separate ANSWERED_DEMO_NUMBER_PRETTY would be two variables
 # holding one fact, which is the same drift this whole exercise exists to kill: somebody updates the
 # E.164 one and the page keeps the old pretty one, silently, in the sentence carriers read.
-A2P_NUMBER = _pretty_number(os.environ.get('ANSWERED_DEMO_NUMBER', '')) or '(916) 350-4869'
+# ★ THE REGISTERED NUMBER IS A PINNED LITERAL, AND THE BUILD REFUSES TO DISAGREE WITH IT.
+#
+# This line used to be `_pretty_number(env) or '(916) 350-4869'`. The fallback was the DEAD number,
+# so any build whose environment was missing or stale silently published a number with no campaign
+# behind it, inside the one sentence a carrier reviewer reads. That is not a hypothetical: it
+# happened on 2026-08-15, when a build run from a control plane holding the old value reverted this
+# page from 282-5278 back to 350-4869 and the diff was one line among asset stamps.
+#
+# It is also, precisely, the fact pattern behind three A2P rejections: the site describing a
+# messaging program from a DIFFERENT number than the campaign registered. Error 30909.
+#
+# So the number the campaign registers is pinned here, deliberately, as the thing this file is
+# willing to be wrong about loudly rather than quietly. The environment is still read, but only to
+# CHECK: if it is set and disagrees, the build STOPS. A build that cannot name the registered
+# number must fail, because "still produces a page" is the wrong trade when the page is a
+# compliance artifact. Change this literal in the same commit as the campaign, never separately.
+A2P_REGISTERED_E164 = '+19162825278'      # the number the A2P campaign registers
+
+_env_number = (os.environ.get('ANSWERED_DEMO_NUMBER', '') or '').strip()
+if _env_number and _env_number != A2P_REGISTERED_E164:
+    raise SystemExit(
+        'BUILD STOPPED. ANSWERED_DEMO_NUMBER is %s but the A2P campaign is registered to %s.\n'
+        'One of them is wrong and publishing either guess is how this filing was rejected three\n'
+        'times. If the campaign moved, change A2P_REGISTERED_E164 in _build.py in the same commit.\n'
+        'If the environment is stale, fix the environment. Do not build around this.'
+        % (_env_number, A2P_REGISTERED_E164))
+
+A2P_NUMBER = _pretty_number(A2P_REGISTERED_E164)
+if not A2P_NUMBER:
+    raise SystemExit('BUILD STOPPED. A2P_REGISTERED_E164 is not a valid US E.164 number.')
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
