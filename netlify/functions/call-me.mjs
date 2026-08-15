@@ -706,15 +706,94 @@ async function handleApi(event) {
   });
 }
 
-/** GET: the sentence the page must render, and whether the line can take a call. */
-function handleGet() {
+// ── can this line ACTUALLY place a call, or are the keys merely present? ─────
+//
+// ★ THIS EXISTS BECAUSE `ready` WAS A LIE AND THE HERO IS BUILT ON IT.
+//
+// outboundConfig() checks that env vars are SET. That is a configuration check, and it was being
+// reported to the page as `ready: true — "The setup line is up."` while Twilio returned 401 to
+// every request on this account, including a plain account read. Measured 2026-08-15.
+//
+// A visitor would have typed their number, ticked a legal consent box, watched a button say
+// "Calling you now", and no phone would ever have rung. On this estate the rule is that A CONTROL
+// WHICH CANNOT ACT MUST NOT RENDER, and a hero CTA promising a call it cannot place is the worst
+// version of breaking it, because the visitor has already given us their number and their consent.
+//
+// PRESENCE OF A CREDENTIAL IS NOT THE ABILITY TO USE IT. So this asks the provider.
+//
+// It is CACHED and it BACKS OFF, because a vendor fetch per page view is a self-inflicted outage —
+// this repo took its whole site down today with exactly that shape in an edge function, where a
+// per-request health call blew the execution budget and every page returned 500.
+//
+// And the 401 sentence is deliberately careful: Twilio returns the SAME 401 for an unfunded or
+// suspended account as for a wrong key, so this reports what is observed and refuses to diagnose
+// which. Naming the wrong cause sends someone to rotate a key that was never broken.
+const CALL_READY_TTL_MS = 120_000;
+const CALL_READY_DOWN_BACKOFF_MS = 15 * 60_000;
+let callReadyCache = { at: 0, value: null };
+
+async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS } = {}) {
   const cfg = outboundConfig();
+  if (!cfg.ok) {
+    // A configuration failure is certain and free. Never spend a vendor round trip to confirm it.
+    return { ok: false, state: 'unconfigured', why: 'The setup line is not switched on right now.', detail: cfg.reason };
+  }
+
+  const ttl = (callReadyCache.value && callReadyCache.value.state === 'provider_unavailable')
+    ? CALL_READY_DOWN_BACKOFF_MS : maxAgeMs;
+  if (callReadyCache.value && Date.now() - callReadyCache.at < ttl) return callReadyCache.value;
+
+  const sid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+  let value;
+  try {
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}.json`, {
+      headers: { Authorization: twilioAuthHeader() },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (r.status === 401 || r.status === 403) {
+      value = { ok: false, state: 'provider_unavailable',
+        why: 'The setup line cannot place calls right now.',
+        detail: 'Twilio is rejecting every request on this account, including a plain account read. '
+              + 'Twilio returns the same error for a suspended or unfunded account as for a bad key, '
+              + 'so this does not say which. Check the account balance and status first, then the key.' };
+    } else if (!r.ok) {
+      value = { ok: false, state: 'provider_unavailable',
+        why: 'The setup line cannot place calls right now.',
+        detail: 'Twilio answered ' + r.status + ' to a plain account read.' };
+    } else {
+      const j = await r.json().catch(() => ({}));
+      const status = String(j.status || '').toLowerCase();
+      // An account can authenticate and still be suspended or closed, and a suspended account
+      // cannot dial. Asking only "did the credential work" would pass one that cannot make a call.
+      if (status && status !== 'active') {
+        value = { ok: false, state: 'account_' + status,
+          why: 'The setup line cannot place calls right now.',
+          detail: 'The Twilio account authenticates but reads status "' + status + '".' };
+      } else {
+        value = { ok: true, state: 'live', why: 'The setup line is up.' };
+      }
+    }
+  } catch (e) {
+    value = { ok: false, state: 'provider_unavailable',
+      why: 'The setup line cannot place calls right now.',
+      detail: 'Twilio did not answer a plain account read: ' + String((e && e.message) || e).slice(0, 120) };
+  }
+  callReadyCache = { at: Date.now(), value };
+  return value;
+}
+
+/** GET: the sentence the page must render, and whether the line can take a call. */
+async function handleGet() {
+  const r = await callReadiness();
   return json(200, {
     ok: true,
     consent_version: CONSENT_VERSION,
     consent_text: CONSENT_TEXT,
-    ready: cfg.ok,
-    reason: cfg.ok ? 'The setup line is up.' : 'The setup line is not switched on right now.',
+    // Measured against the provider, not inferred from the environment.
+    ready: r.ok,
+    state: r.state,
+    reason: r.why,
+    detail: r.detail || null,
   });
 }
 
