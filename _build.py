@@ -1208,6 +1208,18 @@ for slug in _CHROME:
     s = re.sub(r'<header class="nav">.*?</header>\s*<div class="sheet" id="sheet">.*?</div>\n',
                nav(active) + '\n', s, count=1, flags=re.S)
     s = re.sub(r'<footer class="foot">.*?</footer>', FOOT, s, count=1, flags=re.S)
+
+    # ── canonical ────────────────────────────────────────────────────────────
+    # Measured 2026-08-14: ZERO rel="canonical" across all twelve public pages,
+    # while every page is reachable at BOTH /pricing and /pricing.html because
+    # _extensionless() rewrites the links but the .html URL keeps answering 200.
+    # Two live URLs for one page, and nothing telling a crawler which is the
+    # real one. The canonical is always the EXTENSIONLESS form, because that is
+    # what every internal link now points at.
+    canon = 'https://answered.reddenda.com' + ('/' if slug == 'index.html' else '/' + slug[:-5])
+    s = re.sub(r'\n<link rel="canonical"[^>]*>', '', s)
+    s = s.replace('</head>', f'<link rel="canonical" href="{canon}">\n</head>', 1)
+
     p.write_text(s, encoding='utf-8')
     print('chrome normalised in', slug)
 
@@ -1755,7 +1767,22 @@ def _extensionless():
         if k:
             p.write_text(out, encoding='utf-8')
             n += k
-    print('extensionless links: %d rewritten' % n)
+    
+# ── sitemap ──────────────────────────────────────────────────────────────────
+# Measured 2026-08-14: /sitemap.xml was a 404. Generated from _CHROME, the same
+# discovered set the canonical tags come from, so the sitemap and the site can
+# never disagree about which pages exist. A hand-kept list would drift the first
+# time somebody added a page, which is the defect this file has already had twice.
+_sitemap_urls = ['https://answered.reddenda.com' + ('/' if n == 'index.html' else '/' + n[:-5])
+                 for n in _CHROME]
+(ROOT / 'sitemap.xml').write_text(
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    + ''.join(f'  <url><loc>{u}</loc></url>\n' for u in sorted(_sitemap_urls))
+    + '</urlset>\n', encoding='utf-8')
+print(f'sitemap: {len(_sitemap_urls)} urls, generated from the discovered page set')
+
+print('extensionless links: %d rewritten' % n)
 
 _extensionless()
 

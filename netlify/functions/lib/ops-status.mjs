@@ -57,6 +57,11 @@ export const ROUTES = [
   // A GET must be refused: this endpoint only ever accepts a signed POST from Stripe, and a 405
   // here is the proof it deployed. It is the only thing allowed to record that money moved, so if
   // it is missing, settlements silently stop being paid for and nothing else reports it.
+  // @LANE-DELIVERY's queue drain. Scheduled every 2 minutes AND reachable by path, so the sweep
+  // proves it deployed. It is not another lane's job to keep this list current: the staging guard
+  // refuses any deploy that publishes a path this file does not know about, which is how it was
+  // caught, and adding it here is additive and belongs to whoever trips the guard first.
+  { path: '/api/delivery/drain',   kind: 'api', expect: [200, 401, 403, 405], what: 'Drains the delivery queue on a schedule. Nothing a caller ever waits on.' },
   { path: '/api/parley-webhook',   kind: 'api', expect: [405, 400], what: 'Stripe telling us a settlement was actually paid. The only writer of a succeeded payout.' },
   // Internal, PIN-gated server-side. A 200 here is the LOGIN FORM, never the page: the content
   // lives inside the handler and is serialized only past the PIN. Its source file is deliberately
