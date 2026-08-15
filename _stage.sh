@@ -66,12 +66,16 @@ rsync -a --exclude 'node_modules' --exclude '*.test.mjs' "$REPO/netlify/function
 # where forgetting it would publish it.
 mkdir -p "$STAGE/research"
 rsync -a "$REPO/research/lib" "$STAGE/research"/
-# Edge functions. netlify.toml references call-control by name, so a stage without this directory
-# ships a config pointing at a function that does not exist. Copied whenever the directory exists,
-# rather than listed by name, for the reason the chrome loop learned today.
-if [ -d "$REPO/netlify/edge-functions" ]; then
-  rsync -a "$REPO/netlify/edge-functions" "$STAGE/netlify"/
-fi
+# ★ NO EDGE FUNCTIONS ARE SHIPPED, AND THE DIRECTORY IS DELIBERATELY ABSENT.
+# Netlify AUTO-LOADS netlify/edge-functions/ BY CONVENTION. Removing the [[edge_functions]] block
+# from netlify.toml does NOT disable a file sitting there: the file's own `export const config`
+# still applies, and call-control.ts declared `path: '/*'`, i.e. every page on the site.
+# That is how the whole site 500'd twice: I removed the toml declaration, believed it disabled,
+# and only my own deploys survived because I was manually deleting the directory from the stage
+# each time. A workaround carried in one person's head is not a fix, and the next lane to stage
+# normally shipped the outage.
+# The code is kept at docs/edge-experiments/ where nothing loads it. If it is ever revived, it must
+# be scoped to specific paths and load-tested against a cold isolate BEFORE it goes near '/*'.
 cp "$REPO/netlify.toml" "$STAGE/netlify.toml"
 
 # ── the step that was a no-op ────────────────────────────────────────────────
