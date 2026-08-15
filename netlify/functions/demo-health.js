@@ -134,7 +134,14 @@ async function probeTwilioNumber(event) {
   const keySid = (process.env.TWILIO_API_SID || '').trim();
   const keySecret = (process.env.TWILIO_API_SECRET || '').trim();
   const num = (process.env.ANSWERED_DEMO_NUMBER || '').trim();
+  const acct = (process.env.TWILIO_ACCOUNT_SID || '').trim();
   if (!keySid || !keySecret || !num) return probeFail('env not set');
+  if (!/^AC[0-9a-f]{32}$/i.test(acct)) {
+    // A malformed Account SID returns the SAME 20003 as a revoked key and as a dead account, which
+    // is how a truncated SID cost this estate an evening on 2026-08-15. Catch the shape here, where
+    // it can be named, instead of letting it surface as an indistinguishable auth failure.
+    return { landed: true, ok: false, reason: 'TWILIO_ACCOUNT_SID is not a valid Account SID (AC + 32 hex)' };
+  }
   const clean = num.replace(/[^+\d]/g, '');
   if (!/^\+\d{10,15}$/.test(clean)) return probeFail('ANSWERED_DEMO_NUMBER is not E.164');
   try {
@@ -144,10 +151,27 @@ async function probeTwilioNumber(event) {
     if (down0) {
       return { landed: true, ok: false, reason: 'Twilio has been refusing every request for ' + down0.minutes + ' minutes. Not retrying until the window clears.' };
     }
-    const r = await fetch('https://lookups.twilio.com/v2/PhoneNumbers/' + encodeURIComponent(clean), {
-      headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
-      signal: AbortSignal.timeout(5000),
-    });
+    // ★ OWNERSHIP, NOT VALIDITY. This used to call Lookup, which answers "does this number exist
+    // anywhere in the world" and says NOTHING about whether it is ours. Measured 2026-08-15, on the
+    // new Twilio account, minutes after the credentials landed: Lookup returned valid:true for
+    // +1 (916) 350-4869 and this probe went GREEN, while the account owned ZERO phone numbers. The
+    // gate would have published a number we do not control, the client and the edge function would
+    // have rendered it as a real tel: link, and a visitor tapping it would have dialled a stranger.
+    //
+    // That is a fail-open on the one surface whose entire job is to fail closed, and it is exactly
+    // the shape of every other one found today: the check ran, returned 200, and answered a
+    // different question from the one being asked.
+    //
+    // IncomingPhoneNumbers filtered by the number is the question we actually mean: does THIS
+    // account own THIS line. An empty list is a definitive no.
+    const r = await fetch(
+      'https://api.twilio.com/2010-04-01/Accounts/' + encodeURIComponent(acct)
+      + '/IncomingPhoneNumbers.json?PhoneNumber=' + encodeURIComponent(clean),
+      {
+        headers: { Authorization: 'Basic ' + Buffer.from(keySid + ':' + keySecret).toString('base64') },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
     if (!r.ok) {
       // A suspended Twilio account answers exactly like a bad key, so back off
       // rather than asking again in 60 seconds forever. The capability is not
@@ -161,7 +185,18 @@ async function probeTwilioNumber(event) {
       return { landed: true, ok: false, reason: 'lookup returned ' + r.status };
     }
     const j = await r.json();
-    if (j.valid !== true) return { landed: true, ok: false, reason: 'lookup says the number is not valid' };
+    const owned = Array.isArray(j.incoming_phone_numbers) ? j.incoming_phone_numbers : [];
+    if (!owned.length) {
+      return {
+        landed: true, ok: false,
+        reason: 'this Twilio account does not own ' + clean + ', so nothing would answer it',
+      };
+    }
+    // Owning it is not enough: a number with no voice webhook rings and does nothing.
+    const hook = owned[0].voice_url || '';
+    if (!hook) {
+      return { landed: true, ok: false, reason: 'we own ' + clean + ' but it has no voice webhook, so a call would ring into nothing' };
+    }
     return { landed: true, ok: true, reason: '' };
   } catch (e) {
     return probeFail('request failed: ' + String(e && e.message).slice(0, 80));
@@ -352,6 +387,37 @@ exports.handler = async (event) => {
   }
 
   const now = Date.now();
+
+  // ★ AN OPERATOR MUST BE ABLE TO END AN OUTAGE EARLY.
+  // The provider backoff exists so a dead vendor is not hammered, and it clears itself 30 minutes
+  // after the last hard refusal. That is right when nobody is watching and wrong the moment
+  // somebody fixes the cause: on 2026-08-15 new Twilio credentials were installed and verified
+  // working against the live API, and the gate stayed red anyway because a marker written half an
+  // hour earlier had not aged out. A backoff with no manual clear is an outage you cannot end.
+  //
+  // So: ?recheck=<ANSWERED_BRAIN_SECRET> clears the marker AND busts the 60s cache. It is
+  // authenticated, because an anonymous version would let anyone strip the protection that stops us
+  // hammering a vendor, and it is a query parameter on a GET because the person using it is an
+  // operator with a terminal, mid-incident.
+  const wantsRecheck = (() => {
+    const q = (event.queryStringParameters && event.queryStringParameters.recheck) || '';
+    const secret = (process.env.ANSWERED_BRAIN_SECRET || '').trim();
+    if (!q || !secret) return false;
+    const a = Buffer.from(String(q));
+    const b = Buffer.from(secret);
+    return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
+  })();
+  if (wantsRecheck) {
+    try {
+      const pd = await import('./lib/provider-down.mjs');
+      await pd.markUp('twilio', event);
+      console.warn('demo-health: operator forced a recheck; twilio backoff cleared and cache busted.');
+    } catch (e) {
+      console.error('demo-health: could not clear the backoff:', String(e && e.message).slice(0, 120));
+    }
+    cached = { at: 0, body: null };
+  }
+
   let body = cached.body;
   if (!body || now - cached.at > CACHE_MS) {
     const headers = {};
