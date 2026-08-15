@@ -125,6 +125,47 @@ function toAnthropicMessages(inMsgs) {
 // parse. Everything the model produces is treated as a claim, not an
 // instruction, right up until lib/tools.mjs has checked it.
 
+// ── the owner's own instructions, when there are more of them than fit ───────
+//
+// Reported by @LANE-SEARCHLIGHT and verified here: this used to be
+// `incomingSystem.slice(0, 4000)`. It kept the first 4,000 characters and dropped the rest in
+// silence. No log, no counter, nothing in the transcript. The call sounded fine and the model
+// behaved plausibly while half the owner's rules had never arrived.
+//
+// ★ WHY THE TAIL IS THE WORST PART TO LOSE. People write the setup first and the caveats last.
+// "Important:", "Never say...", "If they ask about pricing, do not quote a number." That is the
+// shape of human writing, and the end is exactly what a head-slice throws away.
+//
+// ★ AND WHAT WAS *NOT* WRONG, because the first report of this overstated it: the persona's safety
+// spec is assigned to `system` BEFORE this runs and is never sliced. Safety rules were never at
+// risk. What was lost was the owner's own instructions, which is a real defect and a smaller one.
+//
+// So: keep both ends, and TELL THE MODEL something was dropped. A model that silently receives
+// partial instructions answers confidently from the half it got. A model that is told its notes
+// were clipped can say it will check, which is the behaviour we want at exactly that moment.
+const OWNER_NOTE_LIMIT = 4000;
+
+export function fitOwnerNotes(notes, persona) {
+  const s = String(notes || '');
+  if (s.length <= OWNER_NOTE_LIMIT) return s;
+
+  // 60/40 favouring the tail, because the caveats live there.
+  const head = Math.floor(OWNER_NOTE_LIMIT * 0.55);
+  const tail = OWNER_NOTE_LIMIT - head;
+  const gap =
+    '\n\n[Some of these notes were too long to include and part of the middle was left out. '
+    + 'If something comes up that these notes do not cover, do not guess and do not fill the gap: '
+    + 'say you will check with the owner and come back.]\n\n';
+
+  console.warn(
+    `answered-brain: owner notes for persona ${persona && persona.id} are ${s.length} characters, `
+    + `over the ${OWNER_NOTE_LIMIT} limit. Keeping the first ${head} and the last ${tail}; `
+    + `${s.length - OWNER_NOTE_LIMIT} characters of the middle were dropped and the model was told so.`,
+  );
+
+  return s.slice(0, head) + gap + s.slice(-tail);
+}
+
 const TOOL_NOTE = '[the booking system answered]';
 const toolName = (tc) => (tc && ((tc.function && tc.function.name) || tc.name)) || '';
 
@@ -474,7 +515,7 @@ export default async (req) => {
   // always win; for the customer line, the owner's rules win on every fact
   // about his business and never on safety.
   let system = persona.spec;
-  if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + incomingSystem.slice(0, 4000);
+  if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + fitOwnerNotes(incomingSystem, persona);
   if (assistantTurns >= persona.softCloseAt) system += '\n\n' + persona.softCloseNote;
 
   const offered = offeredTools(persona, body, inMsgs);
