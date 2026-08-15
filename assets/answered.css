@@ -3314,3 +3314,9 @@ section > .wrap > .two > div > p.src:last-child { margin-top: var(--r-tail) !imp
   .ring-tel { flex: 1 0 100%; }
   .ring-go  { flex: 1 0 100%; }     /* full width, so the tap target is the screen width */
 }
+
+/* THE DOWN STATE. The consent sentence stays readable, because a person and a carrier reviewer
+   both have a right to see what they would be agreeing to, and the control is unmistakably off. */
+.ring-down .ring-tel, .ring-down .ring-go { opacity: .55; cursor: not-allowed; }
+.ring-down .ring-go { background: var(--ink-800, #23272D); color: var(--t2, rgba(242,244,240,.66)); }
+.ring-down .ring-consent { opacity: 1; }

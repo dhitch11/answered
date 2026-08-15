@@ -2179,11 +2179,37 @@
     return 'consumer';
   }
 
-  // Ask whether the line can take a call. Only on yes does the form appear.
+  // Ask whether the line can take a call.
+  //
+  // ★ THERE ARE TWO DIFFERENT QUESTIONS HERE AND THE FIRST VERSION CONFLATED THEM.
+  //
+  // "May this button place a call" and "may a person read what they would be agreeing to" are not
+  // the same question, and hiding the whole form when the line is down answered the second one
+  // wrongly. It also broke something concrete: a 10DLC campaign reviewer has to be able to REACH
+  // the opt-in surface and read the consent language at a public URL, and a form that vanishes
+  // whenever the carrier has a bad minute is a form they cannot review. The most cited A2P
+  // rejection reasons after a brand mismatch are a call-to-action the reviewer cannot see and
+  // opt-out language that is described rather than shown.
+  //
+  // So the consent sentence is ALWAYS rendered and the control is what gets gated. A visibly
+  // disabled button that states its own reason is honest; the rule against rendering a control
+  // that cannot act is about controls that LOOK live and are not.
   fetch('/api/call-me', { headers: { accept: 'application/json' } })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
-      if (!d || d.ready !== true || !d.consent_text) return;   // stay hidden, silently
+      if (!d || !d.consent_text) return;                       // no published sentence: stay hidden
+      if (d.ready !== true) {
+        // Readable, reviewable, and unmistakably not armed.
+        consentText = String(d.consent_text);
+        consentT.textContent = consentText;
+        form.hidden = false;
+        form.classList.add('ring-down');
+        tel.disabled = true; ok.disabled = true; go.disabled = true;
+        go.textContent = 'Not placing calls right now';
+        say(d.reason || 'The setup line is not placing calls this minute, so we are not going to '
+                      + 'offer you one it cannot make.', 'warn');
+        return;
+      }
       consentText = String(d.consent_text);
       consentT.textContent = consentText;
       form.hidden = false;
