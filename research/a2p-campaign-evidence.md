@@ -194,6 +194,69 @@ Stated because a reviewer trusts a filing that draws its own boundaries:
 
 ---
 
+## ★ 9b. THE CAMPAIGN WAS FILED AND REJECTED TWICE. THE CAUSE IS ONE WRONG FIELD, AND IT IS NOT ON THIS PAGE.
+
+**Added 2026-08-15 by @LANE-SEARCHLIGHT after driving the whole chain live.** Nothing in sections 1
+to 9 is wrong. The evidence is good. The rejection is somewhere nobody was looking.
+
+**What went through, all measured:**
+
+| Object | SID | State |
+|---|---|---|
+| TwinFlame secondary customer profile | `BUdfa2eea2aed28550d50914a56db86f26` | **twilio-approved** |
+| TwinFlame Standard A2P bundle v2 | `BUb311e948fd48ce790250e72fd5452e5f` | evaluated **compliant**, submitted, **in-review** |
+| TwinFlame brand | `BN24a7a4a0cc7d6e56dba14c5a1606ec64` | **APPROVED**, identity **VETTED_VERIFIED**, tcr **BP01ODH** |
+| Campaign | `QE2c6890da8086d771620e9b13fadeba0b` | **FAILED**, twice |
+
+**Both failures, both times, identical:**
+- `30908 PRIVACY_POLICY_URL` — "a compliant privacy policy can not be verified"
+- `30882 TERMS_AND_CONDITIONS_URL` — "rejected due to Terms and Conditions issues"
+
+**★ THE CAUSE: the customer profile's `website_url` is `https://futureful.app/`.**
+Not answered.reddenda.com. The reviewer went to a workforce-development site to look for the
+Answered texting program's policies. Measured on that site: **zero privacy links, zero terms links,
+zero occurrences of the phrase "privacy policy" anywhere in 517,756 bytes.** It was always going to
+be rejected.
+
+**Our pages are fine and were never the problem.** Re-measured today: `/privacy` 200/18,075 bytes
+carries never-share, never-sell, the mobile number, and the opt-in fact itself, with none of the
+disqualifying third-party-marketing pattern. `/terms` 200/25,547 bytes carries the program section,
+frequency, rates, STOP, HELP and carrier non-liability. `/pricing` carries the full disclosure and
+its Terms and Privacy links both resolve 200.
+
+**I tested the cheap fix first and it failed, which is how we know the cause for certain.** I
+deleted the campaign and refiled it with both policy URLs written literally into `Description` and
+`MessageFlow`, the only two fields a reviewer reads. **Same two errors.** So the check is against
+the brand's registered website and cannot be satisfied from campaign copy. That was worth one
+filing to establish, and it means nobody should spend another one trying variations of the wording.
+
+**Why it cannot be fixed by API, both measured:**
+- Editing the business-information record returns **70002, "a bundle it belongs to is in an
+  immutable state"**. An approved profile is frozen.
+- Editing the brand returns **21725, "Brands can only be updated when they are in FAILED state"**.
+  Ours is APPROVED, so it is out of reach in the other direction.
+- Creating a replacement profile returns **"Secondary Customer Profile for direct_customer can only
+  be created through Twilio console."** Section 10 already said this and it is still true.
+
+**THE FIX, and it is the only one: a new secondary customer profile in the Console with
+`website_url = https://answered.reddenda.com`.** Everything downstream then re-runs in about ten
+minutes, because `netlify/functions/a2p-advance.mjs` now carries the chain the whole way: it
+evaluates, submits the bundle, waits for the brand, and files the campaign itself. Point its
+`PROFILE_SID`, `BUNDLE_SID` and `BRAND_SID` at the new objects and it does the rest unattended.
+
+**Do NOT file this campaign under the approved SMI brand to get around it.** SMI is a separate
+non-profit with a different EIN, the brand carries `tax_exempt_status: 501c3`, and its site is
+sminet.org while the opt-in lives on answered.reddenda.com. That is the same website mismatch that
+just failed twice, plus an entity mismatch, and a suspended brand would take SMI's approval down
+with it.
+
+**One thing this did settle, which section 8 asked for.** Twilio overwrote the opt-out and help
+copy we submitted with its own, and returned the keyword set `CANCEL, QUIT, STOP, OPTOUT,
+UNSUBSCRIBE, STOPALL, REVOKE, END`. **That is Advanced Opt-Out active on the Messaging Service,
+confirmed by observing what the platform did rather than by reading a checkbox.**
+
+---
+
 ## 10. Open, and honest
 
 - **The secondary customer profile for TwinFlame Investments LLC is console-only.** Twilio refuses
