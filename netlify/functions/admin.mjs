@@ -1164,9 +1164,21 @@ async function cockpitBoard() {
         ? { ok: false, why: sms.why }
         : { ok: true, why: 'Twilio is answering on this account.' },
       sms: { ok: Boolean(sms.ok), state: sms.state, why: sms.why },
-      email: outreach.emailConfigured()
-        ? { ok: true, why: 'Resend is configured. ' + (board.book ? board.book.emailable : 0) + ' leads in the book are reachable by email right now.' }
-        : { ok: false, why: 'RESEND_API_KEY is not set on this deploy, so nothing can be sent.' },
+      // ★ THIS LAMP SAID "N leads in the book are reachable by email right now" AND THAT WAS A
+      // PERMISSION CLAIM COMPUTED FROM A PROPERTY. The count is has-an-address minus suppressed;
+      // the outbound lane's classifyEmail() refuses every one of them. The lamp now reports the
+      // provider AND the programme separately, because a working mail key is not a cleared channel.
+      email: !outreach.emailConfigured()
+        ? { ok: false, why: 'RESEND_API_KEY is not set on this deploy, so nothing can be sent.' }
+        : process.env.ANSWERED_EMAIL_PROGRAM_READY === '1'
+          ? { ok: true, why: 'Resend is configured and the email programme is marked cleared. ' +
+                (board.book ? board.book.emailable : 0) + ' leads hold an address and are not suppressed.' }
+          : { ok: false, why: 'Resend is configured, but the email programme is NOT cleared, so no ' +
+                'address in the book is permission to send. ' + (board.book ? board.book.emailable : 0) +
+                ' leads hold an address: that is a property. CAN-SPAM applies in full to a cold ' +
+                'commercial message, and California carries $1,000 per message with a private right ' +
+                'a business may bring. Arm it with ANSWERED_EMAIL_PROGRAM_READY=1 once the postal ' +
+                'address, opt-out, suppression list, domain authentication and state reading are real.' },
       ai: ai,
     },
   };

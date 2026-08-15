@@ -163,16 +163,51 @@ export async function preflight(contactId) {
   if (!db) return null;
   const sms = await smsReadiness();
 
-  const emailOk = emailConfigured() && db.email_db.ok;
+  // ★ EMAIL IS NOT THE OPEN CHANNEL, AND THIS GATE USED TO TREAT IT AS ONE.
+  //
+  // It was `emailConfigured() && db.email_db.ok` — a working mail key plus an address on the record.
+  // That is a PROPERTY test wearing a permission's name, and it would have armed a send to every
+  // business in the book that happens to have published an address.
+  //
+  // `research/lib/lane.mjs classifyEmail()` is the authority and it REFUSES every record we hold
+  // today, for program-level reasons that no per-record data can satisfy: no 16 CFR 316.2(p) postal
+  // address on file, no opt-out mechanism exercised end to end, no live email suppression list for
+  // an opt-out to land in, an unauthenticated sending domain, and not one state's surviving
+  // falsity-based email statute actually read. It also refuses on two RECORD-level unknowns:
+  // an unconfirmed suppression state, and an unchecked no-transfer notice — the third element of
+  // 15 USC 7704(b)(1)(A)(i), the line between an ordinary and an aggravated violation, which our
+  // collector never looked for.
+  //
+  // The trade is not that email is "easier". CAN-SPAM has no private right of action, but Cal. B&P
+  // 17529.5 carries $1,000 per message with a private right a BUSINESS may bring, and WA CEMA
+  // carries $500. Phone risk is gateable by subscribing to a registry; email risk is litigation
+  // risk, and no subscription immunises it.
+  //
+  // So this fails CLOSED behind an explicit arming flag, the same shape as ANSWERED_BILLING_ARMED:
+  // absent is the safe default, and the day the programme is genuinely ready the flag re-arms every
+  // surface with no deploy. Nothing here hardcodes "blocked" — it hardcodes "prove it first".
+  const programReady = process.env.ANSWERED_EMAIL_PROGRAM_READY === '1';
+  const emailOk = emailConfigured() && db.email_db.ok && programReady;
   const callOk = db.call.ok && !callingDisarmed();
 
   return {
     ...db,
     email: {
       ok: emailOk,
+      program_ready: programReady,
       why: !emailConfigured()
         ? 'RESEND_API_KEY is not set on this deploy, so nothing can be sent.'
-        : db.email_db.why,
+        : !db.email_db.ok
+          ? db.email_db.why
+          : !programReady
+            ? 'The email programme is not cleared, so this is a property of the record rather than ' +
+              'permission to use it. classifyEmail() in the outbound lane refuses every record we ' +
+              'hold: no valid physical postal address on file, no opt-out exercised end to end, no ' +
+              'live suppression list for one to land in, an unauthenticated sending domain, and no ' +
+              'state email statute read. CAN-SPAM has no private right of action, but California ' +
+              'carries $1,000 per message and Washington $500, both suable by a business recipient. ' +
+              'Set ANSWERED_EMAIL_PROGRAM_READY=1 once that is genuinely true and this re-arms itself.'
+            : db.email_db.why,
     },
     sms: {
       // Both halves must be true: the line must accept texts AND the carrier must accept us.
