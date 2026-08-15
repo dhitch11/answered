@@ -212,11 +212,11 @@ html:not(.js) .su-nojs { display: block; }
   <div class="wrap">
     <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
     <nav class="nav-links" aria-label="Primary"><a href="/trades">Answered</a><a href="/hold">Hold</a><a href="/recover">Recover</a><a href="/pricing">Pricing</a><a href="/trust">Trust</a></nav>
-    <a class="nav-cta" href="/#early">Tell me when it is my turn</a>
+    <a class="nav-cta" href="/setup">Set your rules</a>
     <button class="burger" aria-label="Menu" aria-expanded="false" aria-controls="sheet"><span></span></button>
   </div>
 </header>
-<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/#early">Tell me when it is my turn</a></div>
+<div class="sheet" id="sheet"><a href="/trades"><span class="sh-l">Answered</span><span class="sh-d">Answers your line</span></a><a href="/hold"><span class="sh-l">Hold</span><span class="sh-d">Waits on hold for you</span></a><a href="/recover"><span class="sh-l">Recover</span><span class="sh-d">Chases what you are owed</span></a><a href="/pricing"><span class="sh-l">Pricing</span><span class="sh-d">Outcomes only, never minutes</span></a><a href="/trust"><span class="sh-l">Trust</span><span class="sh-d">How you audit every call</span></a><a class="nav-cta" href="/setup">Set your rules</a></div>
 <main id="main">
 
 <section class="pad" style="padding-top:calc(var(--nav-h) + clamp(48px,7vw,96px))">
@@ -538,6 +538,7 @@ html:not(.js) .su-nojs { display: block; }
       <div>
         <a class="brand" href="/" aria-label="Answered, home"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect class="bm-stem" x="3" y="2" width="5.2" height="20" rx="2.2" fill="var(--bronze)"/><path class="bm-a1" d="M 11.5 6.284 A 6.6 6.6 0 0 1 11.5 17.716" fill="none" stroke="var(--bronze)" stroke-width="4.8" stroke-linecap="round"/><path class="bm-a2" d="M 15.838 3.808 A 11.2 11.2 0 0 1 15.838 20.192" fill="none" stroke="var(--bronze)" stroke-width="3" stroke-linecap="round"/></svg><span class="brand-name"><b>ANSWERED</b></span></a>
         <p class="small" style="margin-top:16px;max-width:38ch">The phone layer. It answers, it waits, it follows the money. Priced per outcome, never per minute.</p>
+        <p class="src" style="margin-top:10px;max-width:38ch">Every number sourced. Every call auditable. Every price an offer, not an estimate.</p>
       </div>
       <div>
         <h4>Products</h4>
@@ -545,22 +546,50 @@ html:not(.js) .su-nojs { display: block; }
           <li><a href="/trades">Answered, for your line</a></li>
           <li><a href="/hold">Hold, for everyone</a></li>
           <li><a href="/recover">Recover, for your invoices</a></li>
+          <li><a href="/parley">Parley, for settling a price</a></li>
+        </ul>
+      </div>
+      <!-- ★ A WAY TO REACH A PERSON THAT DOES NOT DEPEND ON THE PHONE LINE.
+           Measured 2026-08-14 across all twelve public pages: zero tel: links, and no mailto, no
+           calendar link, no contact route of any kind except one buried in /terms. A visitor who
+           wanted to talk to somebody had nothing.
+
+           The site is not missing the CAPABILITY: 21 health-gated call slots are wired across nine
+           pages and build a real tel: link on a phone the moment /api/demo-health goes green. The
+           gate is red because the telephony account is unfunded, so all 21 are dark at once and the
+           site silently became a phone company you cannot contact.
+
+           That is the estate's own rule landing on us: when the gate is red, the FALLBACK is the
+           product. So this column is deliberately NOT gated on anything. Email works today, it is
+           answered by a person, and it keeps working on the worst day the phone line has. -->
+      <div>
+        <h4>Talk to a person</h4>
+        <ul>
+          <li><a href="mailto:info@reddenda.com">info@reddenda.com</a></li>
+          <li><span class="src">A person reads every one. Usually same day.</span></li>
+          <!-- Uses the SAME health gate as every other call slot, rather than a second mechanism
+               that could disagree with it. Green: this becomes a real call control, and a tel:
+               link on a phone. Red: the honest sentence stays, and the email above still works. -->
+          <li><span class="cta-slot" data-callslot="Call the line yourself"><span class="src">We only show the number when the line is genuinely answering. Right now it is not.</span></span></li>
         </ul>
       </div>
       <div>
         <h4>Company</h4>
         <ul>
+          <li><a href="/account">Your account</a></li>
           <li><a href="/setup">How you set it up</a></li>
           <li><a href="/pricing">Pricing</a></li>
           <li><a href="/trust">Trust and guardrails</a></li>
           <li><a href="/#honesty">What we will not say</a></li>
+          <li><a href="/terms">The terms, in plain words</a></li>
+          <li><a href="/privacy">Privacy and texting</a></li>
+          <li><a href="/recording">If your call was recorded</a></li>
         </ul>
       </div>
     </div>
     <div class="foot-base">
       <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
       <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
-      <p class="src">The rest of the fine print: <a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/recording">You talked to an AI</a></p>
     </div>
   </div>
 </footer>

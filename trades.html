@@ -306,6 +306,30 @@
           <li><a href="/parley">Parley, for settling a price</a></li>
         </ul>
       </div>
+      <!-- ★ A WAY TO REACH A PERSON THAT DOES NOT DEPEND ON THE PHONE LINE.
+           Measured 2026-08-14 across all twelve public pages: zero tel: links, and no mailto, no
+           calendar link, no contact route of any kind except one buried in /terms. A visitor who
+           wanted to talk to somebody had nothing.
+
+           The site is not missing the CAPABILITY: 21 health-gated call slots are wired across nine
+           pages and build a real tel: link on a phone the moment /api/demo-health goes green. The
+           gate is red because the telephony account is unfunded, so all 21 are dark at once and the
+           site silently became a phone company you cannot contact.
+
+           That is the estate's own rule landing on us: when the gate is red, the FALLBACK is the
+           product. So this column is deliberately NOT gated on anything. Email works today, it is
+           answered by a person, and it keeps working on the worst day the phone line has. -->
+      <div>
+        <h4>Talk to a person</h4>
+        <ul>
+          <li><a href="mailto:info@reddenda.com">info@reddenda.com</a></li>
+          <li><span class="src">A person reads every one. Usually same day.</span></li>
+          <!-- Uses the SAME health gate as every other call slot, rather than a second mechanism
+               that could disagree with it. Green: this becomes a real call control, and a tel:
+               link on a phone. Red: the honest sentence stays, and the email above still works. -->
+          <li><span class="cta-slot" data-callslot="Call the line yourself"><span class="src">We only show the number when the line is genuinely answering. Right now it is not.</span></span></li>
+        </ul>
+      </div>
       <div>
         <h4>Company</h4>
         <ul>

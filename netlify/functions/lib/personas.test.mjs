@@ -442,6 +442,36 @@ t('riley alone answers the is-this-real question, because only she is a demo', (
   }
 });
 
+t('the disclosure is in the WORDS, not just in the rule firing', () => {
+  // ★ RELAYED FROM THE FUTUREFUL VOICE LANE, 2026-08-14, and it is worth guarding here because
+  // their line failed exactly this way: asked "is this an AI?" it answered "there's a real person
+  // behind the listening part." False, and a California disclosure exposure. Their conclusion was
+  // that prose inside a long prompt does not enforce itself.
+  //
+  // Our answer is deterministic, so the model never writes it, and the test above already asserts
+  // the RULE fires (`by === 'ai-asked'`). But a rule firing is not the right words being spoken:
+  // that is the estate's own "a tool firing is not its number being spoken". So this asserts the
+  // TEXT a caller actually hears.
+  const asks = ['is this an AI', 'are you a real person', 'am i talking to a robot',
+                'is this a recording', 'you sound fake, are you a bot'];
+  const CLAIMS_HUMAN = /\b(?:i am|i'm)\s+(?:a\s+)?(?:real|human|actual)\b|\breal person\b|\bnot a (?:bot|robot|computer|machine|recording)\b/i;
+  const SAYS_AI = /\b(?:a\s*i|ai|artificial)\b|\bassistant\b|\bvirtual\b/i;
+  for (const id of ['riley', 'customer']) {
+    const p = PERSONAS[id];
+    for (const q of asks) {
+      const d = deterministicLine(p, q, 1);
+      const said = String((d && (d.line || d.text)) || '');
+      assert.ok(said, `${id} said nothing to "${q}"`);
+      assert.ok(SAYS_AI.test(said), `${id} did not disclose it is an AI when asked "${q}": ${said}`);
+      assert.ok(!CLAIMS_HUMAN.test(said), `${id} claimed to be a person when asked "${q}": ${said}`);
+    }
+  }
+  // POSITIVE CONTROL: the matchers must be capable of failing, or every line above passes forever.
+  assert.ok(CLAIMS_HUMAN.test("there's a real person behind the listening part"),
+    'the human-claim matcher cannot catch the exact sentence that caused the incident');
+  assert.ok(!SAYS_AI.test('let me grab that for you'), 'the disclosure matcher fires on anything');
+});
+
 t('a stop on an outbound call is returned unresolved, never as a claim', () => {
   const d = deterministicLine(scout, 'take me off your list', 0);
   assert.equal(d.stop, true);
