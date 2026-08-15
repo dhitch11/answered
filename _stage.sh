@@ -165,6 +165,17 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
+# ── published numbers ────────────────────────────────────────────────────────
+# A published phone number is a claim that DECAYS: it is correct when written and
+# nothing asks again. Twilio recycles released numbers, so a page printing one we
+# no longer own becomes a signpost to a stranger while still claiming to be us.
+# WARNS rather than blocks: the fix is usually a business decision (port, buy, or
+# rewrite the copy), and a guard that blocks every deploy on a pending decision
+# is a guard somebody disables. Run the script directly for a hard gate.
+if [ -f "$REPO/_published-numbers.mjs" ]; then
+  node "$REPO/_published-numbers.mjs" --live 2>&1 | sed 's/^/  /' || true
+fi
+
 cat <<EOF
 Staging tree is ready and every check above passed.
 
