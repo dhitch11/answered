@@ -2116,3 +2116,128 @@
     }, 0);
   });
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TURN IT ON — the hero's one line, one click.
+
+   A visitor types their mobile number, ticks the consent box, and /api/call-me
+   places a REAL outbound call in which a setup voice walks them through
+   switching their line on. The endpoint was already built to a high standard
+   and no page had ever called it.
+
+   FIVE RULES THIS MODULE OBEYS, each one paid for elsewhere on this estate:
+
+   1. A CONTROL THAT CANNOT ACT MUST NOT RENDER. The form stays hidden until the
+      server says a call can actually be placed. That readiness is measured
+      against the provider now, not against the presence of env vars: it used to
+      report "the setup line is up" while the carrier refused every request, and
+      a hero built on that flag would have taken a real number and a real legal
+      consent and then rung nobody.
+
+   2. THE CONSENT SENTENCE IS THE SERVER'S, VERBATIM. It is fetched, not written
+      here. The server compares what it receives against what it published and
+      refuses a mismatch, so a hardcoded copy would start failing silently the
+      day the wording changes, on every cached page, with no error anyone sees.
+
+   3. THE REFUSAL COPY IS THE SERVER'S TOO. call-me already writes a human
+      sentence for all fifteen of its refusal codes. This renders `reason`
+      rather than keeping a second table of strings, because two copies of a
+      sentence drift and the visitor gets whichever one is stale.
+
+   4. THE TRACK RIDES ALONG. The segment control at the top of the page already
+      knows whether this is a person or a business. That answer is sent with the
+      request instead of asking the visitor a question they have already
+      answered.
+
+   5. NO JAVASCRIPT, NO FORM. The endpoint takes JSON, so a native submit could
+      not work. Rather than render a control that breaks on submit, the original
+      call to action is left exactly where it was.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (!window.fetch) return;
+
+  var form = document.getElementById('ring');
+  if (!form) return;
+
+  var tel      = document.getElementById('ring-tel');
+  var ok       = document.getElementById('ring-ok');
+  var go       = document.getElementById('ring-go');
+  var note     = document.getElementById('ring-note');
+  var consentT = document.getElementById('ring-consent-text');
+  var consentText = '';
+  var busy = false;
+
+  function say(msg, tone) {
+    note.textContent = msg || '';
+    note.className = 'ring-note' + (tone ? ' ring-' + tone : '');
+  }
+
+  function track() {
+    // The audience the visitor already chose. Never ask twice.
+    if (document.body.classList.contains('track-biz')) return 'business';
+    return 'consumer';
+  }
+
+  // Ask whether the line can take a call. Only on yes does the form appear.
+  fetch('/api/call-me', { headers: { accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || d.ready !== true || !d.consent_text) return;   // stay hidden, silently
+      consentText = String(d.consent_text);
+      consentT.textContent = consentText;
+      form.hidden = false;
+      form.setAttribute('data-consent-version', String(d.consent_version || ''));
+    })
+    .catch(function () { /* stay hidden. An unknown line is not a green one. */ });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (busy) return;
+
+    var phone = String(tel.value || '').trim();
+    if (!phone) { say('Type the number you want us to call.', 'warn'); tel.focus(); return; }
+    if (!ok.checked) { say('Please tick the box so we may call you.', 'warn'); ok.focus(); return; }
+
+    busy = true;
+    var label = go.innerHTML;
+    go.disabled = true;
+    go.textContent = 'Calling…';
+    say('');
+
+    fetch('/api/call-me', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        phone: phone,
+        consent: true,
+        consent_text: consentText,
+        track: track(),
+        'bot-field': form.querySelector('.ring-hp') ? form.querySelector('.ring-hp').value : '',
+      }),
+    })
+      .then(function (r) { return r.json().catch(function () { return null; }); })
+      .then(function (d) {
+        busy = false;
+        if (d && d.ok) {
+          // The peak of this product is the next four seconds. Get out of the way.
+          form.classList.add('ring-done');
+          say(d.reason || 'Calling you now. Pick up and we will get you set up.', 'ok');
+          go.textContent = 'Your phone is ringing';
+          if (window.answeredEvent) window.answeredEvent('ring_placed', { track: track() });
+          return;
+        }
+        go.disabled = false;
+        go.innerHTML = label;
+        // The server wrote a human sentence for every refusal. Render it.
+        say((d && d.reason) || 'We could not set that call up right now. Please try again in a minute.', 'warn');
+        if (window.answeredEvent) window.answeredEvent('ring_refused', { code: (d && d.code) || 'unknown' });
+      })
+      .catch(function () {
+        busy = false;
+        go.disabled = false;
+        go.innerHTML = label;
+        say('We could not reach our own setup line just then. Please try again in a minute.', 'warn');
+      });
+  });
+})();

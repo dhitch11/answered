@@ -17,7 +17,7 @@
 <meta name="twitter:image" content="https://answered.reddenda.com/assets/og/home.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0C0E'/%3E%3Crect x='4' y='5' width='5.4' height='22' rx='2.4' fill='%23E3FF4F'/%3E%3Cpath d='M 12 7.6 A 8.6 8.6 0 0 1 12 24.4' fill='none' stroke='%23E3FF4F' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M 20.4 10.2 A 11.4 11.4 0 0 1 20.4 21.8' fill='none' stroke='%23E3FF4F' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M 25.2 6.9 A 15.6 15.6 0 0 1 25.2 25.1' fill='none' stroke='%23E3FF4F' stroke-width='2.1' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preload" href="/assets/fonts/archivo-expanded-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/answered.css?v=0f28d054">
+<link rel="stylesheet" href="/assets/answered.css?v=065690c5">
 <link rel="canonical" href="https://answered.reddenda.com/">
 </head>
 <body class="track-me">
@@ -68,6 +68,47 @@
           <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="/setup">Set your rules</a></span>
           <a class="btn btn-ghost" href="#price">See what it costs</a>
         </div>
+
+        <!-- ═══ TURN IT ON. One line, one click, and the phone in your hand rings. ═══════════
+             This posts to /api/call-me, which places a REAL outbound call where a setup voice
+             walks the person through switching their line on. That endpoint has been live and
+             complete for some time and NO PAGE HAS EVER REFERENCED IT: measured 0 occurrences of
+             "call-me" in the served homepage and 0 in _build.py. The hardest part, a compliant
+             dialer with ten gates, was built and never given a door.
+
+             ★ IT STARTS HIDDEN AND ONLY JAVASCRIPT REVEALS IT, WHICH IS THE POINT, NOT A LIMITATION.
+             A control that cannot act must not render. The form is shown only after the server has
+             confirmed, against the provider and not against its own env vars, that a call can
+             actually be placed. With JavaScript off the visitor keeps the CTA above, which works.
+             A form that cannot submit is worse than no form, because the visitor has already spent
+             the effort by the time it fails.
+
+             ★ THE CONSENT SENTENCE IS NOT WRITTEN HERE. It is fetched from the server and printed
+             verbatim, because the server compares the text it receives against the text it
+             published and refuses a mismatch. Hardcoding it means the day the sentence changes,
+             every cached copy of this page starts sending a stale one and every call is refused. -->
+        <form class="ring" id="ring" hidden novalidate>
+          <div class="ring-row">
+            <label class="ring-lab" for="ring-tel" data-track="me">Your mobile number</label>
+            <label class="ring-lab" for="ring-tel" data-track="biz">Your mobile number</label>
+            <input class="ring-tel" id="ring-tel" name="phone" type="tel" inputmode="tel"
+                   autocomplete="tel" placeholder="(916) 555 0142" maxlength="20"
+                   aria-describedby="ring-consent-text ring-note">
+            <button class="btn btn-primary ring-go" id="ring-go" type="submit">
+              <span data-track="me">Call me now</span><span data-track="biz">Set my line up now</span>
+            </button>
+          </div>
+
+          <!-- the honeypot. Named exactly what the server checks. -->
+          <input class="ring-hp" type="text" name="bot-field" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+          <label class="ring-consent">
+            <input type="checkbox" id="ring-ok" name="consent">
+            <span id="ring-consent-text"></span>
+          </label>
+
+          <p class="ring-note" id="ring-note" role="status" aria-live="polite"></p>
+        </form>
         <!-- THE ONE PROOF LINE. This slot used to carry three stacked blocks:
              a per-track risk-reversal plate, this mono law, and the AI
              self-disclosure line. Measured at 1440x900 the stack pushed the
@@ -804,6 +845,6 @@
   </div>
 </footer>
 
-<script src="/assets/answered.js?v=8de96970" defer></script>
+<script src="/assets/answered.js?v=7f64cafa" defer></script>
 </body>
 </html>

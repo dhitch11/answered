@@ -3208,3 +3208,102 @@ section > .wrap > .two > div > p.src:last-child { margin-top: var(--r-tail) !imp
 .paper .step { border-top-color: rgba(11,12,14,.16); }
 .paper .step::before { color: var(--accent-ink); }
 .paper .step p { color: var(--ink-2); }
+
+/* ═══ TURN IT ON — the hero activation form ═══════════════════════════════════
+   One line and one click, sized so a contractor can do it with a thumb, in
+   sunlight, wearing gloves. The input and the button share a row on a desktop
+   and stack on a phone, because a 44px target beside a shrinking input is how a
+   form becomes untappable at 320px.
+
+   IT IS HIDDEN UNTIL THE SERVER SAYS THE LINE CAN CALL, so there is no state
+   where this renders over a dead capability. The [hidden] rule is explicit
+   because .ring sets display and would otherwise beat the attribute. */
+.ring[hidden] { display: none !important; }
+.ring {
+  margin-top: 18px;
+  max-width: 560px;
+  display: block;
+}
+.ring-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.ring-lab {
+  flex: 1 0 100%;
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--t2, rgba(242,244,240,.66));
+  margin-bottom: 2px;
+}
+.ring-tel {
+  flex: 1 1 220px;
+  min-width: 0;                     /* without this a flex child refuses to shrink below content */
+  font: inherit;
+  font-size: 17px;                  /* 16px or larger, or iOS zooms the page on focus */
+  letter-spacing: .02em;
+  padding: 13px 15px;
+  color: var(--t1, #F2F4F0);
+  background: var(--ink-900, #16181C);
+  border: 1px solid var(--line2, rgba(242,244,240,.18));
+  border-radius: 12px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ring-tel::placeholder { color: rgba(242,244,240,.34); }
+.ring-tel:focus-visible {
+  outline: 2px solid var(--bronze, #E3FF4F);
+  outline-offset: 2px;
+  border-color: transparent;
+}
+.ring-go {
+  flex: 0 0 auto;
+  min-height: 48px;                 /* a real thumb target, not a 32px desktop button */
+  white-space: nowrap;
+}
+.ring-go[disabled] { opacity: .72; cursor: progress; }
+
+/* The honeypot is invisible to people and reachable by bots. Never display:none:
+   some bots skip what is not rendered, and some assistive tech announces it. */
+.ring-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The consent line is legal text a regulator may read. It is not fine print: it
+   sits directly under the control it authorises, at a size a person can read. */
+.ring-consent {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin-top: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--t2, rgba(242,244,240,.66));
+  cursor: pointer;
+}
+.ring-consent input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--bronze, #E3FF4F);
+}
+.ring-note { margin-top: 10px; font-size: 13.5px; line-height: 1.5; min-height: 1.2em; }
+.ring-note.ring-ok   { color: var(--bronze, #E3FF4F); }
+.ring-note.ring-warn { color: #FFB4A2; }
+
+/* After a successful placement the form stops inviting a second attempt: the
+   product is now happening on the visitor's phone, not on this page. */
+.ring-done .ring-row, .ring-done .ring-consent { opacity: .5; pointer-events: none; }
+
+@media (max-width: 560px) {
+  .ring-tel { flex: 1 0 100%; }
+  .ring-go  { flex: 1 0 100%; }     /* full width, so the tap target is the screen width */
+}
