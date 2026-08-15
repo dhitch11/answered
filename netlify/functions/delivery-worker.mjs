@@ -34,7 +34,7 @@ import { signWebhook, WEBHOOK_SIG_HEADER } from './lib/outbox.mjs';
 
 // ★ NO `path`. THIS IS DELIBERATE AND IT IS A SECURITY DECISION, NOT AN OMISSION.
 //
-// The first version declared `path: ['/api/delivery/drain']`, which would have made an anonymous
+// The first version declared a drain route, which would have made an anonymous
 // endpoint that drains the queue and fires signed webhooks at a customer's endpoint on demand. It
 // leaks nothing — the payload goes to OUR configured receiver with OUR signature — but it hands a
 // stranger a button that burns retry attempts and can push a struggling receiver over its own rate
@@ -43,6 +43,13 @@ import { signWebhook, WEBHOOK_SIG_HEADER } from './lib/outbox.mjs';
 //
 // A schedule alone is enough. If a human ever needs to force a drain, it goes through /admin behind
 // the session gate, not through an open path.
+//
+// ★ AND THE COMMENT ITSELF NO LONGER QUOTES A ROUTE, WHICH IS NOT PEDANTRY.
+// The removed path used to be spelled out here, and _stage.sh's drift guard grepped this file,
+// read the EXPLANATION as a live declaration, and refused every deploy on the estate until someone
+// traced it. The guard now strips line comments, which is the right fix. This is the second one:
+// a path-shaped literal in a comment is a trap for whatever greps next, and nothing is lost by
+// describing the route instead of quoting it.
 //
 // The object is a LITERAL because Netlify reads this by static analysis at bundle time and silently
 // drops a computed value; this repo has a function that shipped `path: routeTable()` and registered
