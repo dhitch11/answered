@@ -127,6 +127,7 @@ const ENV_SPEC = [
   { name: 'ANSWERED_ACCOUNT_KEY', purpose: 'Signs a CUSTOMER session. Without it no customer can sign in at all.', required: false },
   { name: 'ANSWERED_COCKPIT_KEY', purpose: 'Signs the cockpit session. A different privilege from this one.', required: false },
   { name: 'ANSWERED_AUTOPILOT_KILL', purpose: 'When set, no campaign can place a call.', required: false },
+  { name: 'ANSWERED_LEGAL_ENTITY', purpose: 'The registered entity the opening names, for 47 CFR 64.1200(b)(1). Unset means a call identifies itself only by a product name.', required: false },
   { name: 'ELEVENLABS_API_KEY', purpose: 'The voice.', required: false },
   { name: 'ANTHROPIC_API_KEY_LIVE', purpose: 'The language layer.', required: false },
 ];
@@ -714,10 +715,36 @@ async function compliancePanel(since) {
   ]);
   const classes = evidence.by_class || [];
   const sum = (k) => classes.reduce((n, c) => n + (Number(c[k]) || 0), 0);
+
+  // ★ THE CALLER-IDENTITY DUTY, READ FROM THE RUNTIME AND PUT ON A SCREEN.
+  //
+  // dial.mjs already computes this and its own comment says the gap is "surfaced as a named
+  // readiness gap so it reaches an operator screen rather than dying in a comment". It was not
+  // reaching one: nothing in this console rendered it, so the gap lived in a field nobody read,
+  // which is the same fate as the comment it was written to escape.
+  //
+  // 47 CFR 64.1200(b)(1) requires the responsible entity to be named at the start of the call, and
+  // the (b) chapeau carries no line-type limit, so it binds on business lines too. The value is
+  // read from process.env inside this running function, never from a control-plane listing — this
+  // lane twice filed a set variable as missing by reading `netlify env:list`, which silently omits
+  // context-scoped values.
+  const entity = String(process.env.ANSWERED_LEGAL_ENTITY || '').trim();
+
   return {
     at: new Date().toISOString(),
     evidence,
     dnc,
+    caller_identity: {
+      entity: entity || null,
+      named: Boolean(entity),
+      rule: '47 CFR 64.1200(b)(1)',
+      what_the_line_says: entity
+        ? `"Hi, this is Answered, a service of ${entity}."`
+        : '"Hi, this is Answered." — a product name, which may not be the responsible entity.',
+      why: entity
+        ? 'The opening names the registered entity responsible for the call. No deploy was needed: the script reads this value at call time, so it took effect the moment the variable was set.'
+        : 'ANSWERED_LEGAL_ENTITY is unset, so the opening identifies the caller only by a product name. This does not refuse calls — an unset config value should not silently become an outage — but it is a decision, not a defect.',
+    },
     totals: {
       placed: sum('placed'),
       refused: sum('refused'),

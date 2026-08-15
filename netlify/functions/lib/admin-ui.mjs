@@ -2002,6 +2002,32 @@ VIEWS.compliance = async () => {
   S.lastMeasuredAt = d.at; freshness();
   const t = d.totals, e = d.evidence, k = d.dnc;
 
+  /**
+   * WHO THE CALL SAYS IT IS. 47 CFR 64.1200(b)(1).
+   *
+   * This was computed in dial.mjs and rendered nowhere, which meant a named compliance gap lived in
+   * a field no screen read — the same fate as the comment it was written to escape. It is a card
+   * now, and when the entity IS set the card stays, because "who does this line say it is" is worth
+   * confirming on sight rather than only worth warning about when missing.
+   */
+  const ci = d.caller_identity || {};
+  const identityCard =
+    '<div class="card" style="border-color:' + (ci.named ? 'var(--line)' : 'var(--warn)') + '">' +
+      '<div class="tile-k">Who the call says it is · ' + esc(ci.rule || '47 CFR 64.1200(b)(1)') + '</div>' +
+      (ci.named
+        ? '<div class="tile-v" style="font-size:19px">' + esc(ci.entity) + '</div>'
+        : '<div class="tile-v bad" style="font-size:19px">not named</div>') +
+      '<div class="tile-s" style="margin-top:7px;font-size:13.5px;line-height:var(--lh-base)">' +
+        '<strong>The line opens with:</strong> ' + esc(ci.what_the_line_says || '') +
+      '</div>' +
+      '<div class="tile-s" style="margin-top:7px;font-size:13.5px;line-height:var(--lh-base)">' +
+        esc(ci.why || '') +
+      '</div>' +
+      '<div class="sm muted" style="margin-top:8px">The (b) chapeau carries no line-type limit, so ' +
+        'this binds on business lines too. Read from the runtime, not from a control-plane listing.' +
+      '</div>' +
+    '</div>';
+
   // ★ THE HEADLINE NUMBER NEVER SHIPS WITHOUT ITS DENOMINATOR. A zero here means either "nothing
   // is wrong" or "nothing has been measured", and those are opposite. The columns behind it are
   // new, so most existing rows carry NULL, and a bare reassuring 0 would be the worst kind of lie:
@@ -2039,6 +2065,7 @@ VIEWS.compliance = async () => {
   };
 
   return '' +
+  identityCard +
   '<div class="card" style="border-color:var(--' + (exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn')) + ')">' +
     '<div class="tile-k">AI listening without a verified disclosure</div>' +
     '<div class="tile-v" style="color:var(--' + (exposure > 0 ? 'bad' : (measured > 0 ? 'ok' : 'warn')) + ')">' + n(exposure) + '</div>' +
