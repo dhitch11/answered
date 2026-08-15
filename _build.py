@@ -4,6 +4,7 @@
 One source of truth for the chrome. A menu that drifts between pages is the
 single most common tell of a site assembled by hand, and this site now has six.
 """
+import os
 import re, pathlib
 
 ROOT = pathlib.Path(__file__).parent
@@ -75,6 +76,15 @@ def nav(active):
   </div>
 </header>
 <div class="sheet" id="sheet">{sheet}<a class="nav-cta" href="/setup">Set your rules</a></div>'''
+
+# ★ ONE FACT, ONE SOURCE. The A2P consent sentence names the number our texts come FROM, which
+# is a compliance artifact and not decoration. It was a literal here while every other surface on
+# the estate read ANSWERED_DEMO_NUMBER, so a number change would have moved the spoken callback
+# number, the health probe, the client and the edge function, and silently left this page naming the
+# old one. David bought a NEW number on 2026-08-15, so that drift was about to happen for real.
+# Falls back to the previous literal only so a build without the env still produces a page; the
+# published-number check is what catches it being wrong.
+A2P_NUMBER = os.environ.get('ANSWERED_DEMO_NUMBER_PRETTY') or '(916) 350-4869'
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
@@ -860,7 +870,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
-        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from (916) 350-4869: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Texting is not switched on yet, so for now what you ask for arrives by email.</p>
+        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Texting is not switched on yet, so for now what you ask for arrives by email.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -1216,6 +1226,16 @@ for slug in _CHROME:
     # Two live URLs for one page, and nothing telling a crawler which is the
     # real one. The canonical is always the EXTENSIONLESS form, because that is
     # what every internal link now points at.
+    # ★ ONE FACT, ONE SOURCE. The A2P consent sentence names the number our texts come FROM. It is
+    # a compliance artifact, not decoration, and it was a LITERAL here while every other surface
+    # read ANSWERED_DEMO_NUMBER: scripts.mjs speaks it aloud on every recovery call, the health
+    # probe checks it, the client renders it, the edge function injects it. David bought a NEW
+    # number on 2026-08-15, so a change would have moved all four and silently left this page naming
+    # the dead one. Substituted here, in the loop that already rewrites every page, because the
+    # template it lives in is a plain string full of braces and converting it to an f-string would
+    # break the CSS and JS inside it.
+    s = s.replace('{A2P_NUMBER}', A2P_NUMBER)
+
     canon = 'https://answered.reddenda.com' + ('/' if slug == 'index.html' else '/' + slug[:-5])
     s = re.sub(r'\n<link rel="canonical"[^>]*>', '', s)
     s = s.replace('</head>', f'<link rel="canonical" href="{canon}">\n</head>', 1)
@@ -1767,7 +1787,10 @@ def _extensionless():
         if k:
             p.write_text(out, encoding='utf-8')
             n += k
-    
+    print('extensionless links: %d rewritten' % n)
+
+_extensionless()
+
 # ── sitemap ──────────────────────────────────────────────────────────────────
 # Measured 2026-08-14: /sitemap.xml was a 404. Generated from _CHROME, the same
 # discovered set the canonical tags come from, so the sitemap and the site can
@@ -1782,9 +1805,6 @@ _sitemap_urls = ['https://answered.reddenda.com' + ('/' if n == 'index.html' els
     + '</urlset>\n', encoding='utf-8')
 print(f'sitemap: {len(_sitemap_urls)} urls, generated from the discovered page set')
 
-print('extensionless links: %d rewritten' % n)
-
-_extensionless()
 
 
 # ── ASSET VERSIONING ──────────────────────────────────────────────────────────
