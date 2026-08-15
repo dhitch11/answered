@@ -114,7 +114,14 @@ fi
 # token, and probing one with a made up value would be a fabricated test.
 declare_paths="$(
   { grep -o 'from = "/[^"]*"' "$REPO/netlify.toml" | sed 's/from = //';
-    grep -ho "path: *\[[^]]*\]\|path: *'[^']*'" "$REPO"/netlify/functions/*.mjs \
+    # ★ COMMENTS ARE NOT DECLARATIONS. Measured 2026-08-14: delivery-worker.mjs removed its
+    #   `path` and explained why in a comment that quotes the path it removed. This guard read the
+    #   COMMENT as a live route and refused every deploy on the estate until somebody noticed it was
+    #   arguing with an explanation. A guard that fires on a sentence describing its own fix is a
+    #   guard people learn to bypass, which is worse than not having it. So: strip line comments
+    #   before looking for declarations.
+    sed 's://.*::' "$REPO"/netlify/functions/*.mjs \
+      | grep -ho "path: *\[[^]]*\]\|path: *'[^']*'" \
       | grep -o "'/[^']*'"; } | tr -d "\"'" | grep -v '[:*]' | sort -u
 )"
 unmonitored=""
