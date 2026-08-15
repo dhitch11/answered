@@ -21,4 +21,13 @@ research/data-pull.log
 # visibility "public"), so committing this file publishes the intelligence to
 # the open internet just as surely as serving it would. A bulk `git add -A`
 # would have done it silently.
+# Competitor intelligence. NEVER commit this: dhitch11/answered is a PUBLIC repo
+# and this file is ~144 KB of named competitor analysis.
+# ★ THE SECOND COPY LIVES IN THE PRIVATE REPO, because being gitignored means this
+#   file has no version history and no other backup. It was silently dropped from
+#   five consecutive deploys on 2026-08-15 and served a 404 for hours; a stale-tree
+#   deploy in that window would have destroyed the only copy.
+#     dhitch11/reddenda-ops-knowledge -> intel/answered/competitors.js
+#   Refresh it after any edit:
+#     cp netlify/functions/competitors.js ~/reddenda-ops-knowledge/intel/answered/
 netlify/functions/competitors.js
