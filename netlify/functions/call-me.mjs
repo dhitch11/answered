@@ -66,7 +66,7 @@
 
 import crypto from 'node:crypto';
 import { authenticate, XML, SAY, injectIntoResponse } from './lib/twilio-webhook.mjs';
-import { isDown as providerIsDown } from './lib/provider-down.mjs';
+import { isDown as providerIsDown, markUp as providerMarkUp } from './lib/provider-down.mjs';
 
 // ── the published consent sentence ───────────────────────────────────────────
 // THE SERVER OWNS THIS STRING. The front end must send back the exact sentence
@@ -746,13 +746,26 @@ async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS, event } = {}) {
   // this endpoint kept answering ready:true. Publishing the more optimistic of two instruments is
   // how a hero comes to paint a control over a dead line. If anything on this estate has seen a
   // hard refusal inside the window, this says so too.
+  // ★ EVIDENCE BEATS MEMORY, AND THE FIRST VERSION OF THIS HAD IT BACKWARDS.
+  //
+  // The breaker was consulted and allowed to END the check. That is right for avoiding a pointless
+  // round trip while a provider is genuinely down, and it is wrong the moment the provider comes
+  // back: a latch that never re-tests turns a recovery into a prolonged outage of the honest
+  // signal. Measured today. The credentials were replaced with working ones, Lookup started
+  // returning 200 to a direct call, and this endpoint went on reporting provider_unavailable
+  // because it asked the memory and never let the evidence update it.
+  //
+  // So a latched breaker now costs one probe rather than short-circuiting. If the probe SUCCEEDS,
+  // the marker is cleared and every other surface reading that breaker recovers with it. If it
+  // fails, the latch stands and nothing is lost but one request.
+  //
+  // The asymmetry is deliberate: a breaker exists to stop hammering a dead provider, and one probe
+  // per cache window is not hammering. What it buys is that recovery is automatic instead of
+  // waiting out a window that has nothing to do with the provider's actual state.
+  let wasLatched = false;
   try {
     const down = await providerIsDown('twilio', event);
-    if (down) {
-      return { ok: false, state: 'provider_unavailable',
-        why: 'The setup line cannot place calls right now.',
-        detail: 'The carrier has been refusing requests for ' + down.minutes + ' minutes. ' + (down.reason || '') };
-    }
+    if (down) wasLatched = down;
   } catch (e) { /* a breaker we cannot read is not a green light, but it is not a red one either */ }
 
   const ttl = (callReadyCache.value && callReadyCache.value.state === 'provider_unavailable')
@@ -808,6 +821,13 @@ async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS, event } = {}) {
           detail: 'The Twilio account authenticates but reads status "' + status + '".' };
       } else {
         value = { ok: true, state: 'live', why: 'The setup line is up.' };
+        if (wasLatched) {
+          // The provider answered. Clear the latch so every other surface reading this breaker
+          // recovers too, rather than each one waiting out its own window.
+          await providerMarkUp('twilio', event).catch(() => {});
+          console.log('call-me: twilio answered a live probe while the breaker was latched ('
+            + wasLatched.minutes + ' minutes); breaker cleared for every surface.');
+        }
       }
     }
   } catch (e) {
