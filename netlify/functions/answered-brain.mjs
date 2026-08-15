@@ -145,7 +145,27 @@ function toAnthropicMessages(inMsgs) {
 // were clipped can say it will check, which is the behaviour we want at exactly that moment.
 const OWNER_NOTE_LIMIT = 4000;
 
-export function fitOwnerNotes(notes, persona) {
+/**
+ * Tell the operator, so the person who WROTE the notes can fix them.
+ *
+ * Keeping both ends and warning the model makes the CALL safe. It does not make the owner's notes
+ * right: they still have rules their assistant is not being given, and they cannot know that unless
+ * somebody says so. This is the write side of that; @ANSWERED-INTEL owns the render.
+ *
+ * ★ IT CAN NEVER BREAK A CALL. It is fire-and-forget, it is awaited by nothing, and every failure
+ * path swallows to a log. A caller is on the phone; a flag for a dashboard does not get to be the
+ * reason they hear silence.
+ */
+function flagClipped(line, sent, kept) {
+  try {
+    db.rpc('sv_notes_clipped', { p_line: line || null, p_sent: sent, p_kept: kept })
+      .catch((e) => console.error('answered-brain: could not flag clipped notes:', String(e && e.message).slice(0, 120)));
+  } catch (e) {
+    console.error('answered-brain: could not flag clipped notes:', String(e && e.message).slice(0, 120));
+  }
+}
+
+export function fitOwnerNotes(notes, persona, line) {
   const s = String(notes || '');
   if (s.length <= OWNER_NOTE_LIMIT) return s;
 
@@ -163,6 +183,7 @@ export function fitOwnerNotes(notes, persona) {
     + `${s.length - OWNER_NOTE_LIMIT} characters of the middle were dropped and the model was told so.`,
   );
 
+  flagClipped(line, s.length, OWNER_NOTE_LIMIT);
   return s.slice(0, head) + gap + s.slice(-tail);
 }
 
@@ -515,7 +536,7 @@ export default async (req) => {
   // always win; for the customer line, the owner's rules win on every fact
   // about his business and never on safety.
   let system = persona.spec;
-  if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + fitOwnerNotes(incomingSystem, persona);
+  if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + fitOwnerNotes(incomingSystem, persona, calleeNumber(body, incomingSystem));
   if (assistantTurns >= persona.softCloseAt) system += '\n\n' + persona.softCloseNote;
 
   const offered = offeredTools(persona, body, inMsgs);
