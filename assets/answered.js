@@ -2188,6 +2188,21 @@
       consentT.textContent = consentText;
       form.hidden = false;
       form.setAttribute('data-consent-version', String(d.consent_version || ''));
+
+      // ★ ONE PRIMARY, AND A SCREENSHOT IS WHAT PROVED THIS WAS BROKEN.
+      //
+      // Every assertion passed while the hero rendered TWO full width Hi-Vis buttons stacked on a
+      // phone: the original "Set your rules" and the new "Call me now". A visitor arriving at a
+      // page with two equally weighted primary actions has to choose before they can act, which is
+      // the exact opposite of a one click call to action, and no geometry check catches it because
+      // both buttons are individually correct.
+      //
+      // The form is now the primary action, so the old call to action steps down to a ghost. It is
+      // demoted rather than removed: it is the JavaScript-off fallback, and it is also the slot
+      // that upgrades to the live demo number, which is a genuinely useful second option once it
+      // is no longer shouting at the same volume as the first.
+      var oldCta = document.querySelector('#cta-primary .btn-primary');
+      if (oldCta) { oldCta.classList.remove('btn-primary'); oldCta.classList.add('btn-ghost'); }
     })
     .catch(function () { /* stay hidden. An unknown line is not a green one. */ });
 
