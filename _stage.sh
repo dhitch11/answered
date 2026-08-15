@@ -66,6 +66,12 @@ rsync -a --exclude 'node_modules' --exclude '*.test.mjs' "$REPO/netlify/function
 # where forgetting it would publish it.
 mkdir -p "$STAGE/research"
 rsync -a "$REPO/research/lib" "$STAGE/research"/
+# Edge functions. netlify.toml references call-control by name, so a stage without this directory
+# ships a config pointing at a function that does not exist. Copied whenever the directory exists,
+# rather than listed by name, for the reason the chrome loop learned today.
+if [ -d "$REPO/netlify/edge-functions" ]; then
+  rsync -a "$REPO/netlify/edge-functions" "$STAGE/netlify"/
+fi
 cp "$REPO/netlify.toml" "$STAGE/netlify.toml"
 
 # ── the step that was a no-op ────────────────────────────────────────────────

@@ -234,3 +234,22 @@
   to = "/.netlify/functions/consent-sync"
   status = 200
   force = true
+
+
+# ── the call control, rendered by the server ─────────────────────────────────
+# The number belongs in the bytes we SEND when the line is answering, not only
+# in JavaScript that runs afterwards, so that it exists for a reader with
+# scripting off, for a screen reader before script runs, and for anything that
+# reads the served HTML.
+#
+# It cannot be baked in at build time: a number in static HTML keeps being
+# served from a CDN cache after the line goes down, and every one of those pages
+# dials into silence. An edge function is the only layer that is both on the
+# server side of the cache and running per request, so the verdict is fresh AND
+# the answer is in the bytes.
+#
+# It fails OPEN TO THE PAGE: any error leaves the HTML untouched and the existing
+# client gate decides, exactly as it does today.
+[[edge_functions]]
+  path = "/*"
+  function = "call-control"
