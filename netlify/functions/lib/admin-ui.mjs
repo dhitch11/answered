@@ -688,6 +688,7 @@ export function consolePage({ admin, buildInfo = {} }) {
     <div class="nav-h">Flight deck</div>
     <button class="nav" data-view="cockpit" aria-current="page"><span class="nav-ico">✈</span>Cockpit</button>
     <button class="nav" data-view="ask"><span class="nav-ico">?</span>Ask</button>
+    <button class="nav" data-view="deliveries"><span class="nav-ico">⇉</span>Deliveries<span class="nav-n" data-count="dead"></span></button>
 
     <div class="nav-h">Business</div>
     <button class="nav" data-view="overview"><span class="nav-ico">◎</span>Overview</button>
@@ -901,7 +902,8 @@ const S = {
                     reach: null, enriched: null, suppressed: null, sort: 'recent', offset: 0 },
              customers: { status: null, sort: 'recent', offset: 0 },
              calls: { recorded: null, direction: null, offset: 0 },
-             events: { name: null, offset: 0 } },
+             events: { name: null, offset: 0 },
+             deliveries: { state: null, offset: 0 } },
   lastMeasuredAt: null,
   drawerAccount: null,
   drawerContact: null,
@@ -2277,6 +2279,91 @@ async function runAsk(q) {
   }
 }
 
+/**
+ * THE DELIVERY LOG. Every job that owes an outbound write, and what happened to it.
+ *
+ * This screen exists because the previous shape had no screen. The webhook was fired inside an
+ * awaited fan-out with a .catch() that turned a failure into a reason string in a response nobody
+ * stored. A receiver could be down for a day and the only trace would be log lines. An integration
+ * whose failure mode is silence is worse than no integration, because the customer believes their
+ * CRM has the job.
+ *
+ * DEAD IS THE STATE THAT MATTERS and it is listed first. A dead delivery means a real job exists
+ * here and does not exist in the customer's system. It is not a state the queue recovers from on
+ * its own: a human decides, and replays.
+ */
+VIEWS.deliveries = async () => {
+  const f = S.filters.deliveries;
+  const d = await api('deliveries?' + new URLSearchParams({ state: f.state || '', limit: 200 }));
+  const c = d.counts || {};
+  S.deadDeliveries = c.dead || 0;
+
+  const tile = (k, v, sub, cls) =>
+    '<div class="card"><div class="tile-k">' + esc(k) + '</div>' +
+    '<div class="tile-v ' + (cls || '') + '">' + n(v || 0) + '</div>' +
+    '<div class="tile-s">' + esc(sub) + '</div></div>';
+
+  const head =
+    '<div class="grid g4">' +
+      tile('Dead', c.dead, 'Gave up after every retry. A job exists here and not in their system. Replay it or fix the receiver.', c.dead ? 'bad' : '') +
+      tile('Waiting', (c.pending || 0) + (c.delivering || 0), 'Queued or in flight. Retries carry the same key, so a duplicate is harmless.') +
+      tile('Delivered', c.delivered, 'The receiver accepted it.') +
+      tile('Total', d.total, 'Every delivery ever owed.') +
+    '</div>' +
+    '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap">' +
+      ['', 'dead', 'pending', 'delivering', 'delivered'].map((st) =>
+        '<button class="btn ' + (String(f.state || '') === st ? '' : 'ghost ') + 'sm" ' +
+        'data-filter="deliveries" data-key="state" data-value="' + esc(st) + '">' +
+        (st === '' ? 'All' : esc(st)) + '</button>').join('') +
+    '</div></div>';
+
+  if (!(d.rows || []).length) {
+    return head + '<div class="card pad0"><div style="padding:16px">' +
+      (d.total
+        ? emptyState('Nothing in that state', 'Measured ' + esc(stamp(S.lastMeasuredAt)) + '.')
+        : emptyState('Nothing has been delivered yet',
+            'This is a measured zero. No job has owed an outbound write, which is expected while ' +
+            'ANSWERED_WEBHOOK_URL is unset and no customer connection exists. A row appears here the ' +
+            'moment a booking is created, because the queue row is written inside the job transaction.')) +
+      '</div></div>';
+  }
+
+  return head +
+    '<div class="card pad0"><div class="card-h"><h2>Deliveries</h2>' +
+      '<span class="sp muted">newest first · the key is what makes a retry safe</span></div>' +
+    '<div class="tw"><table><thead><tr><th>State</th><th>Event</th><th>Target</th>' +
+      '<th class="num">Tries</th><th>Last result</th><th>Idempotency key</th><th>When</th><th></th></tr></thead><tbody>' +
+    d.rows.map((r) => '<tr>' +
+      '<td><span class="pill ' + (r.state === 'dead' ? 'bad' : r.state === 'delivered' ? 'ok' : '') + '">' +
+        esc(r.state) + '</span></td>' +
+      '<td class="mono">' + esc(r.event) + '</td>' +
+      '<td class="mono muted">' + esc(r.target) + '</td>' +
+      '<td class="num">' + n(r.attempts) + '</td>' +
+      '<td>' + (r.last_status ? esc(String(r.last_status)) : '<span class="muted">—</span>') +
+        (r.last_error ? '<div class="sm muted">' + esc(String(r.last_error).slice(0, 120)) + '</div>' : '') + '</td>' +
+      '<td class="mono muted" style="font-size:11.5px">' + esc(r.idempotency_key) + '</td>' +
+      '<td class="muted">' + esc(when(r.created_at)) + '</td>' +
+      '<td>' + (r.state === 'dead' || r.state === 'delivered'
+        ? '<button class="btn ghost sm" data-act="delivery-replay" data-id="' + esc(r.id) + '">Replay</button>'
+        : '') + '</td></tr>').join('') +
+    '</tbody></table></div></div>' +
+    '<div class="card"><div class="tile-s">A replay re-sends with the <strong>same idempotency key</strong>, ' +
+    'so a receiver that already has the job will recognise it rather than creating a second one. That is ' +
+    'the whole reason the key is minted before the first attempt and never regenerated.</div></div>';
+};
+
+async function replayDelivery(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Queued…'; }
+  try {
+    const r = await api('delivery/replay', { body: { id } });
+    toast(r.ok ? 'Queued for another attempt with the same key.' : ('Not replayed: ' + (r.error || 'unknown')), r.ok ? 'ok' : 'bad');
+    go('deliveries');
+  } catch (e) {
+    toast(e.message, 'bad');
+    if (btn) { btn.disabled = false; btn.textContent = 'Replay'; }
+  }
+}
+
 VIEWS.audit = async () => {
   const d = await api('audit?limit=200');
   S.lastMeasuredAt = new Date().toISOString(); freshness();
@@ -2696,6 +2783,7 @@ async function actionClick(t, act) {
     case 'ai-draft':  aiDraft(t.dataset.contact); return true;
     case 'backfill':  backfill(t); return true;
     case 'ask-go':    await runAsk(); return true;
+    case 'delivery-replay': await replayDelivery(t.dataset.id, t); return true;
     case 'status':    statusChange(t.dataset.value); return true;
     case 'summarize-call': await summarizeCall(t.dataset.sid, t); return true;
     case 'toggle-interim': {

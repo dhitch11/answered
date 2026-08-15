@@ -56,6 +56,8 @@ export const config = {
     '/api/admin/account',
     '/api/admin/account-status',
     '/api/admin/notes-clipped',
+    '/api/admin/deliveries',
+    '/api/admin/delivery/replay',
     '/api/admin/calls',
     '/api/admin/call',
     '/api/admin/call/summarize',
@@ -287,7 +289,7 @@ async function getConsole(req, url) {
 const MUTATING = new Set([
   'account-status', 'refund', 'attribute-backfill', 'log',
   'crm/update', 'crm/bulk', 'crm/note', 'crm/task', 'crm/email', 'crm/sms', 'crm/call',
-  'crm/draft', 'call/summarize', 'ask',
+  'crm/draft', 'call/summarize', 'ask', 'delivery/replay',
 ]);
 
 async function apiRoute(req, url, name) {
@@ -325,6 +327,20 @@ async function apiRoute(req, url, name) {
       if (!row) return json(404, { error: 'no such account' });
       await audit(admin, req, 'account.view', { targetKind: 'account', targetId: id });
       return json(200, { ...row, notes_fit: await notesFit(row) });
+    }
+
+    case 'deliveries':
+      return json(200, await rpc('sv_admin_deliveries', {
+        p_state: nz(q.get('state')), p_limit: num(q.get('limit'), 100),
+      }));
+
+    case 'delivery/replay': {
+      const b = await readJson(req);
+      if (!b.id) return json(400, { error: 'a delivery id is required' });
+      const r = await rpc('sv_delivery_replay', { p_id: b.id, p_actor: admin.email });
+      await audit(admin, req, 'delivery.replay', { targetKind: 'delivery', targetId: b.id,
+        result: r && r.ok ? 'ok' : 'failed' });
+      return json(200, r);
     }
 
     case 'notes-clipped':

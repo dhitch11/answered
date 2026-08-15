@@ -273,11 +273,26 @@ export default async (req) => {
       taskSubject: `${job.m === 'demo' ? '[demo] ' : ''}Job booked by Answered: ${job.w} for ${job.c}`,
       taskBody: `${bk.whenParts(job).day}, ${bk.whenParts(job).window}. ${job.a || 'No address captured.'} Job page: ${links.job}`,
     }).catch((e) => ({ ok: false, reason: String((e && e.message) || e).slice(0, 160) })),
-    out.webhook('job.booked', {
-      id: job.id, mode: job.m, shop: job.s, customer: job.c, phone: job.cp, email: job.ce,
-      address: job.a, service: job.w, starts_at: job.t, minutes: job.d, tz: job.tz,
-      notes: job.n, call_sid: job.cs, url: links.job, ics_url: links.ics,
-    }).catch((e) => ({ ok: false, reason: String((e && e.message) || e).slice(0, 160) })),
+    // ★ THE WEBHOOK NO LONGER RUNS HERE, AND BOTH REASONS ARE MEASURABLE.
+    //
+    // LATENCY. This is an AWAITED Promise.all, so the booking could not answer until the slowest
+    // receiver did. A customer's endpoint having a bad afternoon became our booking being slow —
+    // a failure mode that only ever appears on someone else's bad day. Measured with a receiver
+    // that sleeps 10 seconds, the numbers are in the commit that moved it.
+    //
+    // DURABILITY. It was best-effort with a .catch() that swallowed to a reason string. A
+    // best-effort second write does not move a failure into a retry, it moves it into nowhere:
+    // every receiver outage was invisible data loss under a green 201.
+    //
+    // The delivery is now enqueued INSIDE sv_job_create's transaction, so a booking that succeeds
+    // always leaves behind the row saying a write is owed, and delivery-worker.mjs delivers it with
+    // backoff, carrying the same idempotency key on every attempt. Nothing about the signature
+    // scheme changed.
+    // Deliberately NOT `ok: true`. A caller reading .ok would take it as "delivered", and all that
+    // is true here is "queued". Naming a queued thing delivered is the same class of overclaim as
+    // calling a property a permission.
+    Promise.resolve({ queued: true, delivered_here: false,
+      note: 'enqueued inside the job transaction; delivery-worker delivers it with retries and the same idempotency key' }),
     durable(job, token).catch((e) => ({ ok: false, reason: String((e && e.message) || e).slice(0, 160) })),
     // ── THE JOB RECORD: the second write, and the one that gives this booking an owner ────────
     //
