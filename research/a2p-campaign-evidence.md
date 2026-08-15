@@ -22,12 +22,25 @@ campaign registers. That mismatch is the documented cause of the three previous 
 
 ---
 
-## 2. Use case: transactional / customer care. Never marketing.
+## 2. Use case: CUSTOMER COMMUNICATION. Never marketing.
 
-Answered is an AI phone line for trade contractors. Every message in this program is the direct,
-requested consequence of something the recipient did: a call they placed, a job they booked, an
-invoice they discussed on a recorded call. **There is no promotional traffic, no newsletter, no
+**Describe it as customer communication and stop there.** Every message in this program is the
+direct, requested consequence of something the recipient did: a call they placed, a job they booked,
+an invoice they discussed on a recorded call. **There is no promotional traffic, no newsletter, no
 drip sequence, and no list.**
+
+★ **A NOTE ON HOW MUCH TO SAY, because it is the difference between an approval and a question.**
+A narrow, unremarkable description passes review. An ambitious one invites scrutiny of things the
+traffic does not actually do. This program sends confirmations, transcripts, receipts and agreed
+follow-ups to people who asked for them. **That is customer communication, and that is the whole
+description.** Do not describe the product's capabilities, its voice agent, its negotiation
+features, or anything the messages themselves are not.
+
+**And keep the description consistent with the samples**, because narrowing the words while leaving
+a mismatched sample is simply a different rejection. Every sample in section 7 is a message to
+somebody about their own job, their own call or their own invoice. The invoice follow-up qualifies
+because it goes only to a person who agreed to it on a recorded call, which is customer
+communication rather than collection outreach.
 
 ---
 
