@@ -137,7 +137,33 @@ async function elAccountHealthy() {
     if (!r.ok) return false;
     const j = await r.json();
     if (j.status === 'past_due') return false;
-    if (typeof j.character_count === 'number' && typeof j.character_limit === 'number' && j.character_count >= j.character_limit) return false;
+
+    // ★ EXHAUSTION IS NOT A STATUS, AND IT IS NOT ALWAYS TERMINAL. Measured by @user-4f on a live
+    // ElevenLabs account and relayed 2026-08-15: an account with characters spent still reports
+    // `status: "active"`. Only `character_count >= character_limit` reveals exhaustion, so a gate
+    // keyed on status alone sails straight past it. This gate already counted characters, so that
+    // fail-open was not ours.
+    //
+    // What their finding DOES change is the other direction. `can_extend_character_limit` is the
+    // entitled-to-overage flag: when it is TRUE the account bills through the limit and keeps
+    // speaking, so refusing at the limit would take a working line off the air for no reason. When
+    // it is FALSE, there is no overage and the account HARD-STOPS: the line answers and makes no
+    // sound, which is the worst possible failure because it looks like a connected call.
+    //
+    // And the margin matters more here than in a health probe: this runs with a caller already
+    // ringing. Stopping exactly AT the limit means the first sentence of a call can be the thing
+    // that exhausts it. So this reserves enough headroom for one ordinary call and refuses before
+    // the bridge, where the honest fallback speaks instead of a silent line.
+    const used = j.character_count;
+    const cap = j.character_limit;
+    if (typeof used === 'number' && typeof cap === 'number') {
+      const canOverage = j.can_extend_character_limit === true;
+      const RESERVE = 2000; // roughly one ordinary call's worth of speech
+      if (!canOverage && used >= cap - RESERVE) {
+        console.error(`ANSWERED-VOICE: ElevenLabs has ${Math.max(0, cap - used)} characters left and cannot overage; refusing to bridge into a line that would go silent mid-call.`);
+        return false;
+      }
+    }
     return true;
   } catch (e) {
     return false;

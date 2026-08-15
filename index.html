@@ -42,8 +42,15 @@
     <div class="hero-grid">
       <div>
         <p class="eyebrow quiet bt b1">ONE AI. BOTH SIDES OF THE PHONE.</p>
-        <h1 class="display bt b2" data-track="me" style="margin-top:8px">You <span class="lit">never</span> have to be on the phone again.</h1>
-        <h1 class="display bt b2" data-track="biz" style="margin-top:8px">Every call answered. Every job booked.</h1>
+        <!-- ★ ONE h1, TWO TRACKS. This used to be two sibling <h1> elements, one per audience, with
+             the track switch hiding whichever did not apply. Only one was ever visible, but BOTH
+             were in the served HTML, so every crawler and screen reader read a page with two first
+             level headings and two competing subjects.
+             The switch is untouched: `[data-track]{display:none}` plus `display:revert` on the
+             active one works on a span exactly as it worked on a heading, reverting to inline
+             instead of block, and answered.js only ever adds an animation class. Default is the
+             "me" track in the markup, so this still resolves with JavaScript off. -->
+        <h1 class="display bt b2" style="margin-top:8px"><span data-track="me">You <span class="lit">never</span> have to be on the phone again.</span><span data-track="biz">Every call answered. Every job booked.</span></h1>
         <p class="lede hero-sub bt b3" data-track="me" style="margin-top:16px">It picks up when you cannot, and it sits on hold until a real person answers.</p>
         <p class="lede hero-sub bt b3" data-track="biz" style="margin-top:16px">It answers your line at 2 AM, books the job, and rings you for emergencies.</p>
         <div class="hero-actions bt b4" style="margin-top:26px">

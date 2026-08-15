@@ -1471,8 +1471,15 @@
   var offs = document.querySelectorAll('[data-callgate-off]');
   if (!slots.length && !gated.length && !offs.length) return;
 
-  var NUM_TEL = '+19163504869';
-  var NUM_TEXT = '+1 (916) 350-4869';
+  // ★ NO HARDCODED NUMBER. These start EMPTY and are filled from /api/demo-health, which reads the
+  // same ANSWERED_DEMO_NUMBER env the server probes and the edge function read. They were literals
+  // until 2026-08-14, when David moved the product to a new Twilio account: a Twilio number is
+  // account-scoped exactly like an API key, so the number itself can change. A literal here would
+  // survive that change and render a real, tappable control pointing at a line that is no longer
+  // ours, which is the worst form of a control that cannot act. Empty means no control is built,
+  // which is the safe direction.
+  var NUM_TEL = '';
+  var NUM_TEXT = '';
   var LABEL = 'Hear it answer';
 
   // one place that swaps children, so the whole module has a single fallback
@@ -1607,7 +1614,25 @@
   // one read, shared with the activation gate below. null means the read
   // itself failed, which is reported differently and treated identically.
   window.answeredHealth().then(function (j) {
-    if (j && j.healthy === true) { upgrade(); return; }
+    // ★ THE NUMBER COMES FROM THE SERVER, AND A MISSING ONE BUILDS NOTHING.
+    // These were literals until the account move. Emptying them without wiring this in would have
+    // rendered `href="tel:"` with a blank label the moment the gate went green: a real, tappable,
+    // completely empty control. Invisible today only because the gate is red, which is exactly how
+    // that class of defect waits.
+    if (j && j.line && typeof j.line.e164 === 'string' && /^\+\d{10,15}$/.test(j.line.e164)) {
+      NUM_TEL = j.line.e164;
+      NUM_TEXT = j.line.pretty || j.line.e164;
+    }
+    if (j && j.healthy === true) {
+      if (!NUM_TEL) {
+        // Green but no number published is a configuration fault, not a reason to draw a dead
+        // control. Say so where an operator can find it and leave the honest fallback in place.
+        console.error('Answered: the line is healthy but /api/demo-health published no number, so no call control was built.');
+        return;
+      }
+      upgrade();
+      return;
+    }
     console.info(j
       ? 'Answered: demo line is not green right now; keeping the list CTA.'
       : 'Answered: demo health unreachable; keeping the list CTA.');

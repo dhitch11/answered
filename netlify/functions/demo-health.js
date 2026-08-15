@@ -81,8 +81,22 @@ async function probeElSubscription() {
     if (!r.ok) return { landed: true, ok: false, reason: 'subscription read returned ' + r.status };
     const j = await r.json();
     if (j.status === 'past_due') return { landed: true, ok: false, reason: 'subscription past_due' };
-    if (typeof j.character_count === 'number' && typeof j.character_limit === 'number' && j.character_count >= j.character_limit) {
-      return { landed: true, ok: false, reason: 'character quota exhausted' };
+    // Exhaustion is not a status: an account with characters spent still reports active, so a gate
+    // keyed on status alone misses it (measured by @user-4f, relayed 2026-08-15). This already
+    // counted characters. What is new is `can_extend_character_limit`, the entitled-to-overage
+    // flag: TRUE means the account bills through the limit and keeps speaking, so refusing at the
+    // limit would take a working line off the air. FALSE means it hard-stops and the line answers
+    // in silence. The reserve makes this pre-emptive rather than a post-mortem.
+    if (typeof j.character_count === 'number' && typeof j.character_limit === 'number') {
+      const left = j.character_limit - j.character_count;
+      if (j.can_extend_character_limit !== true && left <= 2000) {
+        return {
+          landed: true, ok: false,
+          reason: left <= 0
+            ? 'character quota exhausted and the account cannot overage'
+            : `only ${left} characters left and the account cannot overage, so a call would go silent part way`,
+        };
+      }
     }
     return { landed: true, ok: true, reason: '' };
   } catch (e) {
@@ -358,7 +372,27 @@ exports.handler = async (event) => {
     // UNCHANGED, DELIBERATELY. healthy is still the four demo line checks.
     const healthy = [el, brain, twilio, canary].every((c) => c.landed && c.ok);
     const outboundReady = outbound.landed && outbound.ok;
-    body = { healthy, outbound_ready: outboundReady, checks, checked: new Date().toISOString() };
+    // ★ THE NUMBER IS PUBLISHED HERE, SO THERE IS ONE SOURCE OF TRUTH FOR IT.
+    // assets/answered.js used to carry `var NUM_TEL = '+19163504869'` as a literal, which meant the
+    // demo number lived in TWO places: this env var, which every server-side probe and the edge
+    // function read, and a string in client JavaScript that only a deploy could change. On
+    // 2026-08-14 David moved the whole product to a new Twilio account, and a Twilio number is
+    // account-scoped exactly like an API key, so the number itself may change. A hardcoded client
+    // literal would then be a stale number, rendered as a real control, dialling a line that is not
+    // ours. That is the worst version of "a control that cannot act".
+    // Published unconditionally, because it is a fact about configuration and not a permission: the
+    // CLIENT still renders nothing unless `healthy` is true, and so does the edge function.
+    const lineNum = (process.env.ANSWERED_DEMO_NUMBER || '').trim().replace(/[^+\d]/g, '');
+    const lm = /^\+(\d)(\d{3})(\d{3})(\d{4})$/.exec(lineNum);
+    body = {
+      healthy,
+      outbound_ready: outboundReady,
+      line: /^\+\d{10,15}$/.test(lineNum)
+        ? { e164: lineNum, pretty: lm ? `+${lm[1]} (${lm[2]}) ${lm[3]}-${lm[4]}` : lineNum }
+        : null,
+      checks,
+      checked: new Date().toISOString(),
+    };
     cached = { at: now, body };
   }
 

@@ -250,6 +250,3 @@
 #
 # It fails OPEN TO THE PAGE: any error leaves the HTML untouched and the existing
 # client gate decides, exactly as it does today.
-[[edge_functions]]
-  path = "/*"
-  function = "call-control"
