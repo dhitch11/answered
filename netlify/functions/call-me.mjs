@@ -66,6 +66,7 @@
 
 import crypto from 'node:crypto';
 import { authenticate, XML, SAY, injectIntoResponse } from './lib/twilio-webhook.mjs';
+import { isDown as providerIsDown } from './lib/provider-down.mjs';
 
 // ── the published consent sentence ───────────────────────────────────────────
 // THE SERVER OWNS THIS STRING. The front end must send back the exact sentence
@@ -312,7 +313,7 @@ async function logAttempt(store, row) {
 async function handleApi(event) {
   const headers = lowerHeaders(event.headers);
 
-  if (event.httpMethod === 'GET') return handleGet();
+  if (event.httpMethod === 'GET') return handleGet(event);
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: { Allow: 'GET, POST' }, body: 'Method not allowed' };
   }
@@ -732,12 +733,27 @@ const CALL_READY_TTL_MS = 120_000;
 const CALL_READY_DOWN_BACKOFF_MS = 15 * 60_000;
 let callReadyCache = { at: 0, value: null };
 
-async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS } = {}) {
+async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS, event } = {}) {
   const cfg = outboundConfig();
   if (!cfg.ok) {
     // A configuration failure is certain and free. Never spend a vendor round trip to confirm it.
     return { ok: false, state: 'unconfigured', why: 'The setup line is not switched on right now.', detail: cfg.reason };
   }
+
+  // ★ THE SHARED BREAKER OUTRANKS THIS FUNCTION'S OWN OPINION.
+  //
+  // Other surfaces latch `provider-down` when the carrier hard-refuses, and they were latched while
+  // this endpoint kept answering ready:true. Publishing the more optimistic of two instruments is
+  // how a hero comes to paint a control over a dead line. If anything on this estate has seen a
+  // hard refusal inside the window, this says so too.
+  try {
+    const down = await providerIsDown('twilio', event);
+    if (down) {
+      return { ok: false, state: 'provider_unavailable',
+        why: 'The setup line cannot place calls right now.',
+        detail: 'The carrier has been refusing requests for ' + down.minutes + ' minutes. ' + (down.reason || '') };
+    }
+  } catch (e) { /* a breaker we cannot read is not a green light, but it is not a red one either */ }
 
   const ttl = (callReadyCache.value && callReadyCache.value.state === 'provider_unavailable')
     ? CALL_READY_DOWN_BACKOFF_MS : maxAgeMs;
@@ -746,10 +762,30 @@ async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS } = {}) {
   const sid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
   let value;
   try {
-    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}.json`, {
-      headers: { Authorization: twilioAuthHeader() },
-      signal: AbortSignal.timeout(5000),
-    });
+    // ★ PROBE THE CAPABILITY THE FLOW ACTUALLY USES, NOT A NEIGHBOURING ONE.
+    //
+    // This read an ACCOUNT, which proves the credentials authenticate and proves nothing about the
+    // dial path. Gate 11 calls Lookup, and Lookup was returning 401 while the account read returned
+    // 200, so this reported "the setup line is up" while every real number would have been refused
+    // with lookup_failed. The form was painted over a line that could not complete a call, which is
+    // the exact rule it was written to uphold.
+    //
+    // Measured on the live site: a valid number came back "We could not check that number, so we
+    // did not call." That is indistinguishable from a fictional number being correctly rejected,
+    // which is why it was misread for an hour.
+    //
+    // Lookup on the site's OWN number: a real request against the real API, on a number we already
+    // publish, so it costs nothing private and answers the only question that matters.
+    const probeNumber = (process.env.ANSWERED_DEMO_NUMBER || '').trim();
+    const r = probeNumber
+      ? await fetch(`https://lookups.twilio.com/v2/PhoneNumbers/${encodeURIComponent(probeNumber)}`, {
+          headers: { Authorization: twilioAuthHeader() },
+          signal: AbortSignal.timeout(5000),
+        })
+      : await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}.json`, {
+          headers: { Authorization: twilioAuthHeader() },
+          signal: AbortSignal.timeout(5000),
+        });
     if (r.status === 401 || r.status === 403) {
       value = { ok: false, state: 'provider_unavailable',
         why: 'The setup line cannot place calls right now.',
@@ -762,7 +798,8 @@ async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS } = {}) {
         detail: 'Twilio answered ' + r.status + ' to a plain account read.' };
     } else {
       const j = await r.json().catch(() => ({}));
-      const status = String(j.status || '').toLowerCase();
+      // Only the ACCOUNT response carries a status field; a Lookup 200 is itself the proof.
+      const status = probeNumber ? '' : String(j.status || '').toLowerCase();
       // An account can authenticate and still be suspended or closed, and a suspended account
       // cannot dial. Asking only "did the credential work" would pass one that cannot make a call.
       if (status && status !== 'active') {
@@ -783,8 +820,8 @@ async function callReadiness({ maxAgeMs = CALL_READY_TTL_MS } = {}) {
 }
 
 /** GET: the sentence the page must render, and whether the line can take a call. */
-async function handleGet() {
-  const r = await callReadiness();
+async function handleGet(event) {
+  const r = await callReadiness({ event });
   return json(200, {
     ok: true,
     consent_version: CONSENT_VERSION,

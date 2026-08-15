@@ -3288,13 +3288,20 @@ section > .wrap > .two > div > p.src:last-child { margin-top: var(--r-tail) !imp
   color: var(--t2, rgba(242,244,240,.66));
   cursor: pointer;
 }
+/* ★ 18px was below every touch-target standard for the one control that carries a legal
+   agreement. 24px with padding around the label gives a real hit area, and the label element
+   already extends the target across the whole sentence. */
 .ring-consent input {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
   accent-color: var(--bronze, #E3FF4F);
 }
+/* The consent is a legal artifact, not fine print. It reads at the same size as the body copy
+   around it and sits directly above the control it authorises. */
+.ring-consent { font-size: 14.5px; padding: 4px 0; }
+.ring-go { margin-top: 12px; }
 .ring-note { margin-top: 10px; font-size: 13.5px; line-height: 1.5; min-height: 1.2em; }
 .ring-note.ring-ok   { color: var(--bronze, #E3FF4F); }
 .ring-note.ring-warn { color: #FFB4A2; }
