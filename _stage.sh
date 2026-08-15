@@ -159,9 +159,31 @@ fi
 
 # Every .mjs and .js function must at least parse. A syntax error here is a 502
 # on a live route, and it is free to catch now.
-broken="$(cd "$STAGE/netlify/functions" && for f in *.mjs; do node --check "$f" >/dev/null 2>&1 || echo "$f"; done)"
+# ★ THE GLOB USED TO BE `*.mjs` ONLY, while this comment said ".mjs and .js".
+# Six functions are CommonJS .js (answered-voice, competitors, demo-health, event,
+# interest, site-directory) and NONE of them were ever parse-checked. Fixed 08-15.
+broken="$(cd "$STAGE/netlify/functions" && for f in *.mjs *.js; do [ -e "$f" ] || continue; node --check "$f" >/dev/null 2>&1 || echo "$f"; done)"
 if [ -n "$broken" ]; then echo "  FAIL  these functions do not parse: $broken"; fail=1
 else echo "  ok    every function parses"; fi
+
+# ★ EVERY FUNCTION ON DISK MUST REACH THE STAGE TREE.
+# On 2026-08-15 `/internal/competitors` was a live 404 for hours. The function was
+# on disk, parsed clean, and was in the stage tree, but was ABSENT from the deployed
+# bundle: the deploy reported "47 functions deployed" with state ready and
+# error_message null. Cheerful and wrong. A forced upload restored it and the next
+# five deploys silently dropped it again.
+# competitors.js is gitignored ON PURPOSE (it is competitor intelligence and the
+# repo is public), so it can never be recovered from git if it goes missing here.
+# This compares the two directories by name rather than trusting the rsync.
+missing="$(comm -23 \
+  <(cd "$REPO/netlify/functions" && ls *.mjs *.js 2>/dev/null | grep -v '\.test\.' | sort) \
+  <(cd "$STAGE/netlify/functions" && ls *.mjs *.js 2>/dev/null | sort))"
+if [ -n "$missing" ]; then
+  echo "  FAIL  on disk but NOT in the stage tree: $(echo $missing | tr '\n' ' ')"
+  fail=1
+else
+  echo "  ok    every function on disk reached the stage tree"
+fi
 
 echo
 if [ "$fail" -ne 0 ]; then
@@ -186,10 +208,20 @@ Staging tree is ready and every check above passed.
 Deploy it with, from OUTSIDE the repo:
 
   cd $STAGE && netlify deploy --prod \\
-    --dir site --functions netlify/functions \\
+    --dir site --functions netlify/functions --skip-functions-cache \\
     --site 2c9f4ae6-f61c-4c1f-96ba-2a467fec00f3
+
+  ★ KEEP --skip-functions-cache. Without it the CLI restores a cached bundle SET,
+    and on 2026-08-15 that set was missing competitors.js on five consecutive
+    deploys while every one of them reported success. With the flag the deploy
+    hashes all $(cd "$STAGE/netlify/functions" && ls *.mjs *.js 2>/dev/null | wc -l | tr -d ' ') functions from the tree you just staged. It costs about a minute.
 
 Then, before you call it done:
   curl -s https://answered.reddenda.com/api/demo-health | head -c 400
   open https://answered.reddenda.com/internal/ops
+
+  # every function actually shipped, not just the ones the cache remembered:
+  curl -s -o /dev/null -w '/internal/competitors  %{http_code}  %{size_download}b\\n' \\
+    https://answered.reddenda.com/internal/competitors
+  # expect 200 and ~1047 bytes (the PIN form). A 404 means the bundle lost it again.
 EOF
