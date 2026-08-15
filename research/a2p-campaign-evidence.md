@@ -171,14 +171,40 @@ What is true, split by who does what:
 
 | Layer | Handles | State |
 |---|---|---|
-| **Twilio Advanced Opt-Out**, on the Messaging Service | STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, and HELP | Platform default. **@LANE-SEARCHLIGHT must confirm it is enabled on the service before filing** — it is a checkbox, and asserting it without looking is the same mistake in a different place. |
-| **Our own suppression store** | a stop recorded from the website or from a call | Live now. Permanent, written before anything else in the request, checked as gate 4 of 10. |
+| **Twilio Advanced Opt-Out**, on the Messaging Service | STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, REVOKE and HELP | ✅ **CONFIRMED ACTIVE 2026-08-15 by observation, not by reading a checkbox.** @LANE-SEARCHLIGHT watched the platform **overwrite our submitted opt-out and help copy with its own** and return the keyword list `CANCEL, QUIT, STOP, OPTOUT, UNSUBSCRIBE, STOPALL, REVOKE, END`. A platform that rewrites your copy is a platform that owns the behaviour. |
+| **Our own suppression store** | a stop from the website, from a call, **or from an inbound text** | ✅ Live and **measured on production 2026-08-15**. Permanent, written before anything else in the request, checked as gate 4 of 10. |
 
-**BUILD REQUIREMENT WHEN TEXTING GOES LIVE, and it is not optional:** an inbound message webhook of
-ours must write a carrier-level STOP into the same suppression store. Until that exists, a person
-who texts STOP is opted out at the carrier for messaging but would still be reachable by our voice
-path, because the two would be recorded in different places. **Consent withdrawal must be per
-person, not per channel**, and today that is only true for a stop given through the website.
+### ★ THE BUILD REQUIREMENT IN THIS SECTION IS NOW CLOSED, AND IT WAS MEASURED, NOT DECLARED
+
+`netlify/functions/sms-inbound.mjs` is live and mirrors a carrier STOP into the same
+`stop/<sha256(e164)>` key the voice path reads. **Consent withdrawal is now per person rather than
+per channel.** Four separate measurements, on the live site, on 2026-08-15:
+
+| What was measured | Result |
+|---|---|
+| Messaging Service `MGab661e…` routes inbound where? | `inbound_request_url = https://answered.reddenda.com/api/sms-inbound`, `use_inbound_webhook_on_number = false`, `+19162825278` attached |
+| A **correctly signed** POST | verified and handled — `sms-inbound: HELP from 0001.` |
+| A **wrongly signed** POST (negative control) | `REFUSED, signature mismatch. Nothing was written.` |
+| A **signed STOP** from the reserved fictional block `+1 (999) 555-0101` | `STOP recorded from 0101 via "stop"; voice and text are now both suppressed for this number.` |
+
+**Why that last line is real evidence and not a log that flatters itself:** it is printed *after*
+the `await` on the store write, and a store failure takes the other branch, which shouts
+`STORE WRITE FAILED … the voice path did NOT receive this stop`. This estate has shipped a stop
+tripwire that fired, logged a clean success, and suppressed nobody, which is exactly why the
+assertion here is on the consequence rather than on the code path.
+
+**Both signed and unsigned requests return byte-identical empty TwiML**, on purpose: the endpoint
+must never tell a prober which of the two it was.
+
+**And the key agreement is proven separately** (`research/sms-stop-key-agreement.test.mjs`): the two
+shipped functions are extracted and compared across nine input formats plus a negative control
+confirming two different numbers do not collide. A stop that wrote a key nobody reads would leave
+the person opted out in their own mind and reachable in ours.
+
+⚠️ **One caveat worth stating rather than hiding:** `IncomingPhoneNumbers` reports
+`messaging_service_sid: null` and a blank `sms_url` for this number, which reads like "attached to
+nothing". It is not — attachment through the Messaging Service's own `PhoneNumbers` resource does
+not backfill that legacy field. **Check the service, not the number.** I misread it that way first.
 
 ---
 
@@ -261,9 +287,11 @@ confirmed by observing what the platform did rather than by reading a checkbox.*
 
 - **The secondary customer profile for TwinFlame Investments LLC is console-only.** Twilio refuses
   it over the API. It is the one remaining human step and it gates the brand, not the evidence.
-- **No inbound SMS webhook exists yet**, so carrier-level STOP is handled by Twilio and is not yet
-  mirrored into our own suppression store. Named in section 8 as a build requirement rather than
-  left for a reviewer to discover.
+- ~~**No inbound SMS webhook exists yet**, so carrier-level STOP is handled by Twilio and is not yet
+  mirrored into our own suppression store.~~ **CLOSED 2026-08-15.** `/api/sms-inbound` is live,
+  attached to the Messaging Service, signature-verified, and measured writing a real STOP into the
+  same key the voice path reads. Full measurement table in section 8. **A reviewer can test it and
+  it will hold**, which is the only reason to write it down at all.
 - **Twilio Lookup was returning 401 on production earlier tonight.** It does not touch the brand or
   campaign filing path, but no readiness signal on this estate should be trusted if it probes the
   account rather than the capability in question.
