@@ -53,22 +53,6 @@
         <h1 class="display bt b2" style="margin-top:8px"><span data-track="me">You <span class="lit">never</span> have to be on the phone again.</span><span data-track="biz">Every call answered. Every job booked.</span></h1>
         <p class="lede hero-sub bt b3" data-track="me" style="margin-top:16px">It picks up when you cannot, and it sits on hold until a real person answers.</p>
         <p class="lede hero-sub bt b3" data-track="biz" style="margin-top:16px">It answers your line at 2 AM, books the job, and rings you for emergencies.</p>
-        <div class="hero-actions bt b4" style="margin-top:26px">
-          <!-- THE HEALTH GATE: this slot upgrades to the live call control ONLY
-               when /api/demo-health answers healthy:true. The demo number is
-               never in this file. Every [data-callslot] on the site upgrades
-               together, so the closing CTA on each product page gets the same
-               control from the same one fetch. -->
-          <!-- THE RED-LINE STATE HAS TO SELL TOO. This ghost shipped as
-               .btn-ghost beside a second .btn-ghost, so on a red line the
-               first screen of the site carried no primary button at all and
-               nothing told a visitor what to do. It is .btn-primary now: the
-               same one-row shape, so the upgrade to the call control still
-               shifts nothing, and the red state still has an obvious act. -->
-          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="/setup">Set your rules</a></span>
-          <a class="btn btn-ghost" href="#price">See what it costs</a>
-        </div>
-
         <!-- ═══ TURN IT ON. One line, one click, and the phone in your hand rings. ═══════════
              This posts to /api/call-me, which places a REAL outbound call where a setup voice
              walks the person through switching their line on. That endpoint has been live and
@@ -109,6 +93,23 @@
 
           <p class="ring-note" id="ring-note" role="status" aria-live="polite"></p>
         </form>
+
+        <div class="hero-actions bt b4" style="margin-top:26px">
+          <!-- THE HEALTH GATE: this slot upgrades to the live call control ONLY
+               when /api/demo-health answers healthy:true. The demo number is
+               never in this file. Every [data-callslot] on the site upgrades
+               together, so the closing CTA on each product page gets the same
+               control from the same one fetch. -->
+          <!-- THE RED-LINE STATE HAS TO SELL TOO. This ghost shipped as
+               .btn-ghost beside a second .btn-ghost, so on a red line the
+               first screen of the site carried no primary button at all and
+               nothing told a visitor what to do. It is .btn-primary now: the
+               same one-row shape, so the upgrade to the call control still
+               shifts nothing, and the red state still has an obvious act. -->
+          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="/setup">Set your rules</a></span>
+          <a class="btn btn-ghost" href="#price">See what it costs</a>
+        </div>
+
         <!-- THE ONE PROOF LINE. This slot used to carry three stacked blocks:
              a per-track risk-reversal plate, this mono law, and the AI
              self-disclosure line. Measured at 1440x900 the stack pushed the
