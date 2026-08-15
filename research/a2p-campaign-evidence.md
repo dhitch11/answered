@@ -141,8 +141,10 @@ Not described. Implemented, in `netlify/functions/call-me.mjs`:
   call, so a suppressed number cannot be reached even by a later code path that forgets to ask.
 - It is **permanent**, not a pause and not a reduction. It clears only if that person asks for it
   back themselves.
-- The same store backs the voice path, so a stop given by text stops calls too. **Consent and its
-  withdrawal are per person, not per channel.**
+- The same store backs the voice path, so a stop given **through the website or on a call** also
+  stops calls. **A stop given by TEXT is not yet captured here** — see the table below, and the
+  build requirement it names. Consent withdrawal must be per person rather than per channel, and
+  today that holds for every channel except inbound text, because inbound text does not exist yet.
 
 ### ★ Where each part of the opt-out actually lives, stated precisely
 
