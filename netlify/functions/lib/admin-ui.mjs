@@ -2465,7 +2465,7 @@ function renderAccount(d) {
         'purpose. A line goes live when a real number is assigned to it, never because somebody typed ' +
         'a status. Every action here is written to the audit log with your name on it.</p></div>',
 
-    rules: () => d.config
+    rules: () => notesFitCard(d.notes_fit) + (d.config
       ? '<div class="card"><h2 style="margin-bottom:12px">The rules this line answers under</h2><dl class="kv">' +
         kv('Answers as', d.config.greeting_name) + kv('Says the name as', d.config.business_says) +
         kv('Services', (d.config.services || []).join(', ')) + kv('Service area', d.config.service_area) +
@@ -2482,7 +2482,7 @@ function renderAccount(d) {
           '<div class="tw"><table><thead><tr><th>Version</th><th>Changed by</th><th>When</th></tr></thead><tbody>' +
           d.config_versions.map((v) => '<tr><td class="mono">v' + v.version + '</td><td>' + esc(v.author || '—') +
             '</td><td class="muted">' + esc(stamp(v.at)) + '</td></tr>').join('') + '</tbody></table></div></div>' : '')
-      : emptyState('No rules yet', 'This business has not written the instructions its line would answer under.'),
+      : emptyState('No rules yet', 'This business has not written the instructions its line would answer under.')),
 
     calls: () => (d.calls || []).length
       ? '<div class="card pad0"><div class="card-h"><h2>Calls</h2></div><div class="tw"><table>' +
@@ -3021,6 +3021,72 @@ function callSummaryCard(c, transcript) {
     '</div>' +
     '<div id="sumout"></div>' +
   '</div></div>';
+}
+
+/**
+ * DO THIS OWNER'S INSTRUCTIONS FIT DOWN THE PHONE?
+ *
+ * Two different facts, deliberately shown as two, because the operator's next move differs:
+ *
+ *   WILL clip    computed right now from the same renderSpec() the call path sends. True of an
+ *                account that has never been called, and false again the moment they trim it.
+ *   HAS clipped  a real call where it actually happened, written by the voice lane.
+ *
+ * The pair separates "was clipped once, since fixed" from "is still over right now". A stored flag
+ * alone would keep accusing an owner who already fixed it, and would say nothing at all about a
+ * customer who has written too much but not yet been called — which is the moment you actually want
+ * to tell them.
+ *
+ * When nothing is wrong this renders a quiet line with the headroom, not a green tick. An operator
+ * should be able to see the number without being congratulated for it.
+ */
+function notesFitCard(f) {
+  if (!f) return '';
+  if (!f.measurable) {
+    return '<div class="card"><div class="tile-k">Instruction length</div>' +
+      '<div class="tile-s" style="margin-top:4px">Could not be measured' +
+      (f.error ? ': ' + esc(f.error) : '. This is a gap in the check, not a statement about the notes.') +
+      '</div></div>';
+  }
+  const had = f.happened;
+  const rows =
+    kv('Length now', n(f.chars_now) + ' characters') +
+    kv('Fits in', n(f.limit) + ' characters') +
+    (f.will_clip ? kv('Over by', n(f.over_by) + ' characters') : kv('Headroom', n(f.limit - f.chars_now) + ' characters'));
+
+  if (!f.will_clip && !had) {
+    return '<div class="card"><div class="tile-k">Instruction length</div><dl class="kv" style="margin-top:8px">' +
+      rows + '</dl></div>';
+  }
+
+  const nowLine = f.will_clip
+    ? '<strong>This owner’s instructions are too long to send whole.</strong> On the next call, ' +
+      n(f.over_by) + ' characters from the middle will be left out. People write the setup first and ' +
+      'the caveats last, so the part most likely to be lost is the part that begins “Important” or ' +
+      '“Never say”. The assistant is told its notes were clipped and will offer to check rather ' +
+      'than guess, but it is still answering from an incomplete brief.'
+    : '<strong>This is fixed now.</strong> The instructions currently fit, with ' +
+      n(f.limit - f.chars_now) + ' characters to spare.';
+
+  const thenLine = had
+    ? '<div style="margin-top:9px" class="sm">It has already happened on a real call: ' +
+      n(had.chars_sent) + ' characters were sent, ' + n(had.chars_kept) + ' were kept and ' +
+      n(had.chars_dropped) + ' were dropped, ' +
+      (had.times_seen > 1 ? 'on ' + n(had.times_seen) + ' calls, most recently ' : 'once, ') +
+      esc(stamp(had.last_seen)) + '.</div>'
+    : '<div style="margin-top:9px" class="sm muted">It has not happened on a real call yet, so there ' +
+      'is time to tell them before it does.</div>';
+
+  return '<div class="card" style="border-color:' + (f.will_clip ? 'var(--warn)' : 'var(--line)') + '">' +
+    '<div class="tile-k">Instruction length</div>' +
+    '<div class="tile-s" style="margin-top:6px;font-size:13.5px;line-height:var(--lh-base)">' + nowLine + '</div>' +
+    thenLine +
+    '<dl class="kv" style="margin-top:11px">' + rows + '</dl>' +
+    (f.will_clip
+      ? '<div class="sm muted" style="margin-top:9px">What to tell them: shorten it, and put anything ' +
+        'that must never be missed near the top or the very end.</div>'
+      : '') +
+  '</div>';
 }
 
 function renderCallSummary(s) {

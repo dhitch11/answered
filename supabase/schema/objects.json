@@ -248,6 +248,12 @@
    "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
   },
   {
+   "table": "owner_notes_clipped",
+   "schema": "public",
+   "grantee": "service_role",
+   "privileges": "DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE"
+  },
+  {
    "table": "rate_limits",
    "schema": "public",
    "grantee": "service_role",
@@ -4515,6 +4521,63 @@
   },
   {
    "rls": true,
+   "name": "owner_notes_clipped",
+   "schema": "public",
+   "columns": [
+    {
+     "name": "line_number",
+     "type": "text",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "chars_sent",
+     "type": "integer",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "chars_kept",
+     "type": "integer",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "chars_dropped",
+     "type": "integer",
+     "comment": null,
+     "default": null,
+     "nullable": false
+    },
+    {
+     "name": "times_seen",
+     "type": "integer",
+     "comment": null,
+     "default": "1",
+     "nullable": false
+    },
+    {
+     "name": "first_seen",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": "now()",
+     "nullable": false
+    },
+    {
+     "name": "last_seen",
+     "type": "timestamp with time zone",
+     "comment": null,
+     "default": "now()",
+     "nullable": false
+    }
+   ],
+   "comment": null
+  },
+  {
+   "rls": true,
    "name": "rate_limits",
    "schema": "public",
    "columns": [
@@ -5301,6 +5364,13 @@
      "comment": null,
      "default": "now()",
      "nullable": false
+    },
+    {
+     "name": "heard_as",
+     "type": "text",
+     "comment": "VERBATIM THIRD-PARTY SPEECH. Never our determination, never concatenated into one. Render it as an attributed quotation and never splice it into a sentence an operator reads as our finding. Structurally separate because escaping stops helping the moment this text reaches a model prompt.",
+     "default": null,
+     "nullable": true
     }
    ],
    "comment": null
@@ -7581,6 +7651,12 @@
    "definition": "CREATE UNIQUE INDEX notes_pkey ON public.notes USING btree (id)"
   },
   {
+   "name": "owner_notes_clipped_pkey",
+   "table": "owner_notes_clipped",
+   "schema": "public",
+   "definition": "CREATE UNIQUE INDEX owner_notes_clipped_pkey ON public.owner_notes_clipped USING btree (line_number)"
+  },
+  {
    "name": "rate_limits_pkey",
    "table": "rate_limits",
    "schema": "public",
@@ -7843,7 +7919,7 @@
  ],
  "policies": [],
  "postgres": "17.6",
- "taken_at": "2026-08-14T23:36:36.316595+00:00",
+ "taken_at": "2026-08-15T00:27:15.777987+00:00",
  "triggers": [
   {
    "name": "admin_audit_no_mutate",
@@ -8844,6 +8920,23 @@
   },
   {
    "acl": [
+    "postgres=X/postgres",
+    "service_role=X/postgres",
+    "anon=X/postgres"
+   ],
+   "args": "p_secret text, p_line text",
+   "name": "sv_admin_notes_clipped",
+   "config": [
+    "search_path=public"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_admin_notes_clipped(p_secret text, p_line text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare v jsonb;\nbegin\n  perform private.require(p_secret);\n  select coalesce(jsonb_agg(to_jsonb(x) order by x.last_seen desc), '[]'::jsonb) into v\n  from (\n    select c.line_number, c.chars_sent, c.chars_kept, c.chars_dropped, c.times_seen, c.last_seen,\n           a.id as account_id, a.business_name\n      from public.owner_notes_clipped c\n      left join public.account_numbers n on n.phone = c.line_number\n      left join public.accounts a on a.id = n.account_id\n     where p_line is null or c.line_number = p_line\n  ) x;\n  return jsonb_build_object('ok', true, 'rows', v, 'total', jsonb_array_length(v));\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
     "=X/postgres",
     "postgres=X/postgres",
     "anon=X/postgres",
@@ -9817,7 +9910,7 @@
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_dnc_readiness(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare snap public.dnc_snapshots; v jsonb;\nbegin\n  perform private.require(p_secret);\n  select * into snap from public.dnc_snapshots order by downloaded_at desc limit 1;\n\n  select jsonb_build_object(\n    -- (c)(2): a snapshot must EXIST and be under 31 days old. Both, measured.\n    'scrub_ready', snap.id is not null and snap.downloaded_at > now() - interval '31 days',\n    'snapshot_age_days', case when snap.id is null then null\n                              else round(extract(epoch from (now() - snap.downloaded_at)) / 86400) end,\n    'snapshot_numbers', coalesce(snap.numbers, 0),\n    'snapshot_area_codes', coalesce(array_length(snap.area_codes, 1), 0),\n    'san_on_file', snap.san is not null,\n    -- (d): every element has to be present. Missing paper is a shut gate, not a warning.\n    'policy_written',   exists (select 1 from public.compliance_policy where kind='dnc_policy' and superseded_at is null),\n    'affiliate_scope',  exists (select 1 from public.compliance_policy where kind='affiliate_scope' and superseded_at is null),\n    'retention_policy', exists (select 1 from public.compliance_policy where kind='retention' and superseded_at is null),\n    'training_recorded',exists (select 1 from public.compliance_training),\n    'internal_list_live', true,   -- public.suppression has existed and been enforced since day one\n    -- the operational number: requests past their ten-business-day deadline, unhonoured\n    'overdue_requests', (select count(*) from public.dnc_requests where honoured_at is null and honour_by < now())\n  ) into v;\n\n  return v || jsonb_build_object(\n    'procedures_ready',\n      (v->>'policy_written')::boolean and (v->>'affiliate_scope')::boolean\n      and (v->>'retention_policy')::boolean and (v->>'training_recorded')::boolean\n      and (v->>'overdue_requests')::int = 0\n  );\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_dnc_readiness(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare snap public.dnc_snapshots; v jsonb;\nbegin\n  perform private.require(p_secret);\n  select * into snap from public.dnc_snapshots order by downloaded_at desc limit 1;\n\n  select jsonb_build_object(\n    -- (c)(2): a snapshot must EXIST and be under 31 days old. Both, measured.\n    'scrub_ready', snap.id is not null and snap.downloaded_at > now() - interval '31 days',\n    'snapshot_age_days', case when snap.id is null then null\n                              else round(extract(epoch from (now() - snap.downloaded_at)) / 86400) end,\n    -- NULL means no snapshot has ever been loaded. 0 would mean one was loaded and held nothing.\n    -- Those are different facts and the panel must not blend them.\n    'snapshot_numbers',    case when snap.id is null then null else snap.numbers end,\n    'snapshot_area_codes', case when snap.id is null then null else array_length(snap.area_codes, 1) end,\n    'san_on_file', snap.san is not null,\n    -- (d): every element has to be present. Missing paper is a shut gate, not a warning.\n    'policy_written',   exists (select 1 from public.compliance_policy where kind='dnc_policy' and superseded_at is null),\n    'affiliate_scope',  exists (select 1 from public.compliance_policy where kind='affiliate_scope' and superseded_at is null),\n    'retention_policy', exists (select 1 from public.compliance_policy where kind='retention' and superseded_at is null),\n    'training_recorded',exists (select 1 from public.compliance_training),\n    -- MEASURED, not asserted: the internal list is live when the table exists and is readable.\n    'internal_list_live', (to_regclass('public.suppression') is not null),\n    -- the operational number: requests past their ten-business-day deadline, unhonoured\n    'overdue_requests', (select count(*) from public.dnc_requests where honoured_at is null and honour_by < now())\n  ) into v;\n\n  return v || jsonb_build_object(\n    'procedures_ready',\n      (v->>'policy_written')::boolean and (v->>'affiliate_scope')::boolean\n      and (v->>'retention_policy')::boolean and (v->>'training_recorded')::boolean\n      and (v->>'internal_list_live')::boolean       -- was omitted entirely; 64.1200(d)(3) is an element\n      and (v->>'overdue_requests')::int = 0\n  );\nend $function$\n",
    "security_definer": true
   },
   {
@@ -9835,7 +9928,7 @@
    "schema": "public",
    "comment": null,
    "returns": "jsonb",
-   "definition": "CREATE OR REPLACE FUNCTION public.sv_dnc_request(p_secret text, p_phone text, p_channel text, p_heard_as text DEFAULT NULL::text, p_call_sid text DEFAULT NULL::text, p_by text DEFAULT 'system'::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare v_by timestamptz;\nbegin\n  perform private.require(p_secret);\n  if p_phone is null or p_phone !~ '^\\+1\\d{10}$' then\n    return jsonb_build_object('error','a do-not-call request needs a usable number');\n  end if;\n\n  -- ten BUSINESS days, weekends skipped. Amended effective 2025-04-11 (was thirty).\n  v_by := now();\n  for i in 1..10 loop\n    v_by := v_by + interval '1 day';\n    while extract(isodow from v_by) in (6,7) loop v_by := v_by + interval '1 day'; end loop;\n  end loop;\n\n  insert into public.dnc_requests (phone, honour_by, channel, heard_as, call_sid, recorded_by)\n  values (p_phone, v_by, coalesce(p_channel,'call'), p_heard_as, p_call_sid, coalesce(p_by,'system'));\n\n  -- Honoured immediately, because there is no reason to use the ten days. The deadline is recorded\n  -- so the evidence shows we were inside it, not so we can spend it.\n  insert into public.suppression (phone, reason, source)\n  values (p_phone, coalesce('do-not-call request: ' || p_heard_as, 'do-not-call request'), coalesce(p_channel,'call'))\n  on conflict (phone) do nothing;\n  update public.dnc_requests set honoured_at = now() where phone = p_phone and honoured_at is null;\n\n  return jsonb_build_object('ok', true, 'honour_by', v_by, 'honoured_at', now());\nend $function$\n",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_dnc_request(p_secret text, p_phone text, p_channel text, p_heard_as text DEFAULT NULL::text, p_call_sid text DEFAULT NULL::text, p_by text DEFAULT 'system'::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare v_by timestamptz;\nbegin\n  perform private.require(p_secret);\n  if p_phone is null or p_phone !~ '^\\+1\\d{10}$' then\n    return jsonb_build_object('error','a do-not-call request needs a usable number');\n  end if;\n\n  -- ten BUSINESS days, weekends skipped. Amended effective 2025-04-11 (was thirty).\n  v_by := now();\n  for i in 1..10 loop\n    v_by := v_by + interval '1 day';\n    while extract(isodow from v_by) in (6,7) loop v_by := v_by + interval '1 day'; end loop;\n  end loop;\n\n  insert into public.dnc_requests (phone, honour_by, channel, heard_as, call_sid, recorded_by)\n  values (p_phone, v_by, coalesce(p_channel,'call'), p_heard_as, p_call_sid, coalesce(p_by,'system'));\n\n  -- Honoured immediately, because there is no reason to use the ten days. The deadline is recorded\n  -- so the evidence shows we were inside it, not so we can spend it.\n  --\n  -- ★ `reason` is now OURS ALONE and is a fixed string. Their words go in `heard_as`, beside it,\n  -- never inside it. Two columns, two authors, no sentence that blends them.\n  insert into public.suppression (phone, reason, heard_as, source)\n  values (p_phone, 'do-not-call request', p_heard_as, coalesce(p_channel,'call'))\n  on conflict (phone) do nothing;\n  update public.dnc_requests set honoured_at = now() where phone = p_phone and honoured_at is null;\n\n  return jsonb_build_object('ok', true, 'honour_by', v_by, 'honoured_at', now());\nend $function$\n",
    "security_definer": true
   },
   {
@@ -10132,6 +10225,57 @@
    "comment": null,
    "returns": "jsonb",
    "definition": "CREATE OR REPLACE FUNCTION public.sv_next_batch(p_secret text, p_limit integer DEFAULT 25, p_lane text DEFAULT NULL::text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private'\nAS $function$\ndeclare v jsonb;\nbegin\n  perform private.require(p_secret);\n  select coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) into v from (\n    select c.id, c.phone, c.name, c.trade, c.state, c.city, c.line_type, c.lane, c.call_count\n      from public.contacts c\n     where not c.suppressed\n       and not exists (select 1 from public.suppression sp where sp.phone = c.phone)\n       and c.disposition in ('new','queued')\n       and c.lane = coalesce(p_lane, c.lane)\n       and c.lane in ('green','amber')\n       and c.call_count = 0\n     order by c.lane desc, random()\n     limit least(coalesce(p_limit,25), 200)\n  ) s;\n  return v;\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_line text, p_sent integer, p_kept integer",
+   "name": "sv_notes_clipped",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_notes_clipped(p_secret text, p_line text, p_sent integer, p_kept integer)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  if p_line is null or btrim(p_line) = '' then\n    -- No line means no owner to tell. Say so rather than writing a row nobody can act on.\n    return jsonb_build_object('ok', false, 'reason', 'no line number on the request');\n  end if;\n  insert into public.owner_notes_clipped (line_number, chars_sent, chars_kept, chars_dropped)\n  values (p_line, p_sent, p_kept, greatest(0, p_sent - p_kept))\n  on conflict (line_number) do update\n    set chars_sent = excluded.chars_sent,\n        chars_kept = excluded.chars_kept,\n        chars_dropped = excluded.chars_dropped,\n        times_seen = public.owner_notes_clipped.times_seen + 1,\n        last_seen = now();\n  return jsonb_build_object('ok', true);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text, p_line text",
+   "name": "sv_notes_clipped_clear",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_notes_clipped_clear(p_secret text, p_line text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\nbegin\n  perform private.require(p_secret);\n  delete from public.owner_notes_clipped where line_number = p_line;\n  return jsonb_build_object('ok', found);\nend $function$\n",
+   "security_definer": true
+  },
+  {
+   "acl": [
+    "=X/postgres",
+    "postgres=X/postgres",
+    "service_role=X/postgres"
+   ],
+   "args": "p_secret text",
+   "name": "sv_notes_clipped_list",
+   "config": [
+    "search_path=public, private, extensions"
+   ],
+   "schema": "public",
+   "comment": null,
+   "returns": "jsonb",
+   "definition": "CREATE OR REPLACE FUNCTION public.sv_notes_clipped_list(p_secret text)\n RETURNS jsonb\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'private', 'extensions'\nAS $function$\ndeclare out jsonb;\nbegin\n  perform private.require(p_secret);\n  select coalesce(jsonb_agg(jsonb_build_object(\n     'line_number', c.line_number, 'chars_sent', c.chars_sent, 'chars_dropped', c.chars_dropped,\n     'times_seen', c.times_seen, 'last_seen', c.last_seen,\n     'business_name', a.business_name, 'owner_email', a.owner_email\n   ) order by c.last_seen desc), '[]'::jsonb) into out\n  from public.owner_notes_clipped c\n  left join public.accounts a on a.owner_phone = c.line_number;\n  return jsonb_build_object('ok', true, 'clipped', out);\nend $function$\n",
    "security_definer": true
   },
   {
@@ -12263,6 +12407,13 @@
    "table": "notes",
    "schema": "public",
    "definition": "PRIMARY KEY (id)"
+  },
+  {
+   "name": "owner_notes_clipped_pkey",
+   "type": "p",
+   "table": "owner_notes_clipped",
+   "schema": "public",
+   "definition": "PRIMARY KEY (line_number)"
   },
   {
    "name": "rate_limits_pkey",

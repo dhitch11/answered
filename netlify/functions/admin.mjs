@@ -43,6 +43,8 @@ import { CATALOG } from './lib/meter.mjs';
 import * as outreach from './lib/outreach.mjs';
 import * as ai from './lib/anthropic.mjs';
 import { ask as askData } from './lib/ask.mjs';
+import { renderSpec, getAccount } from './lib/accounts.mjs';
+import { fitOwnerNotes } from './answered-brain.mjs';
 
 export const config = {
   path: [
@@ -53,6 +55,7 @@ export const config = {
     '/api/admin/accounts',
     '/api/admin/account',
     '/api/admin/account-status',
+    '/api/admin/notes-clipped',
     '/api/admin/calls',
     '/api/admin/call',
     '/api/admin/call/summarize',
@@ -321,8 +324,11 @@ async function apiRoute(req, url, name) {
       const row = await rpc('sv_admin_account', { p_id: id });
       if (!row) return json(404, { error: 'no such account' });
       await audit(admin, req, 'account.view', { targetKind: 'account', targetId: id });
-      return json(200, row);
+      return json(200, { ...row, notes_fit: await notesFit(row) });
     }
+
+    case 'notes-clipped':
+      return json(200, await rpc('sv_admin_notes_clipped', { p_line: nz(q.get('line')) }));
 
     case 'calls':
       return json(200, await rpc('sv_admin_calls', {
@@ -907,6 +913,75 @@ async function doRefund(req, admin) {
  *    author, and this estate has already had a live phone line quietly running on backup models
  *    with nobody able to tell from the output.
  */
+/**
+ * WILL THIS OWNER'S INSTRUCTIONS FIT DOWN THE PHONE, AND HAVE THEY ALREADY FAILED TO?
+ *
+ * Those are two different facts and the console needs both, because the operator's next action
+ * differs depending on which is true:
+ *
+ *   owner_notes_clipped   it HAS happened, on a real call. The voice lane writes this.
+ *   the length right now   it WILL happen on the next call. Derived here from the same
+ *                          renderSpec() the call path uses, so it cannot drift from reality.
+ *
+ * A stored flag alone would say nothing about an account that has never been called, and would keep
+ * accusing an owner who has since trimmed their notes. Together they separate "was clipped once,
+ * since fixed" from "is still over right now", which is the whole point of telling anyone.
+ *
+ * ★ THE LIMIT IS DERIVED FROM THE VOICE LANE'S OWN FUNCTION, NOT COPIED FROM IT. Feeding
+ * fitOwnerNotes a string of known filler and counting what survives yields their constant exactly,
+ * so this number cannot silently disagree with the one the phone actually applies. A copied
+ * constant is a second source of truth waiting to go stale, and this estate has been bitten by
+ * exactly that more than once today.
+ */
+let CACHED_LIMIT = null;
+function ownerNoteLimit() {
+  if (CACHED_LIMIT != null) return CACHED_LIMIT;
+  try {
+    const probe = fitOwnerNotes('x'.repeat(50_000), { id: 'limit-probe' });
+    const kept = (probe.match(/x/g) || []).length;
+    CACHED_LIMIT = kept > 0 ? kept : null;
+  } catch { CACHED_LIMIT = null; }
+  return CACHED_LIMIT;
+}
+
+async function notesFit(row) {
+  const out = { measurable: false };
+  try {
+    // ★ MEASURE THE STRING THE PHONE ACTUALLY SENDS, NOT A PLAUSIBLE NEIGHBOUR OF IT.
+    //
+    // The obvious move is renderSpec(row) on the admin row already in hand. Measured, that returns
+    // 2,225 characters where the voice path's own getAccount() shape returns 2,266 — a 41-character
+    // gap, because the admin projection drops a line the call path includes. Small, and exactly
+    // large enough to report "fits" on an account the phone is clipping.
+    //
+    // So this re-reads through getAccount(), the same call account-voice.mjs makes, and pays one
+    // extra round trip to be measuring the same bytes. A number from the wrong source is worse than
+    // no number, because it gets believed.
+    const forVoice = await getAccount((row.account && row.account.id) || row.id);
+    const spec = renderSpec(forVoice || row);
+    const limit = ownerNoteLimit();
+    if (typeof spec !== 'string' || !limit) return out;
+    out.measurable = true;
+    out.chars_now = spec.length;
+    out.limit = limit;
+    out.over_by = Math.max(0, spec.length - limit);
+    out.will_clip = spec.length > limit;
+  } catch (e) {
+    out.error = String(e && e.message).slice(0, 160);
+  }
+  // What actually happened on a real call, if anything, for this account's own line.
+  try {
+    const line = (row.numbers && row.numbers[0] && (row.numbers[0].phone || row.numbers[0])) || null;
+    if (line) {
+      const seen = await rpc('sv_admin_notes_clipped', { p_line: String(line) });
+      out.happened = (seen && seen.rows && seen.rows[0]) || null;
+    }
+  } catch (e) {
+    out.happened_error = String(e && e.message).slice(0, 160);
+  }
+  return out;
+}
+
 async function summarizeCall(req, admin) {
   const b = await readJson(req);
   const sid = String(b.call_sid || '').trim();

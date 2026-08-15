@@ -1,5 +1,5 @@
 -- answered-prod, current database definition.
--- Exported 2026-08-14T23:36:36.316595+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
+-- Exported 2026-08-15T00:27:15.777987+00:00 by scripts/dump-schema.mjs. Postgres 17.6.
 --
 -- STRUCTURE ONLY. This file contains no row data of any kind.
 -- This is what the database IS. supabase/migrations/ is how it got here. Both are kept
@@ -836,6 +836,18 @@ create table if not exists public.notes (
 );
 alter table public.notes enable row level security;
 
+-- public.owner_notes_clipped   [RLS ENABLED]
+create table if not exists public.owner_notes_clipped (
+  line_number text not null,
+  chars_sent integer not null,
+  chars_kept integer not null,
+  chars_dropped integer not null,
+  times_seen integer default 1 not null,
+  first_seen timestamp with time zone default now() not null,
+  last_seen timestamp with time zone default now() not null
+);
+alter table public.owner_notes_clipped enable row level security;
+
 -- public.rate_limits   [RLS ENABLED]
 create table if not exists public.rate_limits (
   bucket text not null,
@@ -977,8 +989,10 @@ create table if not exists public.suppression (
   phone text not null,
   reason text not null,
   source text,
-  at timestamp with time zone default now() not null
+  at timestamp with time zone default now() not null,
+  heard_as text
 );
+comment on column public.suppression.heard_as is $c$VERBATIM THIRD-PARTY SPEECH. Never our determination, never concatenated into one. Render it as an attributed quotation and never splice it into a sentence an operator reads as our finding. Structurally separate because escaping stops helping the moment this text reaches a model prompt.$c$;
 alter table public.suppression enable row level security;
 
 -- public.transcript_lines   [RLS ENABLED]
@@ -1377,6 +1391,7 @@ alter table public.messages add constraint messages_message_sid_key UNIQUE (mess
 alter table public.messages add constraint messages_pkey PRIMARY KEY (id);
 alter table public.notes add constraint notes_contact_id_fkey FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE;
 alter table public.notes add constraint notes_pkey PRIMARY KEY (id);
+alter table public.owner_notes_clipped add constraint owner_notes_clipped_pkey PRIMARY KEY (line_number);
 alter table public.rate_limits add constraint rate_limits_pkey PRIMARY KEY (bucket, key_hash, window_start);
 alter table public.recap_deliveries add constraint recap_deliveries_channel_check CHECK ((channel = ANY (ARRAY['email'::text, 'sms'::text, 'webhook'::text])));
 alter table public.recap_deliveries add constraint recap_deliveries_key_channel UNIQUE (spine_key, channel);
@@ -1579,6 +1594,7 @@ CREATE UNIQUE INDEX messages_message_sid_key ON public.messages USING btree (mes
 CREATE UNIQUE INDEX messages_pkey ON public.messages USING btree (id);
 CREATE INDEX notes_contact_idx ON public.notes USING btree (contact_id, at DESC);
 CREATE UNIQUE INDEX notes_pkey ON public.notes USING btree (id);
+CREATE UNIQUE INDEX owner_notes_clipped_pkey ON public.owner_notes_clipped USING btree (line_number);
 CREATE UNIQUE INDEX rate_limits_pkey ON public.rate_limits USING btree (bucket, key_hash, window_start);
 CREATE INDEX recap_deliveries_claimed_at_idx ON public.recap_deliveries USING btree (claimed_at DESC);
 CREATE UNIQUE INDEX recap_deliveries_key_channel ON public.recap_deliveries USING btree (spine_key, channel);
@@ -3460,6 +3476,28 @@ begin
   update public.notes set pinned = coalesce(p_pinned,false) where id = p_id returning * into r;
   if not found then return jsonb_build_object('ok', false, 'error', 'no such note'); end if;
   return jsonb_build_object('ok', true, 'note', to_jsonb(r));
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.sv_admin_notes_clipped(p_secret text, p_line text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v jsonb;
+begin
+  perform private.require(p_secret);
+  select coalesce(jsonb_agg(to_jsonb(x) order by x.last_seen desc), '[]'::jsonb) into v
+  from (
+    select c.line_number, c.chars_sent, c.chars_kept, c.chars_dropped, c.times_seen, c.last_seen,
+           a.id as account_id, a.business_name
+      from public.owner_notes_clipped c
+      left join public.account_numbers n on n.phone = c.line_number
+      left join public.accounts a on a.id = n.account_id
+     where p_line is null or c.line_number = p_line
+  ) x;
+  return jsonb_build_object('ok', true, 'rows', v, 'total', jsonb_array_length(v));
 end $function$
 ;
 
@@ -5421,15 +5459,18 @@ begin
     'scrub_ready', snap.id is not null and snap.downloaded_at > now() - interval '31 days',
     'snapshot_age_days', case when snap.id is null then null
                               else round(extract(epoch from (now() - snap.downloaded_at)) / 86400) end,
-    'snapshot_numbers', coalesce(snap.numbers, 0),
-    'snapshot_area_codes', coalesce(array_length(snap.area_codes, 1), 0),
+    -- NULL means no snapshot has ever been loaded. 0 would mean one was loaded and held nothing.
+    -- Those are different facts and the panel must not blend them.
+    'snapshot_numbers',    case when snap.id is null then null else snap.numbers end,
+    'snapshot_area_codes', case when snap.id is null then null else array_length(snap.area_codes, 1) end,
     'san_on_file', snap.san is not null,
     -- (d): every element has to be present. Missing paper is a shut gate, not a warning.
     'policy_written',   exists (select 1 from public.compliance_policy where kind='dnc_policy' and superseded_at is null),
     'affiliate_scope',  exists (select 1 from public.compliance_policy where kind='affiliate_scope' and superseded_at is null),
     'retention_policy', exists (select 1 from public.compliance_policy where kind='retention' and superseded_at is null),
     'training_recorded',exists (select 1 from public.compliance_training),
-    'internal_list_live', true,   -- public.suppression has existed and been enforced since day one
+    -- MEASURED, not asserted: the internal list is live when the table exists and is readable.
+    'internal_list_live', (to_regclass('public.suppression') is not null),
     -- the operational number: requests past their ten-business-day deadline, unhonoured
     'overdue_requests', (select count(*) from public.dnc_requests where honoured_at is null and honour_by < now())
   ) into v;
@@ -5438,6 +5479,7 @@ begin
     'procedures_ready',
       (v->>'policy_written')::boolean and (v->>'affiliate_scope')::boolean
       and (v->>'retention_policy')::boolean and (v->>'training_recorded')::boolean
+      and (v->>'internal_list_live')::boolean       -- was omitted entirely; 64.1200(d)(3) is an element
       and (v->>'overdue_requests')::int = 0
   );
 end $function$
@@ -5468,8 +5510,11 @@ begin
 
   -- Honoured immediately, because there is no reason to use the ten days. The deadline is recorded
   -- so the evidence shows we were inside it, not so we can spend it.
-  insert into public.suppression (phone, reason, source)
-  values (p_phone, coalesce('do-not-call request: ' || p_heard_as, 'do-not-call request'), coalesce(p_channel,'call'))
+  --
+  -- ★ `reason` is now OURS ALONE and is a fixed string. Their words go in `heard_as`, beside it,
+  -- never inside it. Two columns, two authors, no sentence that blends them.
+  insert into public.suppression (phone, reason, heard_as, source)
+  values (p_phone, 'do-not-call request', p_heard_as, coalesce(p_channel,'call'))
   on conflict (phone) do nothing;
   update public.dnc_requests set honoured_at = now() where phone = p_phone and honoured_at is null;
 
@@ -6013,6 +6058,63 @@ begin
      limit least(coalesce(p_limit,25), 200)
   ) s;
   return v;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.sv_notes_clipped(p_secret text, p_line text, p_sent integer, p_kept integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'private', 'extensions'
+AS $function$
+begin
+  perform private.require(p_secret);
+  if p_line is null or btrim(p_line) = '' then
+    -- No line means no owner to tell. Say so rather than writing a row nobody can act on.
+    return jsonb_build_object('ok', false, 'reason', 'no line number on the request');
+  end if;
+  insert into public.owner_notes_clipped (line_number, chars_sent, chars_kept, chars_dropped)
+  values (p_line, p_sent, p_kept, greatest(0, p_sent - p_kept))
+  on conflict (line_number) do update
+    set chars_sent = excluded.chars_sent,
+        chars_kept = excluded.chars_kept,
+        chars_dropped = excluded.chars_dropped,
+        times_seen = public.owner_notes_clipped.times_seen + 1,
+        last_seen = now();
+  return jsonb_build_object('ok', true);
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.sv_notes_clipped_clear(p_secret text, p_line text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'private', 'extensions'
+AS $function$
+begin
+  perform private.require(p_secret);
+  delete from public.owner_notes_clipped where line_number = p_line;
+  return jsonb_build_object('ok', found);
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.sv_notes_clipped_list(p_secret text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'private', 'extensions'
+AS $function$
+declare out jsonb;
+begin
+  perform private.require(p_secret);
+  select coalesce(jsonb_agg(jsonb_build_object(
+     'line_number', c.line_number, 'chars_sent', c.chars_sent, 'chars_dropped', c.chars_dropped,
+     'times_seen', c.times_seen, 'last_seen', c.last_seen,
+     'business_name', a.business_name, 'owner_email', a.owner_email
+   ) order by c.last_seen desc), '[]'::jsonb) into out
+  from public.owner_notes_clipped c
+  left join public.accounts a on a.owner_phone = c.line_number;
+  return jsonb_build_object('ok', true, 'clipped', out);
 end $function$
 ;
 
@@ -7822,6 +7924,7 @@ CREATE TRIGGER suppression_applies_to_contact AFTER INSERT ON public.suppression
 -- public.lines  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- public.messages  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- public.notes  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
+-- public.owner_notes_clipped  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- public.rate_limits  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- public.recap_deliveries  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
 -- public.recover_calls  service_role  DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE
