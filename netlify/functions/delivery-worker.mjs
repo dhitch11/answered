@@ -31,6 +31,7 @@
 
 import { rpc } from './lib/db.mjs';
 import { signWebhook, WEBHOOK_SIG_HEADER } from './lib/outbox.mjs';
+import { pushJob } from './lib/jobber.mjs';
 
 // ★ NO `path`. THIS IS DELIBERATE AND IT IS A SECURITY DECISION, NOT AN OMISSION.
 //
@@ -82,11 +83,76 @@ function resolveTarget(target) {
     }
     return { url, secret };
   }
+
+  // ── connectors ──────────────────────────────────────────────────────────────────────────────
+  // `jobber:<account uuid>`. The account id is on the target rather than looked up from the row so
+  // that a delivery is self-describing: reading the queue tells you where it is going without
+  // joining anything, and a row cannot be redirected by a later edit to another table.
+  if (target.startsWith('jobber:')) {
+    const accountId = target.slice('jobber:'.length);
+    if (!accountId) return { fail: true, why: 'a jobber target with no account id' };
+    return { connector: 'jobber', accountId };
+  }
+
   return { fail: true, why: `no resolver for target "${target}"` };
+}
+
+/**
+ * A connector delivery. The vendor call is the connector's problem; this function's job is to turn
+ * its verdict into the same three outcomes a webhook produces, so the caller below needs no special
+ * case and the queue's state machine stays one machine.
+ *
+ * ★ `unknown:true` FROM THE CONNECTOR IS STILL A FAILURE HERE, ON PURPOSE. A timeout means the
+ * vendor may have created the record, so it must be retried, and the retry is safe because the
+ * connector reads `external_links` before every write. Treating an unknown as a success to avoid a
+ * duplicate would be choosing silent data loss over a duplicate the idempotency layer already
+ * prevents.
+ */
+async function deliverConnector(row, t) {
+  if (t.connector !== 'jobber') return { ok: false, status: 0, body: '', error: `no connector named "${t.connector}"` };
+
+  let r;
+  try {
+    r = await pushJob(row.payload || {}, t.accountId);
+  } catch (e) {
+    return { ok: false, status: 0, body: '', error: String((e && e.message) || e).slice(0, 300) };
+  }
+
+  if (r.ok) {
+    return {
+      ok: true, status: 200,
+      // What actually happened, in the row, so a human reading the delivery log can tell a fresh
+      // write from a replay of one that already existed.
+      body: JSON.stringify({ request_id: r.request_id, client_id: r.client_id, property_id: r.property_id, reused: Boolean(r.reused) }),
+      error: null,
+    };
+  }
+
+  // ── PARKED vs FAILED, and the difference matters ────────────────────────────────────────────
+  //
+  // A connection that is revoked, expired, pending or never made will not become connected by
+  // retrying. Burning eight attempts on "the customer has not reconnected Jobber yet" marks a
+  // perfectly good job DEAD for a reason that has nothing to do with the job, and the customer who
+  // reconnects tomorrow never receives it.
+  //
+  // ★ SO IT IS REQUEUED WITHOUT BURNING AN ATTEMPT — BUT IT IS NAMED, NOT HIDDEN. A queue that
+  // silently requeues forever is the anti-pattern this file's own header warns about. The reason is
+  // written to the row where the delivery log renders it, the count comes back in this function's
+  // return, and the log line says how many are parked and why. A parked delivery is a customer
+  // action item, and it is supposed to be readable as one.
+  const why = String(r.reason || '');
+  if (/has not connected|reconnect|revoked|is pending|is error|is expired|no tokens/i.test(why)) {
+    return { parked: true, why };
+  }
+
+  return { ok: false, status: 0, body: '', error: (why || 'the connector failed without saying why').slice(0, 300) };
 }
 
 async function deliver(row) {
   const t = resolveTarget(row.target);
+  // A connector target that failed to resolve carries `fail`, not `connector`, so it falls through
+  // to the shared skip/fail handling below rather than being special-cased twice.
+  if (t.connector) return deliverConnector(row, t);
 
   // Nowhere to send is NOT a failure of this delivery. Counting it as one would burn the attempt
   // budget and mark a perfectly good row dead because an env var is unset.
@@ -139,10 +205,23 @@ export default async function handler(req) {
     return Response.json({ ok: false, error: 'claim failed', detail: String(e && e.message).slice(0, 200) }, { status: 500 });
   }
 
-  const out = { claimed: claimed.length, delivered: 0, failed: 0, skipped: 0, dead: 0 };
+  const out = { claimed: claimed.length, delivered: 0, failed: 0, skipped: 0, parked: 0, dead: 0 };
+  const parkedWhy = new Map();
 
   for (const row of claimed) {
     const r = await deliver(row);
+
+    // Parked: waiting on the CUSTOMER, not on us. Requeued without burning an attempt, exactly like
+    // a skip, but counted and named separately so "nothing is configured" never reads the same as
+    // "three customers need to reconnect Jobber".
+    if (r.parked) {
+      out.parked++;
+      parkedWhy.set(r.why, (parkedWhy.get(r.why) || 0) + 1);
+      await rpc('sv_delivery_failed', {
+        p_id: row.id, p_status: 0, p_body: '', p_error: r.why, p_max_attempts: 10_000,
+      }).catch((e) => console.error('delivery-worker: could not requeue a parked row:', e && e.message));
+      continue;
+    }
 
     if (r.skipped) {
       out.skipped++;
@@ -172,5 +251,11 @@ export default async function handler(req) {
 
   out.ms = Date.now() - started;
   if (out.claimed) console.log('delivery-worker:', JSON.stringify(out));
+
+  // Named, every run, because a parked delivery is a customer who has to do something and nobody
+  // finds that out by reading a counter.
+  for (const [why, n] of parkedWhy) {
+    console.log(`delivery-worker: ${n} ${n === 1 ? 'delivery is' : 'deliveries are'} PARKED, waiting on the customer: ${why}`);
+  }
   return Response.json({ ok: true, ...out });
 }
