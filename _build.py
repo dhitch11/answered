@@ -84,7 +84,17 @@ def nav(active):
 # old one. David bought a NEW number on 2026-08-15, so that drift was about to happen for real.
 # Falls back to the previous literal only so a build without the env still produces a page; the
 # published-number check is what catches it being wrong.
-A2P_NUMBER = os.environ.get('ANSWERED_DEMO_NUMBER_PRETTY') or '(916) 350-4869'
+def _pretty_number(e164: str) -> str:
+    """(916) 282-5278 from +19162825278. One fact, one source."""
+    import re as _re
+    m = _re.fullmatch(r'\+1(\d{3})(\d{3})(\d{4})', (e164 or '').strip())
+    return f'({m.group(1)}) {m.group(2)}-{m.group(3)}' if m else ''
+
+
+# ★ DERIVED, NOT A SECOND ENV VAR. A separate ANSWERED_DEMO_NUMBER_PRETTY would be two variables
+# holding one fact, which is the same drift this whole exercise exists to kill: somebody updates the
+# E.164 one and the page keeps the old pretty one, silently, in the sentence carriers read.
+A2P_NUMBER = _pretty_number(os.environ.get('ANSWERED_DEMO_NUMBER', '')) or '(916) 350-4869'
 
 FOOT = f'''<footer class="foot">
   <div class="wrap">
