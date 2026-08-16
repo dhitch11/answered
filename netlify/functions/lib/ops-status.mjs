@@ -192,7 +192,7 @@ export const ENV_SPEC = [
     unset: 'A submission still emails David, but nothing is logged to the CRM. Estate rule 6 says a send that does not log is a bug.' },
   { name: 'TWILIO_AUTH_TOKEN', severity: 'amber',
     readers: ['answered-voice.js', 'lib/twilio-webhook.mjs'],
-    unset: 'Twilio webhook signatures cannot be verified with HMAC. The code degrades loudly to an AccountSid cross check and says so in the log. It is a documented posture, not a crash, but full verification is better.' },
+    unset: 'Twilio webhook signatures cannot be verified with HMAC and the code degrades loudly to an AccountSid cross check. This fires ONLY when the variable is genuinely missing: as of 2026-08-16 it is SET and full verification is live, measured on production rather than read out of the code.' },
   { name: 'ANSWERED_DB_URL', severity: 'amber',
     readers: ['lib/db.mjs', 'truce.mjs'],
     unset: 'The call spine is unreachable. The cockpit serves 503 on every operation.' },

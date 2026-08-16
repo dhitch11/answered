@@ -641,9 +641,18 @@ async function enter(req, url) {
  * The TwiML for the opt-in "call me when a job is booked" channel.
  *
  * ★ AUTHENTICATED BY OUR OWN SIGNATURE, NOT BY TWILIO'S. lib/twilio-webhook.mjs degrades to an
- * AccountSid cross-check when TWILIO_AUTH_TOKEN is absent, and it is absent on this project, which
- * means an AccountSid printed in every console would be the only thing guarding a page that reads
- * a customer's address out loud. So the URL carries a receipt token this server minted, and
+ * AccountSid cross-check when TWILIO_AUTH_TOKEN is absent.
+ *
+ * ★ CORRECTED 2026-08-16: THIS COMMENT USED TO SAY THE TOKEN "IS ABSENT ON THIS PROJECT". IT IS NOT.
+ * Measured on production, twice, by two lanes independently. A correctly signed POST to
+ * /api/sms-inbound is accepted and logged; the identical body with a wrong signature is refused with
+ * "signature mismatch". That verifier FAILS CLOSED on a missing token, so a mismatch refusal can only
+ * happen if the token is present. The claim was stale, and it was load-bearing: it convinced a
+ * careful research agent, with three file citations, that our whole proof layer would refuse every
+ * write. When a code comment disagrees with a measurement, the comment is the suspect.
+ *
+ * The receipt-token design below is UNCHANGED and still correct — it is defence in depth, not a
+ * workaround for a missing token. So the URL carries a receipt token this server minted, and
  * nothing without the HMAC key can produce one. The AccountSid is still checked when Twilio sends
  * it, as a second lock rather than the only one.
  */

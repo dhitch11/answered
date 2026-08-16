@@ -139,7 +139,7 @@ const RUNBOOK = [
   { match: 'ANSWERED_COCKPIT_KEY', title: 'The internal cookie is signed with a key a vendor holds',
     body: 'The fallback key is the bearer token pasted into the ElevenLabs custom LLM configuration, and they transmit it on every conversational turn. Anyone holding it could mint an operator session that places calls. Set <code>ANSWERED_COCKPIT_KEY</code> to a fresh random value of our own.' },
   { match: 'TWILIO_AUTH_TOKEN', title: 'Webhook signatures are not being verified',
-    body: 'The account authenticates with an API key pair, and the account auth token cannot be read back through key auth, so the HMAC check has nothing to sign with. The code degrades loudly to an AccountSid cross check and logs it every time. It is a known posture. Add the auth token to the environment to upgrade to full verification.' },
+    body: 'If this is unset the HMAC check has nothing to sign with and the code degrades loudly to an AccountSid cross check. NOTE, corrected 2026-08-16: the old text here claimed the auth token "cannot be read back through key auth" and was therefore permanently unavailable. That is false — the token IS set on this project and full HMAC verification is live, proven on production by a signed POST that was accepted and a wrong-signed one that was refused. This entry now only fires if the variable is genuinely missing.' },
 ];
 
 function runbookFor(line) {

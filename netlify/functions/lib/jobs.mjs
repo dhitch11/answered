@@ -582,7 +582,10 @@ export async function callBooked({ job, account, prefs, url }) {
       To: to,
       From: gate.from,
       // ★ A SIGNED CAPABILITY, NOT A BARE REFERENCE. lib/twilio-webhook.mjs degrades to an
-      // AccountSid cross-check when TWILIO_AUTH_TOKEN is absent, and it is absent on this project,
+      // AccountSid cross-check when TWILIO_AUTH_TOKEN is absent. ★ CORRECTED 2026-08-16: the token
+      // is NOT absent on this project — measured on production, a wrong-signed POST is refused with
+      // "signature mismatch" by a verifier that fails closed, which is only possible if it is set.
+      // The receipt-token design below stands on its own as defence in depth.
       // so Twilio's own signature cannot guard this URL. A receipt token can: only this server
       // holds the key that mints one, and the endpoint refuses anything else.
       Url: `${siteOrigin()}/api/portal/job-call?k=${encodeURIComponent(mintReceipt(job.job_ref, account && account.id))}`,
