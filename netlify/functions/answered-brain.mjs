@@ -58,6 +58,7 @@ import {
   nextBoundary, trimToSentence,
 } from './lib/personas.mjs';
 import * as db from './lib/db.mjs';
+import { modulesFor } from './lib/brain-modules.mjs';
 import { BOOK_TOOL, anthropicTool, wasBooked } from './lib/tools.mjs';
 
 const GEN_BUDGET_MS = 8400; // inside Netlify's 10s stream ceiling, closes at the last clean clause
@@ -302,6 +303,23 @@ function calleeNumber(body, systemText) {
 }
 
 // ── direct Anthropic caller, streaming and buffered ─────────────────────────
+
+/**
+ * Which knowledge modules this call has already been given.
+ *
+ * ★ DERIVED FROM THE TRANSCRIPT, NEVER HELD IN MODULE SCOPE. This handler is stateless between turns
+ * but WARM across invocations, so a `new Set()` at module level would carry one caller's loaded
+ * modules into the next caller's call. The symptom would be knowledge silently NOT loading for the
+ * second person — no error, no log, just a worse answer — which is the failure shape this estate is
+ * worst at seeing. Replaying the transcript costs a few regex tests and cannot leak.
+ */
+function moduleState(inMsgs) {
+  const said = new Set();
+  const turns = (inMsgs || []).filter((m) => m && m.role === 'user').map((m) => String(m.content || ''));
+  for (const t of turns.slice(0, -1)) modulesFor(t, said);   // every turn except the newest
+  return said;
+}
+
 async function askAnthropic({ apiKey, model, system, messages, maxTokens, temperature, disableThinking, stream, signal, onDelta, tools, onTool }) {
   const reqBody = { model, system, messages, max_tokens: maxTokens, stream: !!stream };
   if (tools && tools.length) reqBody.tools = tools;
@@ -536,6 +554,25 @@ export default async (req) => {
   // always win; for the customer line, the owner's rules win on every fact
   // about his business and never on safety.
   let system = persona.spec;
+
+  // ── KNOWLEDGE MODULES ──────────────────────────────────────────────────────
+  // Appended AFTER the persona spec, never before it, for two reasons that both matter:
+  //
+  //   1. CACHING. lib/anthropic.mjs marks the system prompt cache_control:{type:'ephemeral'}, and a
+  //      cache hit needs a STABLE PREFIX. The spec is identical every turn; the modules grow. Putting
+  //      the growing part last keeps the cached prefix intact, so appending knowledge mid-call does
+  //      not throw the cache away for the rest of the call.
+  //   2. PRECEDENCE. The persona's rules are the floor. Knowledge informs what Thomas SAYS, never
+  //      what he is ALLOWED to say, and a module cannot override a spec rule it comes after.
+  //
+  // ★ THIS BLOCK IS WHY THE LOADER EXISTS AT ALL. brain-modules.mjs shipped ORPHANED — nothing
+  // imported it, so a caller could say "my water heater is leaking" and the trades knowledge sat on
+  // disk unread. Built, wired and never fed, in my own work, one commit after writing a comment
+  // warning about exactly that. The modules are only real from this line down.
+  const fresh = modulesFor(lastUser, moduleState(inMsgs));
+  for (const m of fresh) system += '\n\n' + m.text;
+  if (fresh.length) console.log(`answered-brain: loaded knowledge [${fresh.map((m) => m.name).join(', ')}] for ${persona.id}`);
+
   if (incomingSystem) system += '\n\n' + noteHeader(persona) + '\n' + fitOwnerNotes(incomingSystem, persona, calleeNumber(body, incomingSystem));
   if (assistantTurns >= persona.softCloseAt) system += '\n\n' + persona.softCloseNote;
 
