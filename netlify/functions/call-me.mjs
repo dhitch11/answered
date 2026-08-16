@@ -227,13 +227,10 @@ function insideWindow(zones, at) {
   return { ok: true };
 }
 
-/** Seconds until every zone is inside the window again. Stepped, not solved. */
-function secondsUntilOpen(zones, from) {
-  for (let i = 1; i <= 24 * 60; i += 5) {
-    if (insideWindow(zones, new Date(from.getTime() + i * 60000)).ok) return i * 60;
-  }
-  return null;
-}
+// `secondsUntilOpen` lived here and computed how long a caller had to wait for the morning. It was
+// removed with the refusal it served, on 2026-08-16. Leaving it would have been worse than useless:
+// a live-looking helper named after a rule that no longer exists is how the next reader concludes
+// the line still closes at night.
 
 // ── small helpers ────────────────────────────────────────────────────────────
 const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
@@ -469,16 +466,51 @@ async function handleApi(event) {
     return deny('daily_cap', 'We have hit our limit of setup calls for today. Call the demo line any time.');
   }
 
-  // ── 8. quiet hours ─────────────────────────────────────────────────────────
+  // ── 8. the clock. NOT A GATE ON THIS PATH. ─────────────────────────────────
+  //
+  // ★ REMOVED AS A REFUSAL 2026-08-16, ON DAVID'S INSTRUCTION AND ON THE LAW.
+  //
+  // This used to refuse outside 08:00-21:00 local and tell the person to come back in the morning.
+  // A business owner who is awake at midnight, has just typed their own number in, and pressed a
+  // button that says call me now, is the single most motivated person who will ever touch this
+  // product. Turning them away is not caution, it is refusing money from somebody standing at the
+  // till. Trade contractors keep exactly these hours: the 2am burst-pipe story is on our own
+  // homepage, and we were closed for it.
+  //
+  // ── WHY THIS IS LAWFUL, AND WHY IT DOES NOT GENERALISE ──────────────────────
+  //
+  // TCPA quiet hours (47 CFR 64.1200(c)(1)) restrict TELEPHONE SOLICITATIONS to 8am-9pm local. A
+  // telephone solicitation is defined at 64.1200(f)(15) and it EXPRESSLY EXCLUDES a call made to a
+  // person "with that person's prior express invitation or permission."
+  //
+  // This call is the textbook case of that exclusion, on four counts, all of which are properties of
+  // THIS path and not of calling in general:
+  //   1. The called party typed their own number. We did not source it.
+  //   2. They ticked a consent box whose text is served from the server and recorded verbatim, and
+  //      which says in terms that we may call that number now with an AI voice.
+  //   3. It is a call to THEMSELVES, not to a third party.
+  //   4. It is dialled inline, in the same request, seconds after the invitation. Nothing queues,
+  //      so the permission cannot go stale between the asking and the ringing. If a future change
+  //      ever puts a queue between consent and dial, THIS EXEMPTION WEAKENS AND THIS COMMENT IS THE
+  //      thing to re-read.
+  //
+  // ── WHAT DID NOT CHANGE, AND MUST NOT ──────────────────────────────────────
+  //
+  // ★ COLD OUTBOUND STILL HAS ITS CALLING WINDOW AND IT IS NOT NEGOTIABLE. That path lives in
+  // lib/hours.mjs and dials people who never asked us for anything, which IS solicitation, so 8-9
+  // local plus the FDCPA windows still bind there. The two gates were always separate functions;
+  // this edit touches only the one on the path where the person is calling us to themselves.
+  // Every other gate on this path is untouched: suppression, one-per-number, one-per-session, the
+  // daily ceiling, consent recorded before the dial, and the do-not-call check.
+  //
+  // The local time is still COMPUTED, because knowing it is useful and because a future reader
+  // deserves to see that the removal was a decision rather than an oversight. It is telemetry now.
   const at = new Date();
   const win = insideWindow(zones, at);
   if (!win.ok) {
-    const wait = secondsUntilOpen(zones, at);
-    return deny(
-      'quiet_hours',
-      'It is outside calling hours where that number lives, so we did not call. Try between eight in the morning and nine at night.',
-      wait ? { retry_after_seconds: wait } : undefined,
-    );
+    console.log(`CALL-ME: dialling at ${win.minutes != null ? Math.floor(win.minutes / 60) : '?'}:00 local `
+      + `(${win.tz || 'unknown zone'}), outside 8-21. Proceeding: this is a callback the person `
+      + 'requested seconds ago, which is not a telephone solicitation.');
   }
 
   // ── 9. configured ──────────────────────────────────────────────────────────
