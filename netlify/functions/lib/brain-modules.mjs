@@ -24,11 +24,10 @@
 // sounds, how fast he speaks, or when he takes a turn. David was explicit that the wiring is not to be
 // touched, and nothing here reaches it.
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'brain');
+// ★ IMPORTED, NOT READ FROM DISK. These were .txt files read with fs, and a real phone call proved
+// the bundler cannot see a runtime file read: the live function logged ENOENT and shipped with no
+// knowledge in it. An imported string cannot go missing — if it did, the bundle would not build.
+import { TEXT } from './brain-text.mjs';
 
 /**
  * name → [trigger, filename]
@@ -86,20 +85,18 @@ export const MODULES = [
 
 // Read once per process. These files are small and immutable at runtime; re-reading them per turn
 // would put disk latency inside a conversation, which is exactly where it must never be.
-const cache = new Map();
 function read(file) {
-  if (cache.has(file)) return cache.get(file);
-  let text = '';
-  try {
-    text = fs.readFileSync(path.join(DIR, file), 'utf8');
-  } catch (e) {
+  const key = String(file).replace(/\.txt$/, '');
+  const text = TEXT[key];
+  if (typeof text === 'string' && text.length) return text;
+  {
+    const e = new Error(`no exported module named "${key}" in brain-text.mjs`);
     // ★ A MISSING MODULE IS A LOGGED ABSENCE, NEVER A CRASH AND NEVER A SILENT EMPTY STRING.
     // Silent-empty is how a brain gets deployed with no knowledge in it and nobody notices for a
     // week, which is this estate's dominant failure. The call continues without the module.
     console.error(`brain-modules: ${file} could not be read, so that knowledge is NOT in this call: ${String(e && e.message).slice(0, 120)}`);
   }
-  cache.set(file, text);
-  return text;
+  return '';
 }
 
 /**

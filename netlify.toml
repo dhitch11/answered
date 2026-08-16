@@ -2,20 +2,11 @@
   publish = "."
   functions = "netlify/functions"
 
-# ★ THE KNOWLEDGE MODULES MUST BE DECLARED, OR THEY ARE NOT IN THE BUNDLE.
-#
-# Netlify's function bundler traces JS imports. lib/brain/*.txt are READ AT RUNTIME with fs, not
-# imported, so the tracer cannot see them and silently ships a function with no knowledge in it.
-#
-# Found by a real 31-second phone call, not by a test. Every local test passed, the files were
-# present in the staged tree, and the deploy reported success — and the live function logged
-# ENOENT: no such file or directory, open '/var/task/brain/trades.txt'. The staged tree is not
-# the bundle, which is the same lesson as the cached-bundle incident wearing different clothes.
-#
-# The only reason this was caught rather than shipped as a quietly dumber Thomas is that
-# brain-modules.mjs logs the absence loudly instead of returning an empty string.
-[functions]
-  included_files = ["netlify/functions/lib/brain/**"]
+# The knowledge modules used to need declaring here, because they were .txt files read at runtime
+# with fs and the bundler cannot see a runtime read. Declaring them did not work either: the bundler
+# also flattens lib/ into the task root, so the computed path was wrong in a second, independent way.
+# They are now JavaScript exports in lib/brain-text.mjs, traced like any other import, and this block
+# is deliberately left empty rather than deleted so the next person knows the question was asked.
 
 [[headers]]
   for = "/*"

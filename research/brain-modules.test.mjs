@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { modulesFor, moduleHealth, MODULES } from '../netlify/functions/lib/brain-modules.mjs';
+import { TEXT } from '../netlify/functions/lib/brain-text.mjs';
 
 let pass = 0, fail = 0;
 const t = (n, f) => { try { f(); console.log(`  ok   ${n}`); pass++; } catch (e) { console.log(`  FAIL ${n}\n       ${e.message}`); fail++; } };
@@ -34,7 +35,7 @@ for (const [said, want] of [
 console.log('\n── ★ the product brains must not contradict the engines they describe ──');
 
 t('recover.txt never threatens, and says so as a rule', () => {
-  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/recover.txt', import.meta.url), 'utf8');
+  const s = TEXT.recover;
   assert.match(s, /NEVER THREATEN/i, 'the FDCPA floor the engine enforces must be stated in the brain too');
   assert.match(s, /IDENTITY BEFORE DEBT/i, '1692c(b): the matter is not stated until the debtor is confirmed');
   assert.match(s, /STOP MEANS STOP/i, '1692c(c): a stop is honoured on first hearing');
@@ -43,14 +44,14 @@ t('recover.txt never threatens, and says so as a rule', () => {
 });
 
 t('hold.txt states only the three published prices and never invents a wait', () => {
-  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/hold.txt', import.meta.url), 'utf8');
+  const s = TEXT.hold;
   assert.match(s, /\$20/); assert.match(s, /\$10/); assert.match(s, /\$0/);
   assert.match(s, /NEVER PROMISE A WAIT TIME/i, 'a queue we cannot see must never be given a number');
   assert.ok(!/\$(?!20\b|10\b|0\b)\d/.test(s), 'a price outside the published three appears in the brain');
 });
 
 t('every brain refuses to hand over identity data', () => {
-  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/hold.txt', import.meta.url), 'utf8');
+  const s = TEXT.hold;
   assert.match(s, /social security number|date of birth/i,
     'Hold sits in queues that ask security questions; refusing must be explicit');
 });

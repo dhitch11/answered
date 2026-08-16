@@ -46,11 +46,12 @@ t('it excludes the newest turn, which is the one being evaluated now', () => {
 });
 
 console.log('\n── the modules themselves still ship ──');
-t('the knowledge files exist and are non-trivial', () => {
-  for (const f of ['trades.txt', 'human_range.txt']) {
-    const p = new URL(`../netlify/functions/lib/brain/${f}`, import.meta.url);
-    assert.ok(fs.readFileSync(p, 'utf8').length > 1000, `${f} is missing or nearly empty`);
-  }
+t('the knowledge is IMPORTED, not read from disk at runtime', () => {
+  const loader = fs.readFileSync(new URL('../netlify/functions/lib/brain-modules.mjs', import.meta.url), 'utf8');
+  assert.match(loader, /import \{ TEXT \} from '\.\/brain-text\.mjs'/,
+    'the loader must import its content — a runtime fs read is invisible to the bundler and ships empty');
+  assert.ok(!/readFileSync/.test(loader),
+    'a runtime file read is back: a real call proved the bundler cannot see it (ENOENT on /var/task/brain/)');
 });
 
 console.log(`\n${fail ? 'FAILED' : 'PASSED'}: ${pass} passed, ${fail} failed\n`);
