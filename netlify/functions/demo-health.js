@@ -208,7 +208,22 @@ async function probeTwilioNumber(event) {
 // Blobs store "canary". The canary itself already reported probe_landed facts
 // separately; here landed means "a fresh record exists", ok means what the
 // canary said, with the two-consecutive-fails law applied.
-const CANARY_FRESH_MS = 3 * 60 * 60 * 1000; // canary runs every 2h; 3h = one missed run is stale
+// ★ CALIBRATED TO MEASURED DELIVERY, NOT TO THE CRON STRING. 2026-08-16.
+//
+// This was 3 hours, on the reasoning "the canary runs every 2h, so 3h means one missed run." That
+// reasoning is sound and the premise is false: the schedule asks for 12 runs a day and the platform
+// delivered SEVEN in the last 24 hours, measured from the function logs. Against a 3h window that
+// guarantees regular false reds on a line that is answering perfectly well.
+//
+// A health signal that cries wolf is worse than none, because people learn to scroll past it — and
+// this is the one instrument watching whether the phone picks up. So the window is widened to FIVE
+// hours, which is two missed runs at the delivered cadence rather than one at the hoped-for cadence.
+//
+// ★ THIS IS CALIBRATION, NOT LOOSENING, AND THE DIFFERENCE MATTERS. A real outage still shows up
+// here within five hours. What stops showing up is the platform being slightly late, which was never
+// news. If the delivered cadence improves, tighten this back — and if it degrades further, the
+// honest move is to fix the scheduling, NOT to keep widening the window until it is always green.
+const CANARY_FRESH_MS = 5 * 60 * 60 * 1000;
 const CANARY_SKEW_MS = 5 * 60 * 1000; // tolerate small clock skew, nothing more
 
 async function probeCanary(event) {

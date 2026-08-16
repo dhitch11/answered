@@ -382,10 +382,33 @@ async function persist(getStore, record) {
   await store.setJSON('latest', record);
   await store.setJSON('history/' + record.at.replace(/[:.]/g, '-'), record);
 
-  const back = await store.get('latest', { type: 'json' });
+  // ★ THE READ BACK MUST ASK FOR STRONG CONSISTENCY, OR IT IS RACING THE STORE.
+  //
+  // Netlify Blobs is EVENTUALLY consistent on reads by default. A get issued immediately after a
+  // set is entitled to return the previous value or nothing at all, and it regularly does. This
+  // check did not pass that option, so it was not measuring "did the write land" — it was measuring
+  // "did the write land AND propagate within a few milliseconds", which is a different and much
+  // harsher question that the store never promised to answer yes to.
+  //
+  // Measured 2026-08-16: the 00:01 run logged "blob write FAILED" and "PASSED BUT UNRECORDED" — and
+  // the record it claimed it could not save was sitting in the store, being served by
+  // /api/demo-health, the whole time. The write was fine. The proof was broken.
+  //
+  // That is the worst direction for this particular instrument to fail in: a health canary that
+  // cries wolf teaches everyone to disregard it, which is exactly what you cannot afford from the
+  // one thing watching whether the phone answers.
+  const back = await store.get('latest', { type: 'json', consistency: 'strong' });
   if (!back || back.at !== record.at) {
-    throw new Error('the canary store accepted a write that did not read back');
+    // ★ AND IT IS NO LONGER A THROW. A mismatch here is now reported as a doubt, not as a failure,
+    // because the caller turns a throw into store_writable:false, which is a claim that the result
+    // was lost. Saying "lost" about a record that is present is a lie in the safe-sounding
+    // direction, and this function has already told it once tonight.
+    console.error('ANSWERED CANARY: the read back did not match even under strong consistency '
+      + `(wanted at=${record.at}, got at=${back ? back.at : 'nothing'}). The write may still have `
+      + 'landed; /api/demo-health is the authority on what the gate can actually see.');
+    return { verified: false };
   }
+  return { verified: true };
 }
 
 export default async () => {
@@ -409,12 +432,17 @@ export default async () => {
   }
 
   try {
-    await persist(getStore, record);
+    const { verified } = await persist(getStore, record);
+    // The write did not throw, so it was accepted. `verified` says whether the read back could
+    // also SEE it immediately, which is a separate and weaker question now that the check no longer
+    // races the store's consistency model.
     record.store_writable = true;
+    record.read_back_verified = verified;
   } catch (e) {
-    // If this write fails the gate cannot see the result; demo-health will go
-    // red on staleness within 3 hours, but say it NOW, loudly.
+    // A genuine throw from persist means the write itself was rejected. That is the real failure,
+    // and it is now the ONLY thing that sets store_writable false.
     record.store_writable = false;
+    record.read_back_verified = false;
     console.error('ANSWERED CANARY: blob write FAILED, the gate cannot see this run: ' + String(e && e.message).slice(0, 140));
   }
 
