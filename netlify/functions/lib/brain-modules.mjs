@@ -66,6 +66,22 @@ export const MODULES = [
     // positive this file's header warns about, committed in the same file. Dropped: 'game',
     // 'team' and 'playoffs' already carry the sports read without it.
   ]), 'human_range.txt'],
+
+  // Hold: the consumer product. Triggers on the institutions people dread ringing and on the
+  // language of being stuck in a queue.
+  ['hold', word([
+    'on hold', 'hold for me', 'queue', 'call cent(?:er|re)', 'customer service',
+    'dmv', 'irs', 'social security', 'medicaid', 'medicare', 'unemployment', 'passport',
+    'airline', 'insurance company', 'the bank', 'utility company', 'cable company',
+    'transferred', 'been on the phone', 'wait time', 'hung up on me',
+  ]), 'hold.txt'],
+
+  // Recover: the money product. Triggers on the words of an unpaid invoice, from either side.
+  ['recover', word([
+    'invoices?', 'unpaid', 'past due', 'overdue', 'owes? me', 'owed',
+    'collections?', 'chase payment', 'net thirty', 'net 30', 'outstanding balance',
+    'never paid', 'has not paid', 'wont pay', 'receivables?',
+  ]), 'recover.txt'],
 ];
 
 // Read once per process. These files are small and immutable at runtime; re-reading them per turn

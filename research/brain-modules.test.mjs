@@ -1,5 +1,6 @@
 // research/brain-modules.test.mjs — do the knowledge modules load when they should, and only then?
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { modulesFor, moduleHealth, MODULES } from '../netlify/functions/lib/brain-modules.mjs';
 
 let pass = 0, fail = 0;
@@ -22,6 +23,37 @@ for (const [said, want] of [
   ['did you catch the game', 'human_range'],
   ['the heat pump is out and my son is home', 'human_range+trades'],
 ]) t(`${JSON.stringify(said)} -> ${want}`, () => assert.equal(fire(said), want));
+
+for (const [said, want] of [
+  ['can you wait on hold with the DMV for me', 'hold'],
+  ['been on the phone with the insurance company for an hour', 'hold'],
+  ['this customer never paid the invoice', 'recover'],
+  ['chase payment on that overdue invoice', 'recover'],
+]) t(`${JSON.stringify(said)} -> ${want}`, () => assert.equal(fire(said), want));
+
+console.log('\n── ★ the product brains must not contradict the engines they describe ──');
+
+t('recover.txt never threatens, and says so as a rule', () => {
+  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/recover.txt', import.meta.url), 'utf8');
+  assert.match(s, /NEVER THREATEN/i, 'the FDCPA floor the engine enforces must be stated in the brain too');
+  assert.match(s, /IDENTITY BEFORE DEBT/i, '1692c(b): the matter is not stated until the debtor is confirmed');
+  assert.match(s, /STOP MEANS STOP/i, '1692c(c): a stop is honoured on first hearing');
+  // and it must not itself contain the language it forbids
+  assert.ok(!/we (?:will|may) (?:sue|report you|take legal)/i.test(s), 'the brain contains the threat language it bans');
+});
+
+t('hold.txt states only the three published prices and never invents a wait', () => {
+  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/hold.txt', import.meta.url), 'utf8');
+  assert.match(s, /\$20/); assert.match(s, /\$10/); assert.match(s, /\$0/);
+  assert.match(s, /NEVER PROMISE A WAIT TIME/i, 'a queue we cannot see must never be given a number');
+  assert.ok(!/\$(?!20\b|10\b|0\b)\d/.test(s), 'a price outside the published three appears in the brain');
+});
+
+t('every brain refuses to hand over identity data', () => {
+  const s = fs.readFileSync(new URL('../netlify/functions/lib/brain/hold.txt', import.meta.url), 'utf8');
+  assert.match(s, /social security number|date of birth/i,
+    'Hold sits in queues that ask security questions; refusing must be explicit');
+});
 
 console.log('\n── NEGATIVE CONTROLS: it must not fire on everything ──');
 for (const [said, want] of [
