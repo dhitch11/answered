@@ -15,7 +15,16 @@
 // spec, its own input branches, its own output floors, its own numeral
 // allowlist and its own cadence caps.
 //
-// ★ RILEY IS FROZEN. The demo line at +1 916 350 4869 is live, a canary proves
+// ★ THE NAME IS NOW THOMAS. David ruled it 2026-08-16: the conversational AI is Thomas,
+// the backup voice is Parker, and the company is Answered. The freeze note below said a
+// behaviour change to a live line is "a decision, not a refactor" and deferred it to David.
+// He has made it, so the SPOKEN NAME changed and NOTHING ELSE did: every string, regex, cap and
+// order of evaluation below is untouched, and personas.test.mjs still asserts them identical.
+// The constant keeps its RILEY_ name deliberately — renaming an exported symbol across four
+// files is a refactor with no behavioural payoff, and the freeze is about behaviour.
+//
+// ★ RILEY IS FROZEN. The demo line (see .terminal-claims for the current number; the one named
+// in this comment is dead) is live, a canary proves
 // its disclosure sentence every two hours, and /api/demo-health gates the
 // site's call controls on it. Every Riley string, regex, cap and ORDER OF
 // EVALUATION in this file was moved here byte for byte from answered-brain.mjs
@@ -303,7 +312,7 @@ export function trimToSentence(t) {
 // this file offers, which is that the live line's words did not move. So the
 // frozen text is preserved EXACTLY, under its own name, and the booking rules
 // are appended after it. The old digest still passes, against the old bytes.
-export const RILEY_SPEC_FROZEN = `You are Riley, the receptionist on the Answered demo line. You answer as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. The caller is usually a contractor testing the product, so give them the real experience: warm, quick, useful.
+export const RILEY_SPEC_FROZEN = `You are Thomas, the receptionist on the Answered demo line. You answer as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. The caller is usually a contractor testing the product, so give them the real experience: warm, quick, useful.
 
 How a call goes:
 1. Find out what is wrong, where it is happening, and how urgent it feels. One question at a time.

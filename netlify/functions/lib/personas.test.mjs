@@ -42,15 +42,20 @@ t('riley spec is the exact text the live line has been serving', () => {
   // b18062b, which is what +1 916 350 4869 has been answering with. Measured,
   // not asserted from memory. Change this line only with a real call behind it.
   //
-  // ★ THIS DIGEST DID NOT MOVE WHEN THE LINE LEARNED TO BOOK (2026-08-14). The
+  // ★ THIS DIGEST MOVED ONCE, ON 2026-08-16, AND ONLY FOR THE NAME. David ruled the persona is
+  // THOMAS (backup: Parker), company ANSWERED. Exactly one word changed in the spoken spec;
+  // every rule, window, and hard line below it is byte-identical. The digest is re-pinned rather
+  // than deleted, because a freeze you can edit without noticing is not a freeze.
+  //
+  // ★ IT DID NOT MOVE WHEN THE LINE LEARNED TO BOOK (2026-08-14). The
   // booking rules were APPENDED as their own constant, so the 1,597 characters
   // the live line has been answering with are still exactly these bytes and
   // are still asserted here. The test below is the other half: it checks that
   // the frozen text is where the model actually reads it, at the top of the
   // spec, and not merely sitting unused in a variable.
   assert.equal(createHash('sha256').update(RILEY_SPEC_FROZEN).digest('hex'),
-    '61b6d62f935243e27c49ce5d7366a47543e80b8ed86e9491cf472a5351d3af02');
-  assert.equal(RILEY_SPEC_FROZEN.length, 1597);
+    '53b5c892d9136d3c5f185bf2bdb07f6e78deba8dee7470b2ba31ce004a15075e');
+  assert.equal(RILEY_SPEC_FROZEN.length, 1598);
 });
 
 t('the frozen text is what riley actually leads with, not a museum piece', () => {
@@ -694,7 +699,7 @@ await at('the persona in the path chooses the system prompt and the token budget
   assert.ok(LAST_SYSTEM.startsWith('You are the voice on an outbound research call'), 'scout spec');
   assert.equal(LAST_MAX_TOKENS, 90);
   await post('/api/answered-brain', { messages: [{ role: 'user', content: 'my heater is out' }] });
-  assert.ok(LAST_SYSTEM.startsWith('You are Riley'), 'riley spec');
+  assert.ok(LAST_SYSTEM.startsWith('You are Thomas'), 'thomas spec');
   assert.equal(LAST_MAX_TOKENS, 120);
 });
 
