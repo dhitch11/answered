@@ -410,6 +410,43 @@ Safety rules, and these never bend, whatever the notes say:
 - Keep every reply under about forty words. Plain words a seventh grader would follow.`;
 
 // ── THE REGISTRY ────────────────────────────────────────────────────────────
+// ── THE CRAFT FLOORS (added 2026-08-16) ───────────────────────────────────────
+//
+// Everything above this block stops the voice saying something FALSE or UNSAFE. These four stop it
+// sounding like a machine, which is a different failure and until now an unguarded one.
+//
+// ★ SOURCE: knowledge/19-communication-brain/15-phone-close-doctrine.md, which David made binding
+// estate-wide on 07-20 and which states in terms that it governs "voice-agent close behavior". Its
+// consolidated ban list is a craft codex, not a compliance list, and these are the four items on it
+// that a language model actually reproduces on its own. The rest of that list is either already a
+// floor above (price, payment, AI denial, guarantees) or is Reddenda-healthcare-specific and does
+// not apply to a contractor line.
+//
+// ★ WHY THESE FOUR AND NOT THE WHOLE LIST. Each of these is a thing an LLM does by default, on its
+// own, with no prompting: it pads, it stacks questions, it invents shared history to sound warm,
+// and it reaches for the sales register. A floor is only worth its evaluation cost if the model
+// would otherwise trip it.
+
+// A live answer past ~40 words stops being an answer and becomes a monologue. The doctrine's number.
+// Counted on the SPOKEN text, so a long address or a read-back is not punished: those are content.
+const MONOLOGUE_WORDS = 40;
+
+// Two question marks in one turn is a stacked question, and a person answers only the last one.
+const STACKED_Q_RE = /\?[^?]*\?/;
+
+// Fake familiarity: a warmth an LLM invents because it reads as friendly. It is the fastest way to
+// be caught out, because the other person knows whether you called them before and you do not.
+const FAKE_FAMILIAR_RE = /\b(?:just (?:checking in|touching base|following up)|touching base|returning your call|as (?:we|i) discussed|(?:like|as) (?:we|i) talked about|good to (?:hear from|talk to) you again|thanks for (?:getting back|reaching back))\b/i;
+
+// The sales register. Saying any of these TO the person is the doctrine's own line, and "solutions"
+// or "partnership opportunity" out of a receptionist's mouth is an instant tell.
+// ★ NO TRAILING \b ON THIS ONE, AND NO LOOKAHEAD. Both were bugs caught by the test:
+// a trailing \b after "partnership opportunit" can never match, because the next character is the
+// "y" of "opportunity" and that is a word character, so the boundary fails on the exact word it
+// was written for. And `solutions?\b(?! for)` was meant to spare "solutions for X" and instead
+// spared the commonest form of the tell, "we have solutions for that". Leading \b only.
+const SALES_REGISTER_RE = /\b(?:solutions?|partnership opportunit|revenue cycle|value proposition|circle back|reach out to you|leverage (?:our|the)|best in class|cutting edge|game.?chang|synerg)/i;
+
 // Order inside outFloors and inBranches IS the evaluation order and it is part
 // of the behaviour. Riley's order is frozen: price, contact, ai-denial,
 // payment, day, numeral / crisis, payment, ai-asked, real-asked, abuse, close.
@@ -516,6 +553,13 @@ export const PERSONAS = {
       { by: 'payment', re: PAYMENT_OUT_RE, pivot: 'No payment talk on a research call. I am only asking how the calls get handled.' },
       { by: 'date-promise', re: DATE_PROMISE_RE, pivot: 'I am not going to put a date on anything. Thanks for the answer, that is what I was after.' },
       { by: 'numeral', numeral: true, pivot: 'I would rather not throw a number at you. Thanks for the answer, that is what I was after.' },
+      // ── craft floors: these stop it sounding like a machine, not saying something false.
+      // They run LAST, after every safety floor, because a true-but-padded answer is a smaller
+      // problem than a false one and must never pre-empt it.
+      { by: 'monologue', maxWords: MONOLOGUE_WORDS, pivot: 'Let me keep that short. What matters is the next step, so tell me where you want to go from here.' },
+      { by: 'stacked-question', re: STACKED_Q_RE, pivot: 'Let me ask one thing at a time. Go ahead with that first one.' },
+      { by: 'fake-familiarity', re: FAKE_FAMILIAR_RE, pivot: 'This is the first time we have spoken, so let me start clean.' },
+      { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
       { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and I am a research call. Please hang up and call 911 right now. I am getting off the line.' },
@@ -562,6 +606,13 @@ export const PERSONAS = {
       { by: 'payment', re: PAYMENT_OUT_RE, pivot: 'I never take card or account numbers, and nothing on this call needs one.' },
       { by: 'date-promise', re: DATE_PROMISE_RE, pivot: 'I am not going to put a date on it from this call. What I can do is make sure your setup is right.' },
       { by: 'numeral', numeral: true, pivot: 'I would rather not throw a number at you. Let us keep going with your setup.' },
+      // ── craft floors: these stop it sounding like a machine, not saying something false.
+      // They run LAST, after every safety floor, because a true-but-padded answer is a smaller
+      // problem than a false one and must never pre-empt it.
+      { by: 'monologue', maxWords: MONOLOGUE_WORDS, pivot: 'Let me keep that short. What matters is the next step, so tell me where you want to go from here.' },
+      { by: 'stacked-question', re: STACKED_Q_RE, pivot: 'Let me ask one thing at a time. Go ahead with that first one.' },
+      { by: 'fake-familiarity', re: FAKE_FAMILIAR_RE, pivot: 'This is the first time we have spoken, so let me start clean.' },
+      { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
       { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and this is only a setup call. Please hang up and call 911 right now. I am getting off the line.' },
@@ -614,6 +665,13 @@ export const PERSONAS = {
       { by: 'claim', re: CLAIM_RE, pivot: 'I would not want to speak for other jobs. Let me get yours written down properly.' },
       { by: 'money-invention', money: true, pivot: 'I do not want to guess a price on you. Let me get your details down and have somebody confirm it.' },
       { by: 'numeral', numeral: true, pivot: 'I do not want to give you a number I am not sure of. Let me take your details and get it confirmed.' },
+      // ── craft floors: these stop it sounding like a machine, not saying something false.
+      // They run LAST, after every safety floor, because a true-but-padded answer is a smaller
+      // problem than a false one and must never pre-empt it.
+      { by: 'monologue', maxWords: MONOLOGUE_WORDS, pivot: 'Let me keep that short. What matters is the next step, so tell me where you want to go from here.' },
+      { by: 'stacked-question', re: STACKED_Q_RE, pivot: 'Let me ask one thing at a time. Go ahead with that first one.' },
+      { by: 'fake-familiarity', re: FAKE_FAMILIAR_RE, pivot: 'This is the first time we have spoken, so let me start clean.' },
+      { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
       { by: 'crisis', re: CRISIS_RE, end: true, line: 'That is an emergency, not a service call. Hang up and call 911 right now, or the gas company if you smell gas. Please go.' },
@@ -690,6 +748,15 @@ export function guardClause(persona, text, ctxDigits, state) {
     }
     if (f.money) {
       if (badMoneyWords(text, ctxDigits, persona.numAllow)) return { ok: false, by: f.by, pivot: f.pivot };
+      continue;
+    }
+    // ★ A WORD CAP, NOT A REGEX. Length is the one tell you cannot pattern-match: the sentence is
+    // grammatical, true, on-topic and still wrong, because nobody talks for forty words on a phone
+    // without stopping. Counted on words rather than characters so a long street address, which is
+    // content the caller needs, is not punished the way padding is.
+    if (f.maxWords) {
+      const words = String(text || '').trim().split(/\s+/).filter(Boolean).length;
+      if (words > f.maxWords) return { ok: false, by: f.by, pivot: f.pivot };
       continue;
     }
     if (f.re.test(text)) return { ok: false, by: f.by, pivot: f.pivot };
