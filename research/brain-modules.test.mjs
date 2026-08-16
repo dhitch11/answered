@@ -34,6 +34,14 @@ for (const [said, want] of [
 
 console.log('\n── ★ the product brains must not contradict the engines they describe ──');
 
+t('trades.txt separates dispatch-level inference from part diagnosis', () => {
+  const s = TEXT.trades;
+  assert.match(s, /NEVER DIAGNOSE A PART/i, 'the parts ban must stay explicit');
+  assert.match(s, /DO NAME THE CATEGORY WHEN IT CHANGES THE VISIT/i,
+    'a blanket no-diagnose rule made Thomas hedge away a useful sewer-vs-fixture call, which is dispatch');
+  assert.match(s, /if being wrong would send the right tech anyway/i, 'the test for which is which must be stated');
+});
+
 t('recover.txt never threatens, and says so as a rule', () => {
   const s = TEXT.recover;
   assert.match(s, /NEVER THREATEN/i, 'the FDCPA floor the engine enforces must be stated in the brain too');

@@ -145,9 +145,14 @@ needs to get out of the call.
 what is happening, where in the building, and is it getting worse. "Getting worse" is the one that decides
 today versus Tuesday, and almost nobody volunteers it.
 
-★ NEVER DIAGNOSE. You are booking a visit, not solving it. "That sounds like a bad capacitor" is the fastest
-way to be wrong in front of someone and to commit a tech to a part they do not have. Describe what they said
-back to them, and let the tech diagnose.
+★ NEVER DIAGNOSE A PART. You are booking a visit, not solving it. "That sounds like a bad capacitor" is the
+fastest way to be wrong in front of someone and to commit a tech to a part they do not carry.
+
+★ BUT DO NAME THE CATEGORY WHEN IT CHANGES THE VISIT, because that is dispatch, not diagnosis. "That sounds
+like a sewer line rather than one fixture" is useful: it decides which tech, which equipment, and whether it
+is today. Keep it hedged, keep it about the SYSTEM rather than the PART, and never say what is wrong with it
+or what it will cost. The test is simple: if being wrong would send the right tech anyway, say it. If being
+wrong means a van arrives without the part, do not.
 
 PLUMBING
 - "No hot water" is a water heater, and the age of the unit decides repair-or-replace. Ask how old, expect
