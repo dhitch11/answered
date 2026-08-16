@@ -48,9 +48,17 @@ import { rpc } from './db.mjs';
 // GetJobber/Jobber-AppTemplate-React/.env.sample  → the authorize URL, literally
 // GetJobber/Jobber-AppTemplate-RailsAPI/.env.sample + config/application.rb → the API base and the
 // version header name. Not a blog post, not a forum answer: their code.
-export const JOBBER_AUTHORIZE = 'https://api.getjobber.com/api/oauth/authorize';
-export const JOBBER_TOKEN     = 'https://api.getjobber.com/api/oauth/token';
-export const JOBBER_GRAPHQL   = 'https://api.getjobber.com/api/graphql';
+// ★ THE BASE IS OVERRIDABLE SO THE WRITE PATH CAN BE EXERCISED AGAINST A STAND-IN.
+// It defaults to Jobber and only moves if ANSWERED_JOBBER_API_BASE is set, which nothing in
+// production sets. This exists because the alternative was shipping a connector whose write path had
+// never once executed — the schema gate, the idempotency read, the userErrors branch and the
+// three-step client/property/request chain were all argued and none of them had run. A connector
+// that first executes in front of a paying customer is the definition of built-and-never-fed.
+const JOBBER_BASE = (process.env.ANSWERED_JOBBER_API_BASE || 'https://api.getjobber.com/api').replace(/\/+$/, '');
+
+export const JOBBER_AUTHORIZE = `${JOBBER_BASE}/oauth/authorize`;
+export const JOBBER_TOKEN     = `${JOBBER_BASE}/oauth/token`;
+export const JOBBER_GRAPHQL   = `${JOBBER_BASE}/graphql`;
 export const VERSION_HEADER   = 'X-JOBBER-GRAPHQL-VERSION';
 
 /**
