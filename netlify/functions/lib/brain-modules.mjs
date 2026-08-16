@@ -42,6 +42,26 @@ import { TEXT } from './brain-text.mjs';
 const word = (terms) => new RegExp(`\\b(?:${terms.join('|')})\\b`, 'i');
 
 export const MODULES = [
+  // ★ SAFETY IS FIRST IN THIS LIST ON PURPOSE. Modules append in array order, so when a caller says
+  // something that is both a hazard and a job ("I smell gas near the furnace" hits safety AND trades),
+  // the hazard knowledge lands in the prompt ahead of the scheduling knowledge. Do not reorder.
+  //
+  // ★ NOTE WHAT IS *NOT* IN THIS TRIGGER: the bare word "gas". A trades line takes gas furnace, gas
+  // line, gas water heater and gas fireplace calls all day, and every one of them is routine work. An
+  // unqualified /gas/ would load hazard knowledge into hundreds of ordinary bookings and teach the
+  // model to treat a furnace tune-up as an evacuation. Gas only counts here WITH a smell or leak word
+  // attached, which is how a person in actual danger says it.
+  ['safety', word([
+    // gas, only ever in a smell/leak context
+    'smells? (?:like )?gas', 'smell(?:ing|ed)? gas', 'gas leak\\w*', 'leaking gas', 'smell of gas',
+    'gas smell', 'rotten eggs?', 'sulfur smell', 'smells? like sulfur',
+    // carbon monoxide — the alarm IS the evidence
+    'carbon monoxide', 'co detector', 'co alarm', 'monoxide',
+    // fire and electrical
+    'on fire', 'fire', 'smoke', 'smoking', 'burning smell', 'smells? (?:like )?burning',
+    'sparking', 'sparks', 'shocked me', 'electrocut\\w*',
+  ]), 'safety.txt'],
+
   // The trades. THE module for this product: it fires on the words a homeowner actually uses when
   // something has gone wrong, which are rarely the words a tradesman would use.
   ['trades', word([
