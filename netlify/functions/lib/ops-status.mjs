@@ -47,6 +47,7 @@ export const ROUTES = [
   { path: '/api/event',            kind: 'api', expect: [405, 400, 200], what: 'The funnel collector.' },
   { path: '/api/answered-voice',   kind: 'api', expect: [405, 403, 200], what: 'The demo number Twilio webhook.' },
   { path: '/api/sms-inbound',      kind: 'api', expect: [405, 200], what: 'Inbound texts. Mirrors a carrier STOP into the same suppression the call path reads.' },
+  { path: '/api/sms-status',       kind: 'api', expect: [405, 200], what: 'Delivery receipts. Records every transition and never collapses sent into delivered.' },
   { path: '/api/answered-brain',   kind: 'api', expect: [401, 405, 200], what: 'The demo line reasoning bridge. 401 to a stranger is correct.' },
   { path: '/api/call-voice',       kind: 'api', expect: [405, 403, 200], what: 'Outbound TwiML.' },
   { path: '/api/call-turn',        kind: 'api', expect: [405, 403, 200], what: 'One outbound conversational turn.' },
