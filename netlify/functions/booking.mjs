@@ -41,7 +41,15 @@ const json = (status, obj) => new Response(JSON.stringify(obj, null, 2), {
 });
 
 // The one sentence about texting, in one place, so it can never drift between surfaces.
-export const SMS_TRUTH = 'Answered did not text anyone about this job. Text messaging is not switched on yet, so email is the channel that actually delivers.';
+// ★ TEXTING WENT LIVE 2026-08-16 and this sentence became false the moment it did. It is now
+// DERIVED from the same gate the send path uses, so the copy cannot drift from the behaviour
+// again: if sms() would refuse, we say we did not text; if it sent, we say we did.
+export const smsTruth = (result) => {
+  if (result && result.ok) return 'We also texted this to the shop.';
+  if (result && result.suppressed) return 'We did not text, because that number is on the do-not-contact list.';
+  return 'Answered did not text anyone about this job, so email is the record.';
+};
+export const SMS_TRUTH = smsTruth(null);
 
 /**
  * Best effort, and it is allowed to fail. The customer's link does not depend on it.
@@ -166,7 +174,7 @@ function customerMail(job, links) {
       rows,
       body: demoBand + callBtn,
       cta: { href: links.job, label: 'See it and add it to your calendar' },
-      footer: `${out.esc(changeIt)}<br>Booked for you by Answered. We did not send you a text, because text messaging is not switched on yet.`,
+      footer: `${out.esc(changeIt)}<br>Booked for you by Answered.`,
     }),
     text: [
       `${job.m === 'demo' ? 'DEMO: you reached the Answered demo line, so this booking is pretend and nobody is coming out.\n' : ''}You are on the schedule with ${job.s}.`,
@@ -177,7 +185,7 @@ function customerMail(job, links) {
       `Add it to your calendar: ${links.ics}`,
       `Your job page: ${links.job}`,
       '',
-      'Booked for you by Answered. We did not send you a text, because text messaging is not switched on yet.',
+      'Booked for you by Answered.',
     ].join('\n'),
   };
 }

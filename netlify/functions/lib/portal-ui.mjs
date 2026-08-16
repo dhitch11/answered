@@ -327,7 +327,7 @@ ${voided ? '' : disputeBlock(token, job)}
 
 <div class="foot">
 ${portalHint ? `<p><b>Every job in one place.</b> This link opens this one job with no password, which is the point of it. If you want the whole list, your bookings, your settings and your calendar feed, <a href="/portal">sign in to your portal</a>.</p>` : ''}
-<p><b>What we sent.</b> We emailed this to you. We did not text you: text messaging is not switched on yet, because the carrier registration a business number needs before it can send is still in review. When it clears, this page will stop saying so.</p>
+<p><b>What we sent.</b> We emailed this to you, and email stays the record. Where you have asked for texts, the shop is told that way too.</p>
 <p>This page is private and is not indexed. Anyone holding this link can see this job, so treat it like the job sheet it is.</p>
 </div>`,
   });

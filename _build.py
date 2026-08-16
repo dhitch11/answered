@@ -110,6 +110,22 @@ def _pretty_number(e164: str) -> str:
 # CHECK: if it is set and disagrees, the build STOPS. A build that cannot name the registered
 # number must fail, because "still produces a page" is the wrong trade when the page is a
 # compliance artifact. Change this literal in the same commit as the campaign, never separately.
+# ★ TEXTING WENT LIVE 2026-08-16 (a real message delivered to a real handset, SID SMa9701eb…).
+# Every "not switched on yet" sentence became false that moment. This flag makes the copy derive from
+# the same environment variable the send path reads, so it cannot drift again.
+#
+# ★ DEFAULTS TO OFF ON PURPOSE. A build that cannot prove texting is live emits the cautious copy,
+# because the failure directions are not symmetric: saying "we do not text" while texting works is a
+# missed feature, saying "we text you" while it does not is a broken promise to a customer.
+TEXTING_LIVE = (os.environ.get('ANSWERED_SMS_ENABLED', '') or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+SMS_STATUS_SHORT = ('texting is on, so what you ask for arrives as a text'
+                    if TEXTING_LIVE else
+                    'texting is not switched on, so what you ask for arrives by email')
+SMS_STATUS_LINE = ('Texting is on: what you ask for arrives as a text, and email stays as the record.'
+                   if TEXTING_LIVE else
+                   'Texting is not switched on yet, so for now what you ask for arrives by email.')
+
 A2P_REGISTERED_E164 = '+19162825278'      # the number the A2P campaign registers
 
 _env_number = (os.environ.get('ANSWERED_DEMO_NUMBER', '') or '').strip()
@@ -404,7 +420,7 @@ STATES = [
               'price here was published before we could take a single dollar, which is the order we '
               'wanted it in.'),
     dict(key='texting', name='Texting', live=False,
-         short='texting is not switched on, so what you ask for arrives by email',
+         short=SMS_STATUS_SHORT,
          body='Our messaging program is not approved by the carriers yet, so we are not sending '
               'texts to anybody. Until it clears, anything we would text you arrives by email '
               'instead. We would rather send you the wrong kind of message than leave you waiting '
@@ -909,7 +925,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
-        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Texting is not switched on yet, so for now what you ask for arrives by email.</p>
+        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. ''' + SMS_STATUS_LINE + '''</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -1605,6 +1621,20 @@ def _sms_hits(text):
 
 def _texting_guard():
     import re as _re
+
+    # ★ THE GUARD KNOWS WHETHER TEXTING IS LIVE, added 2026-08-16.
+    # This gate exists to stop a page promising a text the product cannot send. On 2026-08-16 the
+    # product started sending: a real message was delivered to a real handset. So "it texts you the
+    # one line that matters" and "Reply VOID" stopped being promises and became descriptions.
+    #
+    # A guard that keeps refusing them is not being careful, it is enforcing a fact that expired, and
+    # it would block every build until someone weakened it in a hurry — which is how a real gate gets
+    # deleted. It stays fully armed when texting is OFF, which is the state it was written for and
+    # the state a stale or misconfigured build falls back to.
+    if TEXTING_LIVE:
+        print('  texting guard: STOOD DOWN — ANSWERED_SMS_ENABLED is on, so a page that says we text '
+              'is telling the truth. It re-arms the moment that variable is unset.')
+        return
 
     # ── POSITIVE CONTROL, RUN FIRST ──────────────────────────────────────────
     # A gate that reports zero is only worth something if it has just been shown

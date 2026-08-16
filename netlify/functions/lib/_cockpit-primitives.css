@@ -1,0 +1,124 @@
+/* _cockpit-primitives.css — VERIFIED CSS primitives for the Answered admin cockpit.
+   Every technique below was measured in headless Chrome on 2026-08-14, not assumed.
+   Paste into admin-ui.mjs CONSOLE_CSS. Depends only on tokens already in TOKENS-END.
+
+   MEASURED SAFE      @property angle+percentage interpolation, mask-image, conic-gradient,
+                      mix-blend-mode:screen, backdrop-filter, container queries,
+                      repeating-linear-gradient hatch.
+   MEASURED UNSAFE    see the two TRAP blocks at the bottom. Read them before writing motion.
+*/
+
+/* ── registered properties: the honest-gauge primitive ─────────────────────────
+   Measured: --sweep interpolated 0deg -> 89.9446deg over 500ms of a 2s linear cycle.
+   Measured: --fill transitioned 0% -> 54.3278% (@150ms) -> 73% (settled).
+   This is what lets a gauge be driven by a REAL number instead of a keyframe. */
+@property --sweep { syntax:'<angle>';      initial-value:0deg; inherits:false }
+@property --fill  { syntax:'<percentage>'; initial-value:0%;   inherits:false }
+@property --arm   { syntax:'<percentage>'; initial-value:0%;   inherits:false }
+
+/* ── the INOP hatch: the most-used state in this product ───────────────────────
+   135deg silkscreen. Pattern is a THIRD channel alongside colour and label, so an
+   inoperative panel never depends on colour alone (WCAG 1.4.1). */
+.inop{
+  background-image:repeating-linear-gradient(135deg,
+    transparent 0 6px, rgba(107,116,130,.16) 6px 7px);
+  border:1px solid var(--line-3);
+}
+/* ★ MEASURED CONSTRAINT: --line-3 #606B7B is 3.53:1 on --surface, 3.26:1 on --raised,
+   but only 2.73:1 on --raised-3 — under the 3:1 WCAG 1.4.11 floor for a non-text
+   indicator. INOP panels sit on --surface or --raised. NEVER on --raised-3. */
+.inop-label{ font-family:var(--mono); font-size:var(--t-micro); letter-spacing:var(--ls-micro);
+  text-transform:uppercase; color:var(--warn) }   /* 11.41:1 on surface — amber = known
+  condition. Red is reserved for something that went wrong. An unfunded account is amber. */
+
+/* ── instrument corner brackets: "cockpit" without a single extra pixel of colour ──
+   Two 1px strokes per corner. Reads as an instrument; a border-radius reads as a web app. */
+.instr{ position:relative; background:var(--surface) }
+.instr::before,.instr::after{ content:""; position:absolute; width:11px; height:11px;
+  pointer-events:none; border-color:var(--line-3); border-style:solid; border-width:0 }
+.instr::before{ top:-1px; left:-1px;  border-top-width:1px; border-left-width:1px }
+.instr::after { bottom:-1px; right:-1px; border-bottom-width:1px; border-right-width:1px }
+
+/* ── the lamp ──────────────────────────────────────────────────────────────────
+   State lives in data-state, set ONLY by a poll response. Never by a timer.
+   mix-blend-mode:screen keeps the halo from going milky over the near-black ground. */
+.lamp{ width:9px; height:9px; border-radius:50%; flex:0 0 auto;
+  background:var(--ink-4); transition:background-color var(--d-fast) var(--ease) }
+.lamp::after{ content:""; position:absolute; inset:-3px; border-radius:50%;
+  background:currentColor; opacity:.18; mix-blend-mode:screen; pointer-events:none }
+.lamp[data-state="live"]  { background:var(--live);  color:var(--live) }
+.lamp[data-state="ok"]    { background:var(--ok);    color:var(--ok) }
+.lamp[data-state="inop"]  { background:var(--warn);  color:var(--warn) }
+.lamp[data-state="fault"] { background:var(--bad);   color:var(--bad) }
+/* A measurement older than 90s is NOT green. It is stale, and it says so. */
+.lamp[data-state="stale"] { background:var(--ink-4); color:var(--ink-4);
+  background-image:repeating-linear-gradient(135deg,transparent 0 2px,rgba(0,0,0,.5) 2px 3px) }
+
+/* one-shot latch ring, added as a class on change, removed on animationend */
+.lamp.latch{ animation:lamp-latch 320ms var(--ease-out) }
+@keyframes lamp-latch{ from{ box-shadow:0 0 0 0 currentColor } to{ box-shadow:0 0 0 7px transparent } }
+
+/* RINGING is the ONLY repeating animation permitted, because ringing genuinely is a
+   repeating physical event. steps(2) = a square wave: a discrete state, not a signal. */
+.lamp[data-state="ringing"]{ background:var(--live); color:var(--live);
+  animation:ring-sq 1s steps(2,end) infinite }
+@keyframes ring-sq{ 50%{ opacity:.35 } }
+
+/* ── channel arming: the bar fills from a SERVER-CONFIRMED capacity ────────────
+   --arm is set inline from the preflight response. The 220ms is the animation;
+   the percentage is the data. Never set --arm optimistically on click. */
+.chan{ position:relative; padding-left:13px }
+.chan::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(0deg, var(--brand) 0 var(--arm), var(--line) var(--arm) 100%);
+  transition:--arm var(--d-slow) var(--ease-out) }
+
+/* ── the turn ladder: what replaces a fabricated waveform ──────────────────────
+   Left edge = real arrival timestamp. Width = real duration until the next line.
+   No amplitude anywhere, because we have no media stream on an outbound leg. */
+.ladder{ position:relative; height:64px; container-type:inline-size }
+.turn{ position:absolute; height:14px; border-radius:2px;
+  animation:turn-grow var(--d-base) var(--ease) }
+.turn[data-who="agent"] { top:8px;  background:var(--ai) }
+.turn[data-who="caller"]{ top:34px; background:var(--live) }
+@keyframes turn-grow{ from{ width:0 } }   /* rests at its MEASURED width, never at 0 */
+.turn.open{ border-right:2px solid var(--live); animation:ring-sq 1s steps(2,end) infinite }
+.silence{ position:absolute; top:26px; font-family:var(--mono); font-size:var(--t-micro);
+  color:var(--ink-3) }   /* 6.95:1 on surface. Silence is labelled, never hidden. */
+
+/* ── rails feather at both ends (mask-image measured resolving) ────────────────*/
+.rail{ -webkit-mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent);
+       mask-image:linear-gradient(90deg,transparent,#000 24px,#000 calc(100% - 24px),transparent) }
+
+/* ── probe sweep: one rotation per REAL in-flight request ──────────────────────
+   Parks at 0deg when idle AND under reduced motion (measured: --s read "0deg"),
+   so the 0deg state must be a legible tick, not a blank ring. */
+.probe{ width:18px; height:18px; border-radius:50%;
+  background:conic-gradient(from var(--sweep), transparent 0deg, var(--live) 40deg, transparent 60deg) }
+.probe[data-inflight="1"]{ animation:probe-sweep 900ms linear infinite }
+@keyframes probe-sweep{ to{ --sweep:360deg } }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TRAP 1 — MEASURED TODAY. Never write `animation:none` under reduced motion.
+
+     .x{ opacity:0; animation:in .4s forwards }
+     @media (prefers-reduced-motion:reduce){ .x{ animation:none } }
+                                        -> computed opacity 0. FOREVER. Content gone.
+
+   The blanket reset already at admin-ui.mjs:178 does NOT have this bug — it lets the
+   animation run in .001ms and `forwards` lands it at 1 (measured). KEEP THE BLANKET
+   RESET. Never add a per-rule `animation:none`. Never rest a reveal at opacity:0.
+
+   TRAP 2 — MEASURED TODAY. Cascade order kills container and media queries.
+
+     @container (min-width:250px){ #kid{ color:var(--ok) } }
+     #kid{ color:var(--bad) }          -> computed --bad. The @container never applies.
+
+   Equal specificity, so the LATER rule wins and the query is invisible to every
+   grep and every "is the rule present" check. BASE RULE FIRST, @container/@media
+   AFTER. Same defect class as the estate's known "media query above a base rule".
+
+   NEVER USE
+     animation-timeline / scroll-driven animation  — absent in Firefox, never load-bearing
+     morphing an SVG `d` attribute                 — Safari does not interpolate it
+     transform on an SVG child without transform-box:view-box  — origin becomes the canvas
+   ══════════════════════════════════════════════════════════════════════════════ */

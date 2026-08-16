@@ -42,7 +42,8 @@ import { prettyPhone } from './lib/booking.mjs';
 const MAX_BODY = 512 * 1024;   // a long call is a lot of lines
 const MAX_LINES = 600;
 
-export const RECAP_CHANNEL_TRUTH = 'This came by email because text messaging is not switched on yet. Nobody was sent a text about this call.';
+// ★ TEXTING WENT LIVE 2026-08-16. This said texting was not switched on, which is now false.
+export const RECAP_CHANNEL_TRUTH = 'This came by email. Email is the record for a call recap.';
 
 const json = (status, obj) => new Response(JSON.stringify(obj, null, 2), {
   status,
