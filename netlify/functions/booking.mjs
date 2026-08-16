@@ -322,6 +322,47 @@ export default async (req) => {
     console.error(`booking ${job.id}: the queryable job row did NOT land (${jobRes.reason}). The booking itself succeeded: the customer has the link and the shop has the email.`);
   }
 
+  // ── THE TEXT TO THE SHOP ──────────────────────────────────────────────────────────────────
+  //
+  // ★ THIS LINE USED TO BE A HARDCODED `{ ok:false, skipped:true, reason: SMS_TRUTH }` IN THE
+  // RESPONSE BELOW, AND NOTHING EVER CALLED sms().
+  //
+  // So the API reported on a channel it had never attempted. It was true by luck — texting is off,
+  // so "skipped" was the right answer — and it would have stayed "skipped" forever after the
+  // carrier approved us, because there was no code path to change it. The whole A2P registration
+  // could have completed and not one text would have been sent, with this response still cheerfully
+  // reporting the reason as "not switched on yet". `notifyBooked` in lib/jobs.mjs builds this
+  // message correctly and completely, and has no callers anywhere in the tree.
+  //
+  // WHY NOT JUST CALL notifyBooked: it also sends the owner email and places the call, both of
+  // which this handler has already done by the time we get here. Calling it would double-send.
+  // The missing piece was only ever the text, so only the text is added.
+  //
+  // ★ WHO GETS TEXTED, AND WHY IT IS NOT THE HOMEOWNER. This goes to the SHOP — our customer, who
+  // holds the account and asked for the line. We have no consent record for the end customer: they
+  // rang a contractor, they did not opt into messages from us, and texting them would be exactly
+  // the unconsented traffic the campaign evidence promises we never send. The homeowner gets email,
+  // which they gave us for this booking.
+  //
+  // It cannot fail the booking. The shop already has the email and the customer already has the
+  // link before this runs, so a texting fault is a missing convenience, never a lost job.
+  const smsRes = await (async () => {
+    const to = bk.e164(job.sp || '');
+    if (!to) return { ok: false, skipped: true, reason: 'no shop phone on this booking, so there was nobody to text' };
+    if (job.m === 'demo') return { ok: false, skipped: true, reason: 'demo booking, so no text was sent to anyone' };
+    return out.sms({
+      to,
+      transactional: true,
+      body: `Answered booked you a job. ${job.w} for ${job.c}. ${bk.whenParts(job).day}, ${bk.whenParts(job).window}. ${links.job}`,
+    });
+  })().catch((e) => ({ ok: false, skipped: true, reason: String((e && e.message) || e).slice(0, 160) }));
+
+  if (smsRes && smsRes.ok) {
+    console.log(`booking ${job.id}: texted the shop on ${job.sp}`);
+  } else if (smsRes && !smsRes.skipped) {
+    console.error(`booking ${job.id}: the text to the shop FAILED: ${smsRes.reason}`);
+  }
+
   return json(201, {
     ok: true,
     id: job.id,
@@ -337,7 +378,10 @@ export default async (req) => {
       webhook: hookRes,
       durable: durableRes,
       job: jobRes,
-      sms: { ok: false, skipped: true, reason: SMS_TRUTH },
+      // The REAL result of a real attempt. While texting is off this still reads
+      // skipped-with-the-A2P-reason, because that is what outbox.sms actually returns — the
+      // difference is that it is now measured rather than asserted.
+      sms: smsRes,
     },
   });
 };
