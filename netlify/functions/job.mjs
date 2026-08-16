@@ -159,7 +159,7 @@ ${job.sp ? `<a class="cta ghost" href="tel:${esc(job.sp)}">Call ${esc(job.s)}</a
 
 <div class="foot">
 ${changeIt}
-<p>This page is the record of the job. The shop is told by email, and by text where they have asked for it.</p>
+<p><b>We did not text you.</b> Text messaging is not switched on yet, so email is the only channel that actually delivers. When texting is on, this page will say so.</p>
 <p>Booked by Answered, which answers the phone for local trades. Booked ${esc(new Date(job.at || Date.now()).toISOString().slice(0, 10))}. This page is private and is not indexed.</p>
 </div>`,
   });

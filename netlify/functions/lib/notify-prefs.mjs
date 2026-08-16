@@ -879,10 +879,7 @@ export function calendarFeed(jobs, { name, description, tz = DEFAULT_TZ, refresh
 // number first, and a text/plain twin on every email because that is what is readable at arm's
 // length and what keeps us out of a spam folder.
 
-// ★ TEXTING WENT LIVE 2026-08-16. The old sentence claimed texting was not switched on, which is
-// now false. Stated without the stale clause; the per-message truth is carried by the send result
-// where a caller has one.
-export const SMS_TRUTH = 'We did not text you about this one, so email is the record.';
+export const SMS_TRUTH = 'We did not text you about this. Text messaging is not switched on yet, so email is the channel that actually delivers.';
 
 const money = (price) => {
   if (!price) return '';
