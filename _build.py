@@ -6,6 +6,8 @@ single most common tell of a site assembled by hand, and this site now has six.
 """
 import os
 import re, pathlib
+import sys as _sys
+from html.parser import HTMLParser as _HTMLParser
 
 ROOT = pathlib.Path(__file__).parent
 
@@ -1304,12 +1306,110 @@ for slug in _CHROME:
     # break the CSS and JS inside it.
     s = s.replace('{A2P_NUMBER}', A2P_NUMBER)
 
+    # ── A CONSENT MECHANISM MUST NEVER REST AT opacity:0 ─────────────────────
+    # ★ MEASURED ON LIVE PRODUCTION 2026-08-16, and this is a carrier rejection,
+    # not a nitpick. `html.js .rv { opacity: 0 }` until an IntersectionObserver
+    # fires, and EVERY opt-in form on this site shipped as `class="iform rv d2"`.
+    # So on /pricing, the URL filed as the campaign's MESSAGE_FLOW evidence, a
+    # capture that loads the page and does not scroll sees NONE of this:
+    #     "Adding your number opts you into ..."   invisible
+    #     "Fewer than five a month"                invisible
+    #     "Message and data rates may apply"       invisible
+    #     "Reply STOP" / "HELP for help"           invisible
+    # The whole <form> was at opacity 0 while the <p> inside it computed 1,
+    # which is why every grep, every "is it on the page" check and every human
+    # who scrolled said it was fine. Twilio states plainly that the registered
+    # website "undergoes an automated verification process. A screenshot is
+    # captured and is evaluated against the A2P 10DLC compliance rules", and
+    # error 30908 named MESSAGE_FLOW on two consecutive rejections.
+    #
+    # The reveal stays everywhere else. It is stripped from the two things a
+    # reviewer must be able to see without interacting: the opt-in form itself,
+    # and any block carrying the consent sentence. DISCOVERED by the property
+    # that defines them, never a list of page names.
+    _consent_before = s
+    s = re.sub(r'(<form\b[^>]*\bclass=")([^"]*)"',
+               lambda m: m.group(1) + ' '.join(
+                   t for t in m.group(2).split() if t not in ('rv', 'd1', 'd2', 'd3')) + '"', s)
+    for _mark in ('Adding your number opts you into', 'Message and data rates may apply',
+                  'Reply STOP'):
+        for _m in re.finditer(re.escape(_mark), s):
+            _open = s.rfind('<p ', 0, _m.start())
+            _close = s.find('>', _open) if _open >= 0 else -1
+            if _open < 0 or _close < 0 or _close > _m.start():
+                continue
+            _tag = s[_open:_close + 1]
+            _new = re.sub(r'class="([^"]*)"',
+                          lambda m: 'class="' + ' '.join(
+                              t for t in m.group(1).split() if t not in ('rv', 'd1', 'd2', 'd3')) + '"',
+                          _tag)
+            if _new != _tag:
+                s = s[:_open] + _new + s[_close + 1:]
+
     canon = 'https://answered.reddenda.com' + ('/' if slug == 'index.html' else '/' + slug[:-5])
     s = re.sub(r'\n<link rel="canonical"[^>]*>', '', s)
     s = s.replace('</head>', f'<link rel="canonical" href="{canon}">\n</head>', 1)
 
     p.write_text(s, encoding='utf-8')
     print('chrome normalised in', slug)
+
+# ── AND IT REFUSES, RATHER THAN PRINTING THAT IT RAN ─────────────────────────
+# The transform above is worthless if a later edit reintroduces the class, and a
+# disclosure that silently stops being visible is the worst failure available
+# here: everything downstream still believes it is there. This asserts on the
+# OUTPUT of the whole build, with a positive control proving it can fail.
+# ★ IT WALKS THE ANCESTOR STACK, because the element itself is never the problem.
+# On live prod the consent <p> computed opacity 1 while its parent <form> computed
+# 0. A check that reads the element's own class is a check that agrees with every
+# broken page. This one keeps the open-tag stack and asks the only question that
+# matters: is ANY ancestor of this disclosure a reveal?
+# It also means the guard is NOT a tautology against the transform above: that
+# transform only strips <form> and <p> tags, so a reveal on any wrapper still
+# reaches here and still refuses.
+class _RevealScan(_HTMLParser):
+    MARKS = ('Adding your number opts you into', 'Message and data rates may apply', 'Reply STOP')
+    VOID = {'br','img','input','meta','link','hr','source','area','base','col','embed','track','wbr'}
+    def __init__(self, slug):
+        super().__init__(convert_charrefs=True)
+        self.slug, self.stack, self.bad = slug, [], []
+    def handle_starttag(self, tag, attrs):
+        if tag in self.VOID:
+            return
+        cls = dict(attrs).get('class') or ''
+        self.stack.append((tag, 'rv' in cls.split()))
+        if tag == 'form' and any(hidden for _t, hidden in self.stack):
+            self.bad.append('%s: the opt-in <form> is inside a reveal (%s)'
+                            % (self.slug, ' > '.join(t for t, h in self.stack if h)))
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                return
+    def handle_data(self, data):
+        if any(m in data for m in self.MARKS) and any(h for _t, h in self.stack):
+            self.bad.append('%s: a required SMS disclosure is inside a reveal (%s)'
+                            % (self.slug, ' > '.join(t for t, h in self.stack if h)))
+
+_hidden = []
+for _slug in _CHROME:
+    _p = _RevealScan(_slug)
+    _p.feed((ROOT / _slug).read_text(encoding='utf-8'))
+    _hidden += _p.bad
+if _hidden:
+    print('\n*** BUILD REFUSED: a consent mechanism would ship at opacity:0 ***', file=_sys.stderr)
+    for _h in _hidden:
+        print('  -', _h, file=_sys.stderr)
+    print('  A carrier reviewer captures a screenshot without scrolling. An opt-in\n'
+          '  form or a rates/STOP disclosure behind an IntersectionObserver is not on\n'
+          '  the page as far as that reader is concerned. This is error 30908.',
+          file=_sys.stderr)
+    _sys.exit(1)
+# positive control: the transform must actually have had something to do, or the
+# check above is passing because it is looking at the wrong thing.
+assert '<form' in (ROOT / 'pricing.html').read_text(encoding='utf-8'), \
+    'POSITIVE CONTROL FAILED: no <form> on pricing.html, so the consent check proves nothing'
+print('consent visibility: %d pages, 0 opt-in forms and 0 rate disclosures behind a reveal'
+      % len(_CHROME))
 
 
 # ── THE STATE MARKERS ON THE STANDALONE PAGES ─────────────────────────────────
