@@ -325,6 +325,14 @@
       <div>
         <h4>Company</h4>
         <ul>
+          <!-- ★ ABOUT AND CONTACT ARE COMPLIANCE SURFACES, NOT NAVIGATION FURNITURE.
+               A2P 10DLC error 30907 is "the submitted website URL doesn't represent the same
+               business as the registered brand". Measured 2026-08-16 across all twelve live
+               pages: "TwinFlame" 0, "LLC" 0, postal address 0, no About, no Contact. A reviewer
+               had nothing on this domain to match TWINFLAME INVESTMENTS LLC against. These two
+               links are how they find the match from any page on the site. -->
+          <li><a href="/about">About the company</a></li>
+          <li><a href="/contact">Contact a person</a></li>
           <li><a href="/account">Your account</a></li>
           <li><a href="/setup">How you set it up</a></li>
           <li><a href="/pricing">Pricing</a></li>
@@ -336,8 +344,18 @@
         </ul>
       </div>
     </div>
+    <!-- ★ THE ENTITY LINE. It is one sentence and it closes a real hole.
+         The brand registered with the carriers is TWINFLAME INVESTMENTS LLC. Until 2026-08-16
+         that string did not appear anywhere on this site, on any page, in any form, so the
+         registered brand and the registered website named two different things and there was
+         no way to tell from the site that they were one company. It sits in the shared footer
+         rather than on one page because a reviewer, or a customer, can land on any URL.
+         CTIA Messaging Principles 5.3.2 asks that a site reached from a message
+         "unambiguously identify the website owner ... and include contact information, such as
+         a postal mailing address." This is that, on every page, once. -->
     <div class="foot-base">
-      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
+      <p class="src">Answered is a product of <b style="font-weight:600">TwinFlame Investments LLC</b>, trading as Reddenda. 1621 Central Ave, Cheyenne, WY 82001, United States. <a href="mailto:info@reddenda.com">info@reddenda.com</a> &middot; <a href="/about">About</a> &middot; <a href="/contact">Contact</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="/terms">Terms</a></p>
+      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span> TwinFlame Investments LLC.</p>
       <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
     </div>
   </div>

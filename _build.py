@@ -169,6 +169,14 @@ FOOT = f'''<footer class="foot">
       <div>
         <h4>Company</h4>
         <ul>
+          <!-- ★ ABOUT AND CONTACT ARE COMPLIANCE SURFACES, NOT NAVIGATION FURNITURE.
+               A2P 10DLC error 30907 is "the submitted website URL doesn't represent the same
+               business as the registered brand". Measured 2026-08-16 across all twelve live
+               pages: "TwinFlame" 0, "LLC" 0, postal address 0, no About, no Contact. A reviewer
+               had nothing on this domain to match TWINFLAME INVESTMENTS LLC against. These two
+               links are how they find the match from any page on the site. -->
+          <li><a href="/about.html">About the company</a></li>
+          <li><a href="/contact.html">Contact a person</a></li>
           <li><a href="/account">Your account</a></li>
           <li><a href="/setup.html">How you set it up</a></li>
           <li><a href="/pricing.html">Pricing</a></li>
@@ -180,8 +188,18 @@ FOOT = f'''<footer class="foot">
         </ul>
       </div>
     </div>
+    <!-- ★ THE ENTITY LINE. It is one sentence and it closes a real hole.
+         The brand registered with the carriers is TWINFLAME INVESTMENTS LLC. Until 2026-08-16
+         that string did not appear anywhere on this site, on any page, in any form, so the
+         registered brand and the registered website named two different things and there was
+         no way to tell from the site that they were one company. It sits in the shared footer
+         rather than on one page because a reviewer, or a customer, can land on any URL.
+         CTIA Messaging Principles 5.3.2 asks that a site reached from a message
+         "unambiguously identify the website owner ... and include contact information, such as
+         a postal mailing address." This is that, on every page, once. -->
     <div class="foot-base">
-      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span></p>
+      <p class="src">Answered is a product of <b style="font-weight:600">TwinFlame Investments LLC</b>, trading as Reddenda. 1621 Central Ave, Cheyenne, WY 82001, United States. <a href="mailto:info@reddenda.com">info@reddenda.com</a> &middot; <a href="/about.html">About</a> &middot; <a href="/contact.html">Contact</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a></p>
+      <p class="src">Answered. Working name, working site. &copy; <span data-year>2026</span> TwinFlame Investments LLC.</p>
       <p class="src">Every figure on this site carries its source. Nothing here is a customer record.</p>
     </div>
   </div>
@@ -403,12 +421,23 @@ STATES = [
               'anywhere on this site, and the switch that would let a card be charged is off. Every '
               'price here was published before we could take a single dollar, which is the order we '
               'wanted it in.'),
+    # ★ REWORDED 2026-08-16, AND THE REWORD IS A COMPLIANCE FIX, NOT A SOFTENING.
+    # The old body read "we are not sending texts to anybody". True, and fine for a customer.
+    # But this row renders on /terms, which is the URL filed as TermsAndConditionsUrl, and a
+    # carrier reviewer verifying that a live messaging program has compliant terms reads a
+    # page that tells them the program does not exist. Twilio error 30908 is exactly "the
+    # privacy policy in your registration could not be verified as compliant"; a terms page
+    # asserting there is nothing to verify hands them the finding.
+    # The honest version keeps the status and moves the tense: the TERMS are in force, the
+    # PERMISSION is what is pending. Nothing here claims a message has been sent.
     dict(key='texting', name='Texting', live=False,
-         short='texting is not switched on, so what you ask for arrives by email',
-         body='Our messaging program is not approved by the carriers yet, so we are not sending '
-              'texts to anybody. Until it clears, anything we would text you arrives by email '
-              'instead. We would rather send you the wrong kind of message than leave you waiting '
-              'on one that cannot arrive.'),
+         short='the rules are in force, and permission to send has not cleared yet',
+         body='Our messaging program is in carrier registration and has not cleared yet, so no '
+              'message has gone out under it. The rules of the program are in force and are '
+              'written out on the terms page; what is still pending is permission to send. Until '
+              'that clears, anything we would have sent you arrives by email instead. We would '
+              'rather send you the wrong kind of message than leave you waiting on one that '
+              'cannot arrive.'),
 ]
 
 # THE CAPTION IS SHORT BECAUSE 320 IS REAL. At 27 characters this label wrapped
@@ -1476,9 +1505,13 @@ def _guard():
     #      as its own scope PLUS the non-card remainder as another scope. Keeps the
     #      per-card isolation without leaving the space between cards dark.
     SANCTIONED = {'8', '10', '13', '15', '18', '20'}
-    PAGES = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
-             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
+    # ★ DISCOVERED, NOT LISTED. This was a hardcoded twelve-name list, which is the exact
+    # defect this file has already had twice: the loop that normalises the chrome had one,
+    # it missed parley and setup for a day, and the "fix" of adding three names left two
+    # more pages uncovered. A list you must remember to append to is a defect with a delay
+    # on it. _CHROME is every page at the root carrying the shared footer, which is the
+    # property that actually defines "a public page of this site".
+    PAGES = list(_CHROME)
 
     def _scopes(html):
         cards = _re.findall(r'<article class="pcard.*?</article>', html, _re.S)
@@ -1633,8 +1666,15 @@ def _texting_guard():
     # name, on the hand-written ones. Move a page into OWNED the day its lane
     # lands and the report becomes a refusal with no other change.
     OWNED = ['recover.html', 'pricing.html', 'trust.html', 'thanks.html',
-             'terms.html', 'privacy.html', 'recording.html']
-    OTHERS = ['index.html', 'trades.html', 'hold.html', 'parley.html', 'setup.html']
+             'terms.html', 'privacy.html', 'recording.html',
+             # added 2026-08-16 with the pages themselves, so they are a refusal from
+             # birth rather than a report that somebody has to remember to promote.
+             'about.html', 'contact.html']
+    # ★ DERIVED. Everything on the site that is not owned is reported on, and a page added
+    # next week is covered the day it is added, by nobody. The old literal list silently
+    # excluded any new page from the texting guard entirely, which is worse than either
+    # bucket: not owned, not reported, just invisible.
+    OTHERS = [p for p in _CHROME if p not in OWNED]
     findings, reports = [], []
     for pg in OWNED + OTHERS:
         f = ROOT / pg
@@ -1811,10 +1851,13 @@ _refresh_home_cards()
 # from trades.html (pretty URLs); "/index" collapses to "/".
 def _extensionless():
     import re as _re
-    pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
-             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
-    pat = _re.compile(r'href="/(index|trades|hold|recover|pricing|trust|thanks|parley|terms|privacy|recording|setup)\.html([?#][^"]*)?"')
+    # ★ DISCOVERED, AND THE PATTERN IS BUILT FROM THE SAME SET. Two hardcoded lists in one
+    # function is two chances to drift: a page could be in the loop but absent from the
+    # alternation, so its own links were rewritten and links TO it were not, silently.
+    pages = list(_CHROME)
+    slugs = sorted((n[:-5] for n in pages), key=len, reverse=True)
+    pat = _re.compile(r'href="/(' + '|'.join(_re.escape(s) for s in slugs)
+                      + r')\.html([?#][^"]*)?"')
     def repl(m):
         slug, rest = m.group(1), m.group(2) or ''
         return 'href="%s%s"' % ('/' if slug == 'index' else '/' + slug, rest)
@@ -1855,9 +1898,10 @@ print(f'sitemap: {len(_sitemap_urls)} urls, generated from the discovered page s
 # with old assets again. The build FAILS if an unversioned reference survives.
 def _asset_version():
     import re as _re, hashlib as _hl
-    pages = ['index.html', 'trades.html', 'hold.html', 'recover.html',
-             'pricing.html', 'trust.html', 'thanks.html', 'parley.html',
-             'terms.html', 'privacy.html', 'recording.html', 'setup.html']
+    # ★ DISCOVERED. A page missing from this list shipped an UNVERSIONED asset reference and
+    # the refusal below never ran on it, so the one guard that exists to catch a stale-cache
+    # defect was blind on exactly the pages nobody had remembered.
+    pages = list(_CHROME)
     vers = {}
     for a in ('answered.css', 'answered.js'):
         f = ROOT / 'assets' / a
