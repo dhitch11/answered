@@ -432,14 +432,27 @@ STATES = [
     # asserting there is nothing to verify hands them the finding.
     # The honest version keeps the status and moves the tense: the TERMS are in force, the
     # PERMISSION is what is pending. Nothing here claims a message has been sent.
-    dict(key='texting', name='Texting', live=False,
-         short='the rules are in force, and permission to send has not cleared yet',
-         body='Our messaging program is in carrier registration and has not cleared yet, so no '
-              'message has gone out under it. The rules of the program are in force and are '
-              'written out on the terms page; what is still pending is permission to send. Until '
-              'that clears, anything we would have sent you arrives by email instead. We would '
-              'rather send you the wrong kind of message than leave you waiting on one that '
-              'cannot arrive.'),
+    # ★ FLIPPED TO LIVE 2026-08-17, on measurement, not on an approval email. The
+    # A2P campaign reads VERIFIED with a real campaign_id and real per-carrier rate
+    # limits, and two messages were DELIVERED to a real handset on a carrier we do
+    # not control. The same number had four undelivered sends earlier the same day
+    # (30034, 30032), so this is a controlled before-and-after on one circuit rather
+    # than a single hopeful success. The prior wording is now false in the other
+    # direction, which is its own kind of dishonesty on a customer-facing page.
+    dict(key='texting', name='Texting', live=True,
+         short='registered with the carriers, and sending',
+         # ★ THE WORDS "Reply STOP" AND "Message and data rates may apply" ARE DELIBERATELY
+         # ABSENT HERE. This row renders inside a .rv reveal, and _RevealScan refuses the build
+         # when a required SMS disclosure sits behind an IntersectionObserver, because a carrier
+         # reviewer screenshots without scrolling. Putting the disclosure phrases in a status
+         # table would put a compliance string somewhere the reviewer cannot see it, and the
+         # build correctly caught that the first time this row was rewritten. The disclosure
+         # belongs in the opt-in block beside the phone field, where it is always visible.
+         body='Our messaging program is registered and verified with the US carriers, and it '
+              'sends. You only get a message you asked for: the transcript, a booking link, or a '
+              'receipt, fewer than five a month. Stopping them takes one word, and the full '
+              'rules of the program are written out on the terms page. They applied from the '
+              'first message onward.'),
 ]
 
 # THE CAPTION IS SHORT BECAUSE 320 IS REAL. At 27 characters this label wrapped
@@ -597,7 +610,7 @@ PRICING = '''
           <li>Answers your existing number, 24 hours a day</li>
           <li>Qualifies the caller and books into your calendar</li>
           <li>Warm transfers a real emergency to your cell in five seconds</li>
-          <li>Sends you the transcript inside a minute, by email until texting clears</li>
+          <li>Sends you the transcript inside a minute, by text or by email</li>
           <li>Never quotes a price, enforced in three layers</li>
         </ul>
         <div class="pc-foot">
@@ -940,7 +953,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
-        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Carrier registration is in progress, so until it completes what you ask for arrives by email.</p>
+        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -1107,7 +1120,7 @@ TRUST = '''
 <section class="band">
   <div class="wrap" style="padding-inline:0">
     <div class="band-grid">
-      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand.', 'Our design target, published 2026-08-13. Not a measurement, and we will not print one until customer lines are running. It arrives by email while texting is off.', kind='Our commitment') + '''
+      ''' + band_cell('01', '60s', 'from hang up to the transcript in your hand.', 'Our design target, published 2026-08-13. Not a measurement, and we will not print one until customer lines are running. It arrives by text, or by email if you did not give us a number.', kind='Our commitment') + '''
       ''' + band_cell('02', '5s', 'from a caller asking for a human to your cell ringing.', 'Our design target, published 2026-08-13. Warm transfer attempt. 20 seconds without a pickup and it takes a callback and sends it to you.', 'd1', kind='Our commitment') + '''
       ''' + band_cell('03', '0', 'prices quoted. Ever. It is not allowed to say a number.', 'Our rule, published 2026-08-13, held by three guardrails below. Two run on the demo line today, so you can test it yourself.', 'd2', kind='Our commitment') + '''
       ''' + band_cell('04', '1st', 'sentence of every call is the AI saying it is an AI.', 'Our rule, published 2026-08-13. Every call, everywhere, whether or not the law requires it. Check it on the demo line.', 'd3', kind='Our commitment') + '''
@@ -1697,11 +1710,24 @@ _guard()
 # the day it is right. Every hit is exempt if a status sentence sits within
 # _SMS_WINDOW characters of it, and the gate proves itself on a known-bad and a
 # known-good string before it is allowed to report a clean run.
+# ★ THE DELIVERY RULES WERE RETIRED 2026-08-17, ON MEASUREMENT. Texting is live: the A2P campaign
+# reads VERIFIED with campaign_id C1D7R7P and real per-carrier rate limits, and two messages were
+# DELIVERED to a real handset on a carrier we do not control. The same handset took four undelivered
+# sends earlier the same day (30034, 30032), so it is a controlled before-and-after on one circuit.
+# "It texts you the transcript" is now simply true, and a guard that keeps calling a true sentence a
+# violation trains the next reader to ignore the whole gate.
+#
+# ★ THE CHANNEL RULES STAY, AND "reply VOID" IS THE REASON. Outbound going live did not make the
+# INBOUND side real. Measured on production: POST /api/sms-inbound with Body=VOID returns an empty
+# <Response></Response>, and `void` appears nowhere in sms-inbound.mjs. STOP and HELP do work - our
+# handler records the stop into the same stop/<hash> key the call path reads, and Twilio's Advanced
+# Opt-Out sends the customer-facing reply at the platform level, which is why all three return empty
+# TwiML and only STOP has an effect. So a page saying "Reply VOID and it comes off" still names a
+# channel that cannot receive, and the honest wording the generated pages already use is
+# "One word, VOID, and it comes off."
+#
+# WHEN VOID IS IMPLEMENTED in sms-inbound.mjs, delete the last rule here and not before.
 _SMS_BANNED = [
-    (r'\btexts you\b',            'delivery', 'says a text goes out'),
-    (r'\bwe text you\b',          'delivery', 'says a text goes out'),
-    (r'\btext you that\b',        'delivery', 'says a text goes out'),
-    (r'\btexts you the\b',        'delivery', 'says a text goes out'),
     (r'\btext and transcript\b',  'channel',  'names SMS as the channel'),
     (r'\breply\s+VOID\b',         'channel',  'names a reply channel that cannot receive'),
 ]
