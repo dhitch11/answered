@@ -313,6 +313,25 @@ function calleeNumber(body, systemText) {
  * second person — no error, no log, just a worse answer — which is the failure shape this estate is
  * worst at seeing. Replaying the transcript costs a few regex tests and cannot leak.
  */
+/**
+ * Does the owner's own note say somebody rings the caller back?
+ *
+ * ★ WHY THIS IS A NARROW PATTERN AND NOT A CLEVER ONE. It unlocks a promise the voice makes to a
+ * real customer, so a false positive is the voice promising a call that nobody will make. It must
+ * match an owner WRITING that calls get returned, and nothing else. It deliberately does NOT match:
+ *
+ *   "call us on 555 0100"              an instruction to the CALLER, the opposite direction
+ *   "after hours goes to voicemail"     where a call lands, not a promise to return it
+ *   "do not call the cell"              a prohibition containing the word call
+ *
+ * Absent or unreadable notes return false, which leaves the floor at full strength.
+ */
+export function notesAuthorizeCallback(notes) {
+  const s = String(notes || '');
+  if (!s.trim()) return false;
+  return /\b(?:(?:we|i|they|the owner|someone|somebody|a tech\w*)\s+(?:will\s+|always\s+|usually\s+|do\s+|does\s+)?(?:call|ring|phone)\s+(?:them|the caller|people|customers|you)?\s*back\b|call(?:s|ing)?\s+back\s+(?:within|inside|same day|the same day|by)\b|return\s+(?:all\s+)?calls?\b|calls?\s+(?:are|get)\s+returned\b)/i.test(s);
+}
+
 function moduleState(inMsgs) {
   const said = new Set();
   const turns = (inMsgs || []).filter((m) => m && m.role === 'user').map((m) => String(m.content || ''));
@@ -580,7 +599,16 @@ export default async (req) => {
   // The one fact the output guard cannot read out of the model's own words. See the note above
   // BOOKED_CLAIM_RE in lib/personas.mjs: this is what stops "you are all set" from being said on a
   // call where nothing was ever written down.
-  const guardState = { booked: bookedAlready(inMsgs) };
+  // ★ THE SECOND FACT: does this business actually call people back? The persona rule permits the
+  // voice to say the owner will call back ONLY WHEN THE OWNER'S NOTES SAY THAT IS WHAT HAPPENS, so
+  // the floor that enforces it has to know. Read from the notes the owner wrote, never inferred from
+  // the conversation and never defaulted to true: no notes means the floor runs at full strength and
+  // the voice takes a number instead of promising a call. That is the safe direction, and it is the
+  // one that is honest on a business we know nothing about.
+  const guardState = {
+    booked: bookedAlready(inMsgs),
+    callbackOk: notesAuthorizeCallback(incomingSystem),
+  };
 
   const messages = toAnthropicMessages(inMsgs);
 

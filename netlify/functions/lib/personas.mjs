@@ -121,6 +121,29 @@ const CRISIS_RE = new RegExp('\\b(?:' + [
 
 const PAYMENT_IN_RE = /\b(?:card number|credit card|debit card|social security|ssn|cvv|routing number)\b|\b\d{13,16}\b/i;
 
+// A promise that a HUMAN will ring the caller. Distinct from CONTACT_MSG_RE, which is about a text
+// or an email, and which measurably does not catch any of these.
+//
+// ★ WHAT IS DELIBERATELY NOT HERE, because the voice must still be able to do its actual job:
+//   - "I'll put your details in front of the owner"  - a note, not a promise about anyone's action
+//   - "I've written that down for the owner"          - past tense, about the voice's own act
+//   - "the owner handles that"                        - a statement of fact from the notes
+// The pattern needs a FUTURE-TENSE commitment that a person will make contact. A caller ASKING
+// "will someone call me back?" is untouched: floors run on what the voice says, never the caller.
+const CALLBACK_PROMISE_RE = new RegExp('\\b(?:' + [
+  // First person arranging it. The leading pronoun is OPTIONAL: the phrasing that slipped through
+  // the first version of this pattern was "...and have them call you with a number", lifted straight
+  // out of a drafted knowledge module, where the subject is carried by an earlier clause. A promise
+  // does not stop being a promise because it is the second half of a sentence.
+  "(?:i(?:'ll| will| can| am going to| am gonna)?\\s+)?(?:have|get|ask)\\s+(?:them|him|her|someone|somebody|the owner|the tech\\w*)\\s+(?:to\\s+)?(?:call|ring|phone|get back)",
+  // third person doing it
+  "(?:they|he|she|someone|somebody|the owner|the tech\\w*|a tech\\w*)(?:'ll| will| is going to| are going to| can)\\s+(?:call|ring|phone)\\b",
+  "(?:they|he|she|someone|somebody|the owner)(?:'ll| will| is going to| are going to)\\s+get back to you",
+  // bare future commitments people actually say
+  "(?:you(?:'ll| will) (?:get|receive) a call)",
+  "(?:expect a call)", "(?:we(?:'ll| will) call you)", "(?:i(?:'ll| will) call you)",
+].join('|') + ')', 'i');
+
 // The bracketed [r] keeps a word Riley must never speak out of this file's own
 // text, per the copy rule; the pattern still catches callers who say it.
 // "are you real / a person / a machine" is the identity question; a bare
@@ -703,6 +726,20 @@ export const PERSONAS = {
       { by: 'ai-denial', re: AI_DENY_RE, pivot: 'To be straight with you, I am an AI assistant answering this line. What can I get done for you?' },
       { by: 'payment', re: PAYMENT_OUT_RE, pivot: 'I never take card or account numbers on this line. Let me get your name and a good number instead.' },
       { by: 'message-promise', re: CONTACT_MSG_RE, pivot: 'I am not going to promise you a message. Let me take your number down and get this to the right person.' },
+      // ★ THE CALLBACK PROMISE. Added 2026-08-16 after six independently written knowledge modules
+      // were reviewed and FIVE of them broke this rule, in eleven separate places. That is not five
+      // mistakes, it is one rule with nothing enforcing it: "I'll have them call you back" is the
+      // humane thing to say, it is what a good human receptionist says, and the model reaches for it
+      // exactly as a person would. CONTACT_MSG_RE never caught it — measured, it passes "I will have
+      // them call you back", "someone will call you back today" and "they will get back to you
+      // shortly", while catching text, email and "reach out".
+      //
+      // ★ IT IS CONDITIONAL, NOT ABSOLUTE, because the persona rule is conditional: the voice MAY
+      // say the owner will call back WHEN THE OWNER'S NOTES SAY THAT IS WHAT HAPPENS. So this floor
+      // is skipped only when the notes actually authorize it (`state.callbackOk`), and with no state
+      // it runs at full strength. A blanket ban would make the voice worse on every business that
+      // does call people back, which is most of them.
+      { by: 'callback-promise', re: CALLBACK_PROMISE_RE, unlessCallbackOk: true, pivot: 'I do not want to promise you a call I cannot promise. Let me take your number and put this in front of the owner.' },
       { by: 'claim', re: CLAIM_RE, pivot: 'I would not want to speak for other jobs. Let me get yours written down properly.' },
       { by: 'money-invention', money: true, pivot: 'I do not want to guess a price on you. Let me get your details down and have somebody confirm it.' },
       { by: 'numeral', numeral: true, pivot: 'I do not want to give you a number I am not sure of. Let me take your details and get it confirmed.' },
@@ -781,8 +818,13 @@ export function personaFor(pathname, body) {
  */
 export function guardClause(persona, text, ctxDigits, state) {
   const booked = Boolean(state && state.booked);
+  // ★ SECOND CONDITIONAL FACT, added 2026-08-16. Same shape and same failure direction as `booked`:
+  // absent state means the floor runs at FULL STRENGTH, so a caller that forgets to pass it gets the
+  // safe behaviour rather than the permissive one.
+  const callbackOk = Boolean(state && state.callbackOk);
   for (const f of persona.outFloors) {
     if (f.unlessBooked && booked) continue;
+    if (f.unlessCallbackOk && callbackOk) continue;
     if (f.numeral) {
       if (badNumeral(text, ctxDigits, persona.numAllow)) return { ok: false, by: f.by, pivot: f.pivot };
       continue;
