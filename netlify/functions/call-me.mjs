@@ -1147,10 +1147,25 @@ async function handleTwiml(event) {
     console.error('CALL-ME TwiML: not configured at answer time:', cfg.reason);
     return XML(`<Response>${SAY(brokenLine(callback))}<Hangup/></Response>`);
   }
-  if (!(await elHealthy())) {
-    console.error('CALL-ME TwiML: ElevenLabs unhealthy at answer time; speaking the honest line.');
-    return XML(`<Response>${SAY(brokenLine(callback))}<Hangup/></Response>`);
-  }
+  // ★ THE elHealthy() PRE-FLIGHT WAS REMOVED FROM THIS PATH, 2026-08-16, after a real call.
+  //
+  // David's phone rang, he answered, and heard "our setup process failed on our end" in a stock
+  // Twilio voice instead of his own. No ElevenLabs conversation was ever created. Both this check
+  // and register-call below produce that identical sentence, so the message could not tell us which
+  // one fired, and both the API key and register-call tested healthy minutes later.
+  //
+  // What this pre-check actually did was make TWO sequential vendor round-trips on the answer path,
+  // each with a 5 second timeout, inside a webhook Netlify kills at 10 seconds and a human is
+  // holding a silent phone through. It could spend five seconds discovering something register-call
+  // would have told us for free, and its own transient failure spoke the apology on a call that
+  // would otherwise have worked.
+  //
+  // ★ REGISTER-CALL IS THE HEALTH CHECK. It is the operation we actually need; if ElevenLabs is
+  // down, out of quota, or past due, it fails and we speak the honest line then. A pre-flight that
+  // can only ever agree with the real call, at the cost of doubling the latency and doubling the
+  // chance of a spurious failure, is not a safety net. It is a second thing to go wrong.
+  //
+  // elHealthy() is still used by the health gate, where its cost is paid off the call path.
 
   try {
     const r = await fetch('https://api.elevenlabs.io/v1/convai/twilio/register-call', {
