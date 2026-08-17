@@ -126,5 +126,27 @@ t('POSITIVE CONTROL — notesAuthorizeCallback can return both values', () => {
   assert.equal(notesAuthorizeCallback('Hours 8 to 5.'), false);
 });
 
+
+// ── THE NOUN-PHRASE FORM, added 2026-08-16 after a LIVE measurement ──────────────────────────────
+// Asked "can someone call me back", the live voice replied "a few quick things so we can get you the
+// right callback" on notes authorising no callback at all. The floor missed it because "callback"
+// there is a NOUN, not a promise verb: nobody is stated to be calling, and the caller still hangs up
+// certain that someone will. An implication the notes do not support costs what a promise costs,
+// because the customer cannot tell the difference.
+for (const s of [
+  'A few quick things so we can get you the right callback.',
+  'Let me get you a callback.',
+  'I can set up a callback for you.',
+  'Let me arrange a callback.',
+]) t(`CAUGHT (implied, notes silent): ${s}`, () => assert.equal(caught(s), 'callback-promise', 'not caught'));
+
+t('but a callback NUMBER is a field, not a promise', () => {
+  assert.equal(caught('Let me get your callback number.'), null);
+  assert.equal(caught('What is the best callback number for you?'), null);
+});
+t('the implied form is still allowed when the notes authorise it', () => {
+  assert.equal(caught('A few quick things so we can get you the right callback.', { callbackOk: true }), null);
+});
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

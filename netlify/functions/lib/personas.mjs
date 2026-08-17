@@ -121,6 +121,46 @@ const CRISIS_RE = new RegExp('\\b(?:' + [
 
 const PAYMENT_IN_RE = /\b(?:card number|credit card|debit card|social security|ssn|cvv|routing number)\b|\b\d{13,16}\b/i;
 
+// ★ COACHING A PHYSICAL ACTION. Measured on the live line 2026-08-16: told "my water heater burst
+// and there is water everywhere", the voice replied *"Stop, turn off the water at the main shutoff
+// valve right now."* The safety module bans exactly this, and uses a valve as its own example. The
+// prose did not hold, because the model reaches for the genuinely helpful thing.
+//
+// Why it must not: the voice cannot see the house. It does not know whether the caller is standing
+// in water next to a panel, whether the valve is seized, whether there is a ladder involved, or
+// whether the person is physically able. Recognition and getting out of the way is the whole
+// doctrine; a confident instruction is where a phone voice does real harm.
+//
+// ★ NOT MATCHED, deliberately: the caller's own report ("I turned off the water already") and the
+// voice ASKING ("is the water off?"). Floors run on what the voice SAYS, and asking is not coaching.
+// The pattern requires an imperative or a "you need to" aimed at a control.
+const COACH_ACTION_RE = new RegExp('(?:' + [
+  // imperative or directive, then a control, within a short window
+  "\\b(?:turn|shut|switch|cut|kill|flip|trip|close|open)\\s+(?:it\\s+|that\\s+|the\\s+|your\\s+)?(?:off|on|down)?\\s*(?:the\\s+|your\\s+)?(?:water|gas|main|valve|breaker|panel|power|electric\\w*|shutoff|shut-off|supply|line)",
+  "\\byou (?:need to|should|have to|want to|can) (?:turn|shut|switch|cut|kill|flip|unplug|reset|open|close)\\b",
+  "\\b(?:go|head)\\s+(?:and\\s+)?(?:turn|shut|switch|check|open|close)\\b",
+  "\\bunplug\\s+(?:it|the|your)\\b",
+  "\\breset\\s+(?:the\\s+|your\\s+)?(?:breaker|panel|switch)\\b",
+  "\\bopen\\s+(?:a\\s+|the\\s+|your\\s+)?window",
+  "\\blight\\s+(?:the\\s+|a\\s+)?(?:pilot|match)",
+].join('|') + ')', 'i');
+
+// ★ A TIME NOBODY GAVE US. Measured the same night: "we can get someone out today" and "we'll get
+// someone out today" on notes that carry business hours and nothing about same-day service. Two of
+// five test calls. The scheduling module bans it in plain words and the model said it anyway.
+//
+// A promised day is the single most load-bearing thing a caller remembers, and it is the owner's to
+// promise, not ours. This floor is unconditional on the customer line because there is no notes flag
+// that could authorise it generically: a business that really does same-day says so in its own notes
+// and the voice can quote them, which the numeral and money floors already allow for.
+//
+// NOT MATCHED: the caller's own words, and a question ("are you free today?"). Same reason as above.
+const TIME_PROMISE_RE = new RegExp('\\b(?:' + [
+  "(?:we|i|someone|somebody|a tech\\w*|the tech\\w*)(?:'ll| will| can| could| should)?\\s+(?:get|have|send|be)\\s+(?:someone|somebody|a tech\\w*|him|out|there)?[^.!?]{0,24}\\b(?:today|tomorrow|this (?:morning|afternoon|evening)|tonight|right away|first thing|within the hour|shortly)",
+  "\\bout (?:there )?(?:today|tomorrow|this (?:morning|afternoon)|tonight|right away|shortly|first thing)\\b",
+  "\\bcome (?:out )?(?:today|tomorrow|tonight|right away|first thing)\\b",
+].join('|') + ')', 'i');
+
 // A promise that a HUMAN will ring the caller. Distinct from CONTACT_MSG_RE, which is about a text
 // or an email, and which measurably does not catch any of these.
 //
@@ -142,6 +182,16 @@ const CALLBACK_PROMISE_RE = new RegExp('\\b(?:' + [
   // bare future commitments people actually say
   "(?:you(?:'ll| will) (?:get|receive) a call)",
   "(?:expect a call)", "(?:we(?:'ll| will) call you)", "(?:i(?:'ll| will) call you)",
+  // ★ THE NOUN-PHRASE FORM, added after a live measurement. Asked "can someone call me back", the
+  // voice replied "a few quick things so we can get you the right callback" on notes that authorise
+  // no callback at all. The floor missed it because "callback" there is a NOUN, not a promise verb:
+  // nobody is stated to be calling, and yet the caller hangs up certain that somebody will. An
+  // implication the notes do not support costs exactly what a promise costs, because the customer
+  // cannot tell the difference. Grammar is not the thing being regulated; the expectation is.
+  // The trailing lookahead keeps "callback NUMBER" out of it: asking for the number to reach
+  // somebody on is a field, not a promise that anyone will dial it.
+  "(?:get|getting|set|setting|line|lining)\\s+(?:you\\s+)?(?:up\\s+)?(?:with\\s+)?(?:a|the|your)\\s+(?:right\\s+|quick\\s+)?call\\s?back(?!\\s*(?:number|line|time|info))",
+  "(?:arrange|schedule|organis|organiz)\\w*\\s+(?:a|the|your)\\s+call\\s?back(?!\\s*(?:number|line|time|info))",
 ].join('|') + ')', 'i');
 
 // The bracketed [r] keeps a word Riley must never speak out of this file's own
@@ -569,7 +619,7 @@ export const PERSONAS = {
       { by: 'numeral', numeral: true, pivot: "Here's what I have: Tuesday at eight in the morning, Tuesday at one thirty, or Wednesday at nine. Which one works?" },
     ],
     inBranches: [
-      { by: 'crisis', re: CRISIS_RE, end: true, line: "That's an emergency, not a booking. Hang up and call 911 right now, or the gas company if you smell gas. We can talk once you're safe." },
+      { by: 'crisis', re: CRISIS_RE, end: true, line: "That's an emergency, not a booking. Get everyone outside first, then call 911 or the gas company from outside. We can talk once you're safe." },
       { by: 'payment-offered', re: PAYMENT_IN_RE, line: "Please don't read that out, I never take card or account numbers. A name, an address, and a good number is all a visit needs." },
       { by: 'ai-asked', re: AI_ASKED_RE, line: "I'm an AI receptionist, and this is Answered's demo line. Now, what's going on at your place?" },
       { by: 'demo-asked', re: REAL_ASKED_RE, line: 'Straight answer: this is the demo line, the booking is pretend, the product is real. Want to play it through anyway?' },
@@ -626,7 +676,7 @@ export const PERSONAS = {
       { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
-      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and I am a research call. Please hang up and call 911 right now. I am getting off the line.' },
+      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and I am only a research call. Get outside, then call 911 from outside. I am getting off the line.' },
       { by: 'payment-offered', re: PAYMENT_IN_RE, line: 'Please do not read that out. I never take card or account numbers, and this call does not need one.' },
       { by: 'ai-asked', test: (t) => askedIfAI(t) || AI_ASKED_RE.test(t), line: 'Yes, I am an A I voice, and this call is recorded. Happy to keep it short.' },
       { by: 'abuse', test: isAbusive, end: true, line: 'Understood, I will get out of your way. Sorry to have bothered you.' },
@@ -679,7 +729,7 @@ export const PERSONAS = {
       { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
-      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and this is only a setup call. Please hang up and call 911 right now. I am getting off the line.' },
+      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That sounds like an emergency and this is only a setup call. Get outside, then call 911 from outside. I am getting off the line.' },
       { by: 'payment-offered', re: PAYMENT_IN_RE, line: 'Please do not read that out. I never take card or account numbers, and nothing here needs one.' },
       { by: 'ai-asked', test: (t) => askedIfAI(t) || AI_ASKED_RE.test(t), line: 'Yes, I am an A I voice. You asked us to call, and this is what picks up. What is the name of the business?' },
       { by: 'abuse', test: isAbusive, line: 'I hear you. We can keep going, or I can get off the phone right now, your call.' },
@@ -740,6 +790,9 @@ export const PERSONAS = {
       // it runs at full strength. A blanket ban would make the voice worse on every business that
       // does call people back, which is most of them.
       { by: 'callback-promise', re: CALLBACK_PROMISE_RE, unlessCallbackOk: true, pivot: 'I do not want to promise you a call I cannot promise. Let me take your number and put this in front of the owner.' },
+      // Both added 2026-08-16 after live measurement, not after review. See the notes on each regex.
+      { by: 'coach-action', re: COACH_ACTION_RE, notQuestion: true, pivot: 'I am not going to talk you through anything hands on, because I cannot see what you are looking at. Tell me what is happening and I will get it to somebody who can.' },
+      { by: 'time-promise', re: TIME_PROMISE_RE, notQuestion: true, pivot: 'I do not want to put a time on it that nobody can keep. Let me get the details down so the owner can tell you honestly.' },
       { by: 'claim', re: CLAIM_RE, pivot: 'I would not want to speak for other jobs. Let me get yours written down properly.' },
       { by: 'money-invention', money: true, pivot: 'I do not want to guess a price on you. Let me get your details down and have somebody confirm it.' },
       { by: 'numeral', numeral: true, pivot: 'I do not want to give you a number I am not sure of. Let me take your details and get it confirmed.' },
@@ -752,7 +805,7 @@ export const PERSONAS = {
       { by: 'sales-register', re: SALES_REGISTER_RE, pivot: 'Plain words are better. Here is the practical version.' },
     ],
     inBranches: [
-      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That is an emergency, not a service call. Hang up and call 911 right now, or the gas company if you smell gas. Please go.' },
+      { by: 'crisis', re: CRISIS_RE, end: true, line: 'That is an emergency, not a service call. Get everyone out of the building now. Once you are outside, call 911 or the gas company. Go.' },
       { by: 'payment-offered', re: PAYMENT_IN_RE, line: 'Please do not read that out. I never take card or account numbers, and nothing here needs one.' },
       { by: 'ai-asked', test: (t) => askedIfAI(t) || AI_ASKED_RE.test(t), line: 'I am an AI assistant answering this line. Now, what is going on at your place?' },
       { by: 'abuse', test: isAbusive, line: 'I hear you, and I am still here. We can keep working on it, or I can take a message, your call.' },
@@ -842,6 +895,12 @@ export function guardClause(persona, text, ctxDigits, state) {
       if (words > f.maxWords) return { ok: false, by: f.by, pivot: f.pivot };
       continue;
     }
+    // ★ A QUESTION IS NOT AN INSTRUCTION. "Did you turn the water off?" and "Turn the water off"
+    // share every word that matters, and only one of them is coaching. Floors that describe an ACT
+    // the voice performs (coaching a physical action, promising a time) must not fire when the voice
+    // is ASKING about it, which is a legitimate and often necessary thing to do. Caught by a test:
+    // the first version of the coach-action floor refused "Did you turn the water off?".
+    if (f.notQuestion && /\?\s*$/.test(String(text || '').trim())) continue;
     if (f.re.test(text)) return { ok: false, by: f.by, pivot: f.pivot };
   }
   return { ok: true };
