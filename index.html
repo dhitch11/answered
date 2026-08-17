@@ -106,7 +106,23 @@
                nothing told a visitor what to do. It is .btn-primary now: the
                same one-row shape, so the upgrade to the call control still
                shifts nothing, and the red state still has an obvious act. -->
-          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="/setup">Set your rules</a></span>
+          <span class="cta-slot" id="cta-primary" data-callslot><a class="btn btn-primary" href="sms:+19162825278?&amp;body=SETUP">Text SETUP to start</a></span>
+          <!-- ★ THE ACTION HALF OF THE HERO, ADDED 2026-08-17, AND IT IS ALWAYS VISIBLE.
+               Two measurements forced this. (a) The signup CTA sat at 83% document depth against a
+               hero at 12%, which is the same defect as the 96%-deep footer link it replaced, with a
+               shorter scroll. (b) I had put it inside [data-listfallback], which the stylesheet
+               hides with display:none the moment the call control renders - so the signup appeared
+               ONLY when the demo line was DOWN, and vanished whenever the product was working. My
+               reasoning was right and my placement inverted it.
+               "Hear it answer" and "Text SETUP" are the two halves of one decision: proof, then
+               action. The proof half upgrades in place via [data-callslot]; this half never moves.
+               ★ AND IT IS TAPPABLE. There were ZERO sms: and ZERO tel: links across all four pages
+               - the 08-12 war room's number one defect on a PHONE product, still open. A number a
+               contractor has to memorise, leave the site, and retype is a sentence, not a CTA.
+               The sms: form is `?&body=` deliberately: iOS and Android disagreed historically and
+               this is the form that works on both. NEEDS A REAL-HANDSET TEST, which @LANE-SEARCHLIGHT
+               is running - it is exactly the class of thing that renders fine and does nothing. -->
+          <a class="btn btn-ghost" href="sms:+19162825278?&amp;body=SETUP" data-setup-sms>Text SETUP to (916)&nbsp;282-5278</a>
           <a class="btn btn-ghost" href="#price">See what it costs</a>
         </div>
 
@@ -721,7 +737,7 @@
          question thread that provisions the account, verified end to end on production.
          The email form stays underneath, quiet, because a CONSUMER here is not setting up a
          contractor line and has nothing to text about. Primary path first, second path kept. -->
-    <p class="lede" style="margin-top:28px;text-align:center;margin-inline:auto;max-width:52ch"><b style="font-weight:600">Text SETUP to (916) 282-5278</b></p>
+    <p class="lede" style="margin-top:28px;text-align:center;margin-inline:auto;max-width:52ch"><a href="sms:+19162825278?&amp;body=SETUP" style="font-weight:600;color:inherit"><b style="font-weight:600">Text SETUP to (916) 282-5278</b></a></p>
     <p class="src" style="margin-top:8px;text-align:center;margin-inline:auto;max-width:52ch">Seven questions and your line is set up. No form, no call, no card. A person assigns your number after that, and nothing answers for you until they do.</p>
     <p class="src" style="margin-top:22px;text-align:center;margin-inline:auto;max-width:52ch">Not setting up a business line, or would rather use email?</p>
 

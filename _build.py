@@ -925,7 +925,7 @@ PRICING = '''
 <section class="paper seam pad" id="interest" data-aud="consumer business both">
   <div class="wrap narrow">
     <p class="eyebrow rv" style="justify-content:center">Set your line up</p>
-    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;text-align:center">Text SETUP to<br>''' + A2P_NUMBER + '''</h2>
+    <h2 class="h2 rv d1" style="''' + H2_UTIL + ''';margin-top:16px;text-align:center"><a href="sms:+19162825278?&amp;body=SETUP" style="color:inherit">Text SETUP to<br>''' + A2P_NUMBER + '''</a></h2>
     <p class="lede rv d2" style="margin-top:20px;text-align:center;margin-inline:auto;max-width:54ch">Seven questions and your line is set up. No form, no call, no card.</p>
     <p class="src rv d2" style="margin-top:12px;text-align:center;margin-inline:auto;max-width:54ch">A person assigns your number after that, and nothing answers for you until they do.</p>
     ''' + reversal('answered', top=24, center=True) + '''
