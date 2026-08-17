@@ -367,7 +367,7 @@ async function handleApi(event) {
     // NO CONSENT RECORD, NO DIAL. This is the whole rule, and it is why a store
     // that will not open refuses instead of dialling on a promise to log later.
     console.error('CALL-ME DOWN: consent store would not open:', String(e && e.message).slice(0, 160));
-    return refuse('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return refuse('store_open', 'We could not open the consent store. Nothing was set up. (ref: store-open)');
   }
 
   // ── the stop action. Suppression is permanent and it is written first ──────
@@ -422,7 +422,7 @@ async function handleApi(event) {
     if (stopped) return deny('suppressed', 'That number asked us to stop, so we will not call it.');
   } catch (e) {
     console.error('CALL-ME: suppression read failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_stop_read', 'We could not check the do-not-call list, so we did not place a call. (ref: stop-read)');
   }
 
   // ── 5. one per session — REMOVED 2026-08-16 on David's instruction ─────────
@@ -451,7 +451,7 @@ async function handleApi(event) {
     lastRec = await store.get(`last/${phoneHash}`, { type: 'json' });
   } catch (e) {
     console.error('CALL-ME: rate read failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_rate_read', 'We could not check the recent calls for this number, so we did not place one. (ref: rate-read)');
   }
   // ★ THE CAP COUNTS CALLS THAT HAPPENED, NOT RESERVATIONS THAT DID NOT, 2026-08-16.
   //
@@ -503,7 +503,7 @@ async function handleApi(event) {
     count = Number(c && c.n) || 0;
   } catch (e) {
     console.error('CALL-ME: daily count read failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_count_read', 'We could not read the call count for today, so we did not place a call. (ref: count-read)');
   }
   if (count >= cap) {
     console.error(`CALL-ME: daily ceiling reached (${count} of ${cap}); refusing until tomorrow.`);
@@ -615,7 +615,7 @@ async function handleApi(event) {
     await store.setJSON(recordKey, consentRecord);
   } catch (e) {
     console.error('CALL-ME DOWN: consent record write failed, so no call is placed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_record_write', 'We could not write your consent record, so no call was placed. (ref: record-write)');
   }
 
   // ── 12b. TELL THE DIAL GATE, or the person who just said yes stays RED ──────
@@ -681,7 +681,7 @@ async function handleApi(event) {
     await store.setJSON(`session/${sessionHash}`, { at: nowIso(), nonce });
   } catch (e) {
     console.error('CALL-ME: reservation write failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_reservation_write', 'We could not reserve this number, so no call was placed. (ref: reservation-write)');
   }
   await sleep(150);
   try {
@@ -711,8 +711,22 @@ async function handleApi(event) {
       return deny('race_lost', 'Another request for this number is being handled right now. If no call arrives in a minute, try again.');
     }
   } catch (e) {
-    console.error('CALL-ME: reservation read back failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    // ★ THE ARBITRATION IS THE ONE CHECK HERE THAT FAILS OPEN, and that is deliberate.
+    //
+    // Every other store failure above refuses, correctly: without the suppression list we might call
+    // somebody who asked us to stop, and without the rate record we might call somebody twenty times.
+    // Those are refusals that protect a person.
+    //
+    // This one protects nothing except against a double dial, and by the time we reach it the
+    // reservation has ALREADY been written successfully. We hold the nonce. The only thing this read
+    // adds is knowing whether somebody else clicked in the same 150ms. A strongly-consistent read is
+    // slower than a default one and can time out under load, so making the whole call depend on it
+    // trades a rare double dial for a certain, total outage of the button, which is exactly what
+    // David has been hitting all evening.
+    //
+    // So: log it loudly, and proceed. The worst case is one extra call to a number whose owner just
+    // asked to be called twice. The alternative failure mode is nobody ever gets called at all.
+    console.error('CALL-ME: reservation read back failed, PROCEEDING on the nonce we already wrote:', String(e && e.message).slice(0, 160));
   }
 
   // ── 13. the dial ───────────────────────────────────────────────────────────
@@ -726,7 +740,7 @@ async function handleApi(event) {
     });
   } catch (e) {
     console.error('CALL-ME: token write failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
+    return deny('store_token_write', 'We could not create the call token, so no call was placed. (ref: token-write)');
   }
 
   // The kill switch is asserted a second time, here, at the moment of the dial.
