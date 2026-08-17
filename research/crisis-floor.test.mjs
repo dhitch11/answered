@@ -43,12 +43,37 @@ t('every crisis floor ends the call', () => {
     assert.equal(crisisOf(p).end, true, `persona ${p.id} crisis floor does not end the call`);
   }
 });
-t('all personas share one crisis pattern (one place to fix, not four)', () => {
-  const src = new Set(personaList.map((p) => String(crisisOf(p).re)));
-  assert.equal(src.size, 1, `found ${src.size} different crisis patterns across personas`);
+// ★ NARROWED 2026-08-17 FROM "all personas" TO "all ENGLISH personas". The point of this assertion
+// is to stop DRIFT: four English voices quietly ending up with four slightly different hazard
+// patterns, so a fix lands in one and not the others. It was never "every voice on the estate must
+// match", and the Spanish line proves the difference - `customer_es` carries its own floor as a
+// FUNCTION, because Spanish needs NFC normalisation and clause-level negation that no single regex
+// can express. Sharing the English pattern with it would be the bug, not the guarantee.
+t('all ENGLISH personas share one crisis pattern (one place to fix, not four)', () => {
+  const english = personaList.filter((p) => !p.id.endsWith('_es'));
+  assert.ok(english.length >= 4, 'expected at least the four English personas');
+  const src = new Set(english.map((p) => String(crisisOf(p).re)));
+  assert.equal(src.size, 1, `found ${src.size} different crisis patterns across the English personas`);
 });
 
-const RE = crisisOf(personaList[0]).re;
+t('the Spanish line has its OWN crisis floor, and it is a function not a regex', () => {
+  const es = personaList.find((p) => p.id === 'customer_es');
+  assert.ok(es, 'customer_es is missing');
+  const c = crisisOf(es);
+  assert.ok(c, 'customer_es has no crisis branch');
+  assert.equal(typeof c.test, 'function', 'Spanish crisis must be a function: it needs NFC normalisation and clause-level negation');
+  assert.equal(c.end, true, 'the Spanish crisis branch must end the call');
+  assert.match(c.line, /911/, 'the Spanish crisis line must still route to 911');
+  assert.match(c.line, /[Ss]algan|[Ss]alga/, 'the Spanish crisis line must tell them to get OUT, and out comes first');
+});
+
+// ★ PICKED BY IDENTITY, NOT BY INDEX. This read `personaList[0]` and worked only because riley
+// happens to be declared first. The moment a persona is added ahead of it - or the Spanish line,
+// whose crisis branch has a `test` function and NO `.re` - this becomes `undefined.test(...)` and
+// every assertion below throws instead of failing. A hardcoded index is a defect with a delay on it.
+const englishCrisis = crisisOf(PERSONAS.riley);
+if (!englishCrisis || !englishCrisis.re) throw new Error('riley has no regex crisis floor; this suite cannot run');
+const RE = englishCrisis.re;
 const hits = (s) => RE.test(s);
 
 // ── MUST END THE CALL. All 17 were checked against the pre-fix pattern; 11 failed then. ──────────

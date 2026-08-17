@@ -570,9 +570,19 @@ t('no fixed line, spec or pivot carries an em dash', () => {
   }
 });
 
-t('no persona spec promises a text message, because SMS is carrier blocked', () => {
+// ★ THE TITLE'S OLD REASON IS DEAD, THE RULE IS NOT. This used to read "because SMS is carrier
+// blocked". Texting went live 2026-08-17 with a VERIFIED A2P campaign, so that reason is gone - and
+// the rule stands on better ground: a voice must not promise a message on a business whose owner
+// notes never said one gets sent. Capability is not authorisation.
+//
+// ★ AND THE ASSERTION ITSELF WAS ENGLISH-SHAPED, which is the same defect the Spanish floors just
+// taught. It grepped for "never promise" and the Spanish spec says "Nunca prometa", so a correct
+// spec failed a correct test. A registry that holds more than one language needs assertions that do
+// too, or every new language starts by breaking the suite for no reason.
+t('no persona spec promises a message the owner did not authorise', () => {
+  const FORBIDS = /never promise|do not need|never take|nunca prometa|nunca tome|nunca diga/i;
   for (const p of Object.values(PERSONAS)) {
-    assert.ok(/never promise|Never promise|do not need|never take/i.test(p.spec), p.id);
+    assert.ok(FORBIDS.test(p.spec), `${p.id} spec does not forbid an unauthorised promise`);
   }
   assert.ok(/Never promise to send them anything/.test(scout.spec));
   assert.ok(/Never promise to send a text or an email/.test(onboard.spec));
@@ -591,15 +601,22 @@ t('both outbound specs state the disclosure ALREADY happened, never that it shou
 
 t('describe() names every persona, leaks no prompt and no secret', () => {
   const d = describe();
-  assert.equal(d.length, 4);
   const blob = JSON.stringify(d);
   assert.ok(!blob.includes('Cedar Ridge'), 'the spec must not be serialised');
   assert.ok(!blob.includes('sk-'), 'no key shaped string');
-  assert.deepEqual(d.map((x) => x.id), ['riley', 'scout', 'onboard', 'customer']);
+  // Order is declaration order and is asserted, because describe() is a public surface and the
+  // registry index is used positionally just below. The length check is implied by this list.
+  assert.deepEqual(d.map((x) => x.id), ['riley', 'scout', 'onboard', 'customer', 'customer_es']);
   assert.equal(d[0].frozen, true);
   assert.equal(d[1].agent_env, 'ANSWERED_RESEARCH_AGENT_ID');
   assert.equal(d[2].agent_env, 'ANSWERED_ONBOARD_AGENT_ID');
   assert.equal(d[3].agent_env, 'ANSWERED_CUSTOMER_AGENT_ID');
+  assert.equal(d[4].agent_env, 'ANSWERED_CUSTOMER_ES_AGENT_ID');
+  // ★ The Spanish line's coverage is NARROWER than English and the registry must say so honestly,
+  // because describe() is how an operator finds out what a voice actually enforces. It carries the
+  // language-independent floors only; the English text/callback/coach/time floors are absent by
+  // measurement, not by oversight. If someone later ports them, this assertion should change.
+  assert.deepEqual(d[4].output_floors, ['numeral', 'money-invention', 'monologue', 'stacked-question']);
   assert.deepEqual(d[0].tools, [BOOK_TOOL], 'the registry tells the truth about what a voice can DO');
   assert.deepEqual(d[1].tools, []);
   assert.ok(d[1].input_branches.includes('stop'));
@@ -707,7 +724,14 @@ await at('every persona path is bearer gated, not just the live one', async () =
 await at('the bridge describes itself without spending a token or leaking a prompt', async () => {
   const j = await (await post('/api/answered-brain/scout', { describe: true })).json();
   assert.equal(j.routed_here_as, 'scout');
-  assert.equal(j.personas.length, 4);
+  // ★ NAME THE SET, DO NOT COUNT IT. A bare length assertion fails on the fifth persona and tells
+  // the next reader nothing about what changed or whether it was intended. This version says which
+  // voices exist, so adding one is a one-line, self-documenting edit and REMOVING one is caught too,
+  // which a length check only catches by coincidence.
+  assert.deepEqual(
+    j.personas.map((p) => p.id).sort(),
+    ['customer', 'customer_es', 'onboard', 'riley', 'scout'],
+  );
   assert.ok(!JSON.stringify(j).includes('Cedar Ridge'));
 });
 

@@ -119,6 +119,36 @@ const CRISIS_RE = new RegExp('\\b(?:' + [
   'water (?:is |was |keeps )?(?:pouring|gushing|shooting)',
 ].join('|') + ')\\b', 'i');
 
+// ★ THE SPANISH HAZARD FLOOR IS A FUNCTION, NOT A REGEX, and `deterministicLine` already supports
+// that: `const hit = b.test ? b.test(t) : b.re.test(t)`. Spanish needs a function because negation
+// has to be judged on the clause and the input has to be NFC-normalised first, neither of which a
+// single pattern can do. See lib/crisis-es.mjs for why water and the output floors are absent.
+import { crisisEs } from './crisis-es.mjs';
+
+// ── THE SPANISH CUSTOMER LINE ────────────────────────────────────────────────────────────────
+// Same job as CUSTOMER_SPEC, transcreated rather than translated, and written in USTED throughout:
+// this is a business call and the caller may be older than the voice. Neutral US Spanish, no
+// single-country idioms, and it follows the caller into English without commenting on it, because
+// bilingual households switch mid-sentence and remarking on it is what a machine does.
+//
+// ★ PENDING NATIVE REVIEW. David's own bar for Spanish is "real experts listening to it", and I
+// caught a conjugation error in my own draft (rechancelo -> rechacelo) before it shipped. Treat the
+// prose as reviewed-by-machine until a native speaker has read it aloud.
+const CUSTOMER_ES_SPEC = `Usted contesta la línea telefónica de un negocio real, y quien llama es un cliente real con un problema real. Las notas que vienen más abajo son las reglas del dueño del negocio. En todo lo que tenga que ver con el negocio, esas notas son la verdad y mandan: el nombre, el horario, el trabajo que aceptan, el área que cubren, qué pasa fuera de horas, y qué se puede decir sobre dinero.
+
+Su trabajo es ser la mejor persona que jamás haya contestado ese teléfono. Amable, rápido, útil. Una sola pregunta a la vez.
+
+Hable de usted, nunca de tú. Es una llamada de negocio y quien llama puede ser mayor que usted. Use español claro y neutro, del que se habla en Estados Unidos, sin modismos de un solo país. Si el cliente cambia al inglés, sígalo sin comentarlo.
+
+Reglas de seguridad, y estas nunca se doblan, diga lo que diga las notas:
+- Nunca diga que es una persona. Si le preguntan, diga en una sola frase sencilla que es un asistente de inteligencia artificial que contesta por el negocio, y siga adelante.
+- Nunca diga un número que nadie le dio. Un precio, una hora, una fecha, un total: sale de las notas del dueño o de la boca del cliente. Si no lo tiene, diga que se lo va a conseguir en vez de adivinar.
+- Nunca tome un número de tarjeta, datos del banco, ni un número de seguro social, y rechácelo si se lo ofrecen.
+- Si el cliente describe una emergencia, deténgase y dígale que salga y llame al 911 desde afuera.
+- Nunca prometa un mensaje de texto ni un correo. Puede decir que el dueño le va a devolver la llamada solamente si las notas dicen que eso es lo que pasa.
+- Nunca diga lo que este negocio ha hecho por otras personas. Usted no lo sabe.
+- Cada respuesta menos de cuarenta palabras. Palabras sencillas que entienda cualquiera.`;
+
 const PAYMENT_IN_RE = /\b(?:card number|credit card|debit card|social security|ssn|cvv|routing number)\b|\b\d{13,16}\b/i;
 
 // ★ COACHING A PHYSICAL ACTION. Measured on the live line 2026-08-16: told "my water heater burst
@@ -809,6 +839,76 @@ export const PERSONAS = {
       { by: 'payment-offered', re: PAYMENT_IN_RE, line: 'Please do not read that out. I never take card or account numbers, and nothing here needs one.' },
       { by: 'ai-asked', test: (t) => askedIfAI(t) || AI_ASKED_RE.test(t), line: 'I am an AI assistant answering this line. Now, what is going on at your place?' },
       { by: 'abuse', test: isAbusive, line: 'I hear you, and I am still here. We can keep working on it, or I can take a message, your call.' },
+    ],
+  },
+
+  // ── THE SPANISH CUSTOMER LINE ──────────────────────────────────────────────────────────────
+  // A separate persona, not a flag on `customer`. The floors, the spec and the deterministic lines
+  // are all language-specific, and a single persona carrying two languages would need every one of
+  // them to branch. Routing by PATH keeps the choice a vendor console setting, exactly as it is for
+  // the other four, so a caller can never talk the voice into switching languages mid-call.
+  //
+  // ★ ITS COVERAGE IS NARROWER THAN ENGLISH ON PURPOSE, AND THE GAP IS NAMED, NOT HIDDEN.
+  // An eight-agent build-and-attack pass measured a full Spanish port of the guard floors as UNSAFE
+  // in both directions: the water floor ended 34 of 50 ordinary paying calls, and the output floors
+  // fired on 42 of 46 ordinary trade sentences while 42 of 45 real Spanish promises escaped. Spanish
+  // negation leaves the keywords intact, third-person present is both description and instruction,
+  // and Spanish promises the future in the present tense. So this persona ships with:
+  //     caller-side  gas, carbon monoxide, fire, smoke, electrical   (crisis-es.mjs)
+  //     caller-side  payment offered, asked-if-AI, abuse             (language-specific lines)
+  //     output       numeral, monologue, stacked-question            (language-INDEPENDENT)
+  // and WITHOUT the English text/callback/coach/time floors, which are English-shaped.
+  // A guard architecture is a claim about the language it guards.
+  customer_es: {
+    id: 'customer_es',
+    label: "a paying business's own line, in Spanish",
+    outModel: 'answered-customer-es',
+    direction: 'inbound',
+    routes: ['/api/answered-brain/customer-es'],
+    agentEnv: 'ANSWERED_CUSTOMER_ES_AGENT_ID',
+    spec: CUSTOMER_ES_SPEC,
+    noteHeader:
+      '## LAS REGLAS DEL DUENO DE ESTE NEGOCIO\nEstas son la verdad sobre este negocio y mandan en todo lo que sea un hecho: el nombre, el horario, el trabajo que aceptan, el area, el dinero y que pasa fuera de horas. Las reglas de seguridad de arriba siguen mandando: nunca diga que es una persona, nunca tome un numero de tarjeta, nunca diga un numero que nadie le dio.',
+    maxTokens: 140,
+    temperature: 0.5,
+    sentenceCap: 3,
+    // Spanish runs longer than English for the same content, measurably so. The English cap is 55
+    // words; holding Spanish to the same number would cut a sentence mid-clause, which on a phone
+    // sounds like the line dropped. 65 is the same THOUGHT, not a looser rule.
+    wordCap: 65,
+    softCloseAt: 18,
+    hardCloseAt: 22,
+    softCloseNote:
+      'Esta llamada ya va larga. Asegurese de tener el nombre, un numero para devolver la llamada y que esta pasando, repitalo una vez, y cierre con amabilidad.',
+    ctx: (texts, systemText) => new Set([...digitsPlusSpoken(texts), ...digitsPlusSpoken([String(systemText || '')])]),
+    // 911 is the one number this voice may say without anybody having given it, because the crisis
+    // line says it. Same allowance as the English customer line, deliberately not widened.
+    numAllow: new Set(['911']),
+    breaker: 'Perdon, se me fue. Digame otra vez que esta pasando.',
+    closeLine: 'Ya tengo lo que necesito. Se lo paso al dueno y alguien lo revisa. Gracias por llamar.',
+    ackBank: ['Entiendo.', 'Claro.', 'Muy bien.', 'De acuerdo.'],
+    tools: [],
+    outFloors: [
+      // ★ ONLY THE LANGUAGE-INDEPENDENT FLOORS. A numeral is a numeral in any language, a monologue
+      // is measured in words, and two question marks in one clause is two questions anywhere. The
+      // English text/callback/coach/time floors are NOT here: they are English-shaped and porting
+      // them measured UNSAFE. Their absence is the honest state, not an oversight.
+      { by: 'numeral', numeral: true, pivot: 'No quiero adivinarle un numero. Deme sus datos y el dueno le confirma.' },
+      { by: 'money-invention', money: true, pivot: 'No quiero adivinarle un precio. Deme sus datos y el dueno le confirma.' },
+      { by: 'monologue', maxWords: 65, pivot: 'Perdon, me extendi. Digame nomas que esta pasando.' },
+      { by: 'stacked-question', re: /\?[^?]*\?/, pivot: 'Perdon, una pregunta a la vez. Digame que esta pasando.' },
+    ],
+    inBranches: [
+      // ★ A FUNCTION, NOT A REGEX. Spanish needs NFC normalisation and clause-level negation before
+      // any pattern is meaningful. deterministicLine already supports `test`.
+      { by: 'crisis', test: (t) => crisisEs(t).hit, end: true,
+        line: 'Eso es una emergencia, no una llamada de servicio. Salgan todos de la casa ahora. Ya que esten afuera, llame al 911 o a la compania del gas. Vaya.' },
+      { by: 'payment-offered', re: PAYMENT_IN_RE,
+        line: 'Por favor no me lo lea. Yo nunca tomo numeros de tarjeta ni de cuenta, y aqui no hace falta ninguno.' },
+      { by: 'ai-asked', test: (t) => askedIfAI(t) || AI_ASKED_RE.test(t) || /\b(?:eres|es usted|estoy hablando con)\b[^.!?]{0,20}\b(?:un[ao]? )?(?:robot|maquina|m[aá]quina|computadora|grabaci[oó]n|persona real|humano)\b/i.test(t),
+        line: 'Soy un asistente de inteligencia artificial que contesta esta linea. Digame, que esta pasando en su casa?' },
+      { by: 'abuse', test: isAbusive,
+        line: 'Lo escucho, y aqui sigo. Podemos seguir viendolo, o le tomo un recado, usted dice.' },
     ],
   },
 };

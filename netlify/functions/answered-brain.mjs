@@ -870,5 +870,7 @@ export const config = {
     '/api/answered-brain/onboard/chat/completions',
     '/api/answered-brain/customer',
     '/api/answered-brain/customer/chat/completions',
+    '/api/answered-brain/customer-es',
+    '/api/answered-brain/customer-es/chat/completions',
   ],
 };
