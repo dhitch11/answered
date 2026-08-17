@@ -274,9 +274,17 @@ export default async function handler(req, context) {
     console.log('signup: STOP received; the setup thread is closed for this number.');
     return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
   }
-  if (['help', 'info'].includes(word)) {
-    return new Response(reply(HELP_LINE).body, { status: 200, headers: { 'Content-Type': 'text/xml' } });
-  }
+  // ★ HELP IS DELIBERATELY *NOT* ANSWERED HERE ANY MORE. It used to return before the store was
+  // read, which put it in front of the turn cap: measured, 200 inbound HELP produced 200 outbound
+  // SMS with the stored record still null. At $0.0113 a message and the 4/sec carrier ceiling that
+  // is roughly $163/hour of outbound from one stranger with one phone, forever, and HELP is the
+  // keyword every carrier tells consumers to send. It was the cheapest unbounded spend in the file.
+  //
+  // It falls through to the normal path now, so it is counted and capped like anything else. The
+  // person is not left without help: Twilio's Advanced Opt-Out answers HELP at the PLATFORM level
+  // before this function is reached, which is the same reason the inbound STOP handler replies with
+  // empty TwiML rather than sending its own confirmation. Two replies to one HELP would be a
+  // duplicate to the person and a second billed message to us.
 
   const s = store(event, 'signup');
   let rec;
