@@ -95,6 +95,76 @@ export const MODULES = [
     'transferred', 'been on the phone', 'wait time', 'hung up on me',
   ]), 'hold.txt'],
 
+  // ── ADDED 2026-08-16 ────────────────────────────────────────────────────────────────────────
+  // Six modules, drafted and put through two adversarial review rounds and an objective gate
+  // (research/module-gate.mjs). Their triggers were proposed by the reviewers and then attacked by
+  // them for false positives, which is where most of these exclusions come from.
+
+  // The price question. THE commonest opening sentence on a trades line, and the one where the
+  // voice most wants to invent a number.
+  ['money', word([
+    'how much', 'what do you charge', 'whats? the (?:rate|charge|cost|price)', 'price', 'pricing',
+    'cost', 'quote', 'estimate', 'ballpark', 'service charge', 'trip charge', 'call ?out fee',
+    'diagnostic fee', 'free estimate', 'covered by (?:insurance|warranty)', 'home warranty',
+    'deductible', 'too expensive', 'cheaper',
+  ]), 'money.txt'],
+
+  // What makes a booking usable by the tech who has to drive to it.
+  // NOT triggered on a bare 'address' or 'name': those appear in almost every call.
+  ['scheduling', word([
+    'book', 'booking', 'schedule', 'appointment', 'come out', 'send someone', 'send somebody',
+    'available', 'availability', 'what time', 'today', 'tomorrow', 'this week', 'gate code',
+    'buzzer', 'apartment number', 'unit number', 'nobody(?:s| is)? home', 'i(?:ll| will) be home',
+  ]), 'scheduling.txt'],
+
+  // The caller who is already angry. Not a new job: a callback about one that went wrong.
+  ['upset', word([
+    'complain\\w*', 'unacceptable', 'ridiculous', 'furious', 'angry', 'upset',
+    'never showed', 'didnt show', 'did not show', 'no ?show', 'still not fixed', 'came back',
+    'overcharged', 'rip ?off', 'refund', 'money back', 'lawyer', 'attorney', 'bbb',
+    'leave a review', 'bad review', 'third time', 'speak to the owner', 'talk to the owner',
+  ]), 'upset.txt'],
+
+  // What breaks when. The seasonal shape of a trades line, which is what David meant by the trends.
+  // ★ 'season' is NOT in this list. My own test caught it firing on "wheat season" in the
+  // human_range module, and the same trap applies here.
+  ['seasonal', word([
+    'first (?:cold|freeze|frost)', 'hard freeze', 'freeze warning', 'cold snap', 'heat ?wave',
+    'busy season', 'this time of year', 'every (?:winter|summer|spring|fall)',
+    'holiday', 'thanksgiving', 'christmas', 'new years?',
+    'storm damage', 'after the storm', 'since the rain', 'when it rains',
+  ]), 'seasonal.txt'],
+
+  // The caller who is not the homeowner. A different register and a different authorization question.
+  ['property', word([
+    'tenant', 'renter', 'i rent', 'my landlord', 'the landlord', 'property manag\\w*',
+    'management company', 'realtor', 'real estate agent', 'closing', 'inspection report',
+    'general contractor', '\\bgc\\b', 'work order', 'the owner of the (?:building|property)',
+    // ★ PLURALS. 'rental property' as a bare phrase does not match "rental properties", because the
+    // trailing \b in the built pattern requires a word boundary right after "property". A landlord
+    // with more than one is the commonest kind of landlord, so the plural was the likelier phrasing
+    // and it was the one that missed. Caught by a test, not on a call.
+    'one of (?:my|our) (?:\\w+ )?(?:properties|property|units|buildings)',
+    // ★ AND 'my property' IS NOT HERE, though it looks like the obvious sibling. A homeowner says
+    // "my property line", "the back of my property", "on my property" constantly. Adding it put
+    // landlord knowledge in front of a homeowner with a broken sprinkler on the first test run.
+    // "rental" is the word that actually carries the meaning; "property" alone does not.
+    'rental propert(?:y|ies)',
+  ]), 'property.txt'],
+
+  // The trades the first module does not cover.
+  ['trades_two', word([
+    'fridge', 'refrigerator', 'freezer', 'washer', 'dryer', 'dishwasher', 'oven', 'stove', 'range',
+    'appliance',
+    'septic', 'leach field', 'drain ?field', 'well pump', 'well water',
+    'pool', 'spa', 'hot tub', 'chlorine',
+    'locked out', 'lock ?smith', 'rekey', 'lost my key',
+    'pest', 'exterminat\\w*', 'termites?', 'roaches?', 'rodents?', 'bed bugs?',
+    'tree', 'stump', 'landscap\\w*', 'irrigation', 'sprinkler',
+    'concrete', 'masonry', 'driveway', 'foundation crack',
+    'drywall', 'flooring', 'water damage',
+  ]), 'trades_two.txt'],
+
   // Recover: the money product. Triggers on the words of an unpaid invoice, from either side.
   ['recover', word([
     'invoices?', 'unpaid', 'past due', 'overdue', 'owes? me', 'owed',
