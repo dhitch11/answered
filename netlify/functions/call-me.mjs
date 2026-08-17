@@ -294,6 +294,10 @@ async function openStore(event) {
 }
 
 const HOURS_24 = 24 * 60 * 60 * 1000;
+// How long a bare RESERVATION holds a number. Long enough to arbitrate a real double click, short
+// enough that a reservation whose dial never happened does not cost somebody their whole day. The
+// 24 hour cap applies only to a call that was actually placed.
+const RESERVATION_GRACE_MS = 90 * 1000;
 
 async function logAttempt(store, row) {
   const key = `attempt/${day(new Date())}/${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
@@ -441,10 +445,26 @@ async function handleApi(event) {
     console.error('CALL-ME: rate read failed:', String(e && e.message).slice(0, 160));
     return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
   }
+  // ★ THE CAP COUNTS CALLS THAT HAPPENED, NOT RESERVATIONS THAT DID NOT, 2026-08-16.
+  //
+  // The reservation two hundred lines below writes this same key with outcome 'reserved' BEFORE the
+  // dial, so that a second click can be arbitrated. When the dial then did not happen, for any
+  // reason, the number was left holding a `last/` record and this gate locked it out for a full DAY
+  // for a call nobody ever received. That is what happened to the first real hero click: the
+  // arbitration read failed on eventual consistency, no call was placed, and the number was still
+  // burned for 24 hours.
+  //
+  // A reservation is evidence that a request STARTED, not that a phone rang. It gets a short grace
+  // window, long enough to arbitrate a genuine double click and nowhere near long enough to punish
+  // somebody for our own failure. Only 'placed' earns the 24 hours.
   const lastAt = lastRec && Date.parse(lastRec.at || '');
-  if (Number.isFinite(lastAt) && Date.now() - lastAt < HOURS_24) {
-    const wait = Math.ceil((HOURS_24 - (Date.now() - lastAt)) / 1000);
-    return deny('called_today', 'We already called that number today. One call a day is the rule we hold ourselves to.', { retry_after_seconds: wait });
+  const placed = lastRec && lastRec.outcome === 'placed';
+  const window = placed ? HOURS_24 : RESERVATION_GRACE_MS;
+  if (Number.isFinite(lastAt) && Date.now() - lastAt < window) {
+    const wait = Math.ceil((window - (Date.now() - lastAt)) / 1000);
+    return placed
+      ? deny('called_today', 'We already called that number today. One call a day is the rule we hold ourselves to.', { retry_after_seconds: wait })
+      : deny('in_flight', 'We are already setting up a call to that number. Give it a moment, and try again if nothing arrives.', { retry_after_seconds: wait });
   }
 
   // ── 7. daily ceiling ───────────────────────────────────────────────────────
@@ -641,9 +661,30 @@ async function handleApi(event) {
   }
   await sleep(150);
   try {
-    const back = await store.get(`last/${phoneHash}`, { type: 'json' });
+    // ★ STRONGLY CONSISTENT, AND THIS IS THE WHOLE BUG, 2026-08-16.
+    //
+    // Netlify Blobs is EVENTUALLY consistent by default. This read happens 150ms after the write
+    // above, so on a first click with no competing request the read came back stale or empty, the
+    // nonce did not match, and the request was refused as if it had lost a race it was never in.
+    // The dial below never ran. David clicked the hero button once and got "that call is already
+    // on its way" for a call that was never placed.
+    //
+    // The arbitration logic was right. The read was lying to it. answered-canary.mjs already reads
+    // its own write with { consistency: 'strong' } for exactly this reason; this file used it in
+    // zero of ten reads.
+    //
+    // ★ A RACE ARBITRATOR THAT READS EVENTUALLY-CONSISTENT STORAGE DOES NOT ARBITRATE A RACE. It
+    // reports one at random, and the failure is invisible in every test that writes and reads in
+    // separate requests.
+    const back = await store.get(`last/${phoneHash}`, { type: 'json', consistency: 'strong' });
     if (!back || back.nonce !== nonce) {
-      return deny('called_today', 'That call is already on its way. Give it a minute.');
+      // ★ AND THE MESSAGE MUST NOT CLAIM A CALL IS COMING. Nothing has been dialled at this point.
+      // The old wording ("already on its way") plus the old code (`called_today`, which this is not,
+      // it is the race-loser path) told the caller a call was on the way when none existed, which is
+      // the one thing this product must never do. If a genuine second click loses the race, the
+      // FIRST click's call really is coming, so the honest sentence covers both readings without
+      // promising anything this request caused.
+      return deny('race_lost', 'Another request for this number is being handled right now. If no call arrives in a minute, try again.');
     }
   } catch (e) {
     console.error('CALL-ME: reservation read back failed:', String(e && e.message).slice(0, 160));
@@ -1013,10 +1054,16 @@ async function handleTwiml(event) {
   const token = tokenOf(event);
   try {
     store = await openStore(event);
-    if (token) rec = await store.get(`token/${token}`, { type: 'json' });
+    // ★ STRONGLY CONSISTENT for the same reason as the arbitration read-back above. This token is
+    // written moments before Twilio is asked to dial, and Twilio hits this webhook a second or two
+    // later. An eventually-consistent read can miss a write that recent, and the failure is the
+    // worst-looking one the product has: the phone rings, the caller says hello, and the TwiML
+    // endpoint refuses because it cannot find a token that exists. Silence on a call the customer
+    // asked for is worse than no call at all.
+    if (token) rec = await store.get(`token/${token}`, { type: 'json', consistency: 'strong' });
     if (!rec && p.CallSid) {
-      const bysid = await store.get(`bysid/${p.CallSid}`, { type: 'json' });
-      if (bysid && bysid.token) rec = await store.get(`token/${bysid.token}`, { type: 'json' });
+      const bysid = await store.get(`bysid/${p.CallSid}`, { type: 'json', consistency: 'strong' });
+      if (bysid && bysid.token) rec = await store.get(`token/${bysid.token}`, { type: 'json', consistency: 'strong' });
     }
   } catch (e) {
     console.error('CALL-ME TwiML: store read failed:', String(e && e.message).slice(0, 160));
