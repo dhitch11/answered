@@ -166,6 +166,33 @@ broken="$(cd "$STAGE/netlify/functions" && for f in *.mjs *.js; do [ -e "$f" ] |
 if [ -n "$broken" ]; then echo "  FAIL  these functions do not parse: $broken"; fail=1
 else echo "  ok    every function parses"; fi
 
+# ★ PARSING IS NOT LOADING, AND THE DIFFERENCE TOOK THE VOICE LINE DOWN.
+#
+# On 2026-08-17 `lib/personas.mjs` referenced an identifier that was never defined.
+# `node --check` PASSED, because the file is syntactically perfect. The gate above
+# passed. The deploy was green. And `/api/answered-brain` returned 502 to every
+# caller, `demo-health` went red, and the phone number vanished from the whole site,
+# because a ReferenceError on an undefined identifier is a RUNTIME event that only
+# fires when something actually imports the module.
+#
+# It was found by accident: a NEW function imported the same library, 502'd, and the
+# staged import named the real culprit. Nothing in this script could see it.
+#
+# So the gate is now a real `import()` of every module in the bundle. It is
+# @ANSWERED-INTEL's sweep, kept in their file rather than reimplemented here, and it
+# DISCOVERS the modules by walking the directory rather than carrying a list, so a
+# module added next month is covered without anyone remembering. It carries its own
+# positive control that fails if the sweep ever stops being able to detect a break.
+if [ -f "$REPO/research/every-function-imports.test.mjs" ]; then
+  if node "$REPO/research/every-function-imports.test.mjs" >/tmp/_import-sweep.log 2>&1; then
+    echo "  ok    every function IMPORTS ($(grep -oE '[0-9]+ passed' /tmp/_import-sweep.log | head -1))"
+  else
+    echo "  FAIL  a function throws on import. Parsing is not loading:"
+    grep -E "FAIL|Error|not defined" /tmp/_import-sweep.log | head -6 | sed 's/^/          /'
+    fail=1
+  fi
+fi
+
 # ★ EVERY FUNCTION ON DISK MUST REACH THE STAGE TREE.
 # On 2026-08-15 `/internal/competitors` was a live 404 for hours. The function was
 # on disk, parsed clean, and was in the stage tree, but was ABSENT from the deployed
