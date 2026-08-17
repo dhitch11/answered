@@ -31,3 +31,7 @@ research/data-pull.log
 #   Refresh it after any edit:
 #     cp netlify/functions/competitors.js ~/reddenda-ops-knowledge/intel/answered/
 netlify/functions/competitors.js
+
+# Written by a research agent and carries a Twilio Account SID inline. This repo is
+# PUBLIC and GitHub push protection blocked it, correctly. Keep it local.
+research/a2p-campaign-resubmit.mjs
