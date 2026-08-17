@@ -287,6 +287,31 @@ export default async function handler(req, context) {
   }
   if (!rec) rec = { started: nowIso(), profile: {}, step: 0, last4: from.slice(-4) };
 
+  // ── ★ A CAP, BECAUSE THIS ENDPOINT SPENDS MONEY ON BEHALF OF A STRANGER ────────────────────
+  //
+  // Anyone in the world can text our published number, and until now every inbound produced an
+  // outbound reply: $0.0113 per message in SMS plus carrier fees, about $11.30 per thousand, plus a
+  // model call on any message containing a question mark. There was no cap of any kind. One bored
+  // person with a script is an unbounded bill, and the first sign of it would have been the invoice.
+  //
+  // The cap is generous on purpose. A real setup is seven turns; somebody correcting an answer or
+  // asking two questions might take fifteen. Forty is far past any honest signup and far below a
+  // number that costs real money. The point is a ceiling, not a tight leash.
+  //
+  // ★ AND IT FAILS QUIET, NOT LOUD. Past the cap we record and stop REPLYING, rather than sending a
+  // "you have sent too many messages" message. Answering an abuser costs exactly the thing we are
+  // trying to stop spending. A real person who somehow reaches forty turns is not abandoned either:
+  // their record and every answer they gave is intact, and the operator can see it.
+  const CAP = 40;
+  rec.turns = (rec.turns || 0) + 1;
+  if (rec.turns > CAP) {
+    if (rec.turns === CAP + 1) {
+      console.error(`signup: ${rec.last4} passed ${CAP} turns. Recording and no longer replying.`);
+    }
+    try { await s.setJSON(sha(from), rec); } catch (e) { /* the cap holds either way */ }
+    return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+  }
+
   if (rec.stopped) {
     // They said stop. A later message re-opens the thread only if it is an explicit start.
     if (!['start', 'unstop', 'yes'].includes(word)) {
