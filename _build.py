@@ -940,7 +940,7 @@ PRICING = '''
       <div class="ifield">
         <label for="i-phone">Phone, if you want us to call</label>
         <input id="i-phone" name="phone" type="tel" autocomplete="tel" placeholder="Optional">
-        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Texting is not switched on yet, so for now what you ask for arrives by email.</p>
+        <p class="src" style="margin-top:8px">Adding your number opts you into Answered texts from {A2P_NUMBER}: the transcript, booking link, or receipt you asked for. Fewer than five a month, and it varies by what you ask for. Message and data rates may apply. Reply STOP to stop, HELP for help. <a href="/terms#texting">Terms</a> and <a href="/privacy">Privacy</a>. Carrier registration is in progress, so until it completes what you ask for arrives by email.</p>
       </div>
       <div class="ifield full">
         <label for="i-note">Anything we should know</label>
@@ -1715,7 +1715,14 @@ _SMS_BANNED = [
 # any one of these within the window makes the sentence honest rather than false
 _SMS_OK = ['not switched on', 'until texting clears', 'while texting is off',
            'not approved by the carrier', 'arrives by email', 'comes by email',
-           'by email instead', 'reaches you by email']
+           'by email instead', 'reaches you by email',
+           # Added 2026-08-16. The opt-in block on /pricing is the page BOTH carrier filings
+           # cite as consent evidence, and "texting is not switched on yet" reads to a reviewer
+           # as "there is no messaging program here" - which is the thing 30908 [MESSAGE_FLOW]
+           # keeps naming. "Carrier registration is in progress" is equally true and is the
+           # compliant order of operations. It is a status label, not a delivery promise, so it
+           # belongs in this list for the same reason every other entry does.
+           'carrier registration', 'registration is in progress']
 _SMS_WINDOW = 900
 
 
@@ -1745,8 +1752,19 @@ def _texting_guard():
     # matcher that fires on everything is as useless as one that fires on
     # nothing: this estate has shipped both.
     bad = 'It texts you the transcript inside a minute and you reply VOID to any charge.'
-    good = ('Texting is not switched on yet, so what you ask for arrives by email. '
-            'When it clears it texts you the transcript inside a minute.')
+    # ★ THE NEGATIVE CONTROL IS THE SENTENCE THAT ACTUALLY SHIPS, not a paraphrase of it.
+    # A control written in wording nobody deploys proves the guard tolerates that wording and
+    # nothing else. This is the live /pricing opt-in status line, verbatim, so if a future edit
+    # to _SMS_OK stops accepting the real page, the build refuses here rather than on the page.
+    good = ('Carrier registration is in progress, so until it completes what you ask for '
+            'arrives by email. When it completes it texts you the transcript inside a minute.')
+    # The older phrasing stays covered too, because /terms and several bands still use it.
+    good_legacy = ('Texting is not switched on yet, so what you ask for arrives by email. '
+                   'When it clears it texts you the transcript inside a minute.')
+    if _sms_hits(good_legacy):
+        print('*** BUILD REFUSED: the texting guard fired on the legacy status wording, which is '
+              'still live on /terms and in the band copy. ***', file=_sys.stderr)
+        _sys.exit(1)
     if not _sms_hits(bad):
         print('*** BUILD REFUSED: the texting guard failed its own positive control. It did not '
               'fire on a known-false sentence, so its clean result on the real pages means '

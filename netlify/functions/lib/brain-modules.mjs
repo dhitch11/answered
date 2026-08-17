@@ -59,7 +59,7 @@ export const MODULES = [
     'carbon monoxide', 'co detector', 'co alarm', 'monoxide',
     // fire and electrical
     'on fire', 'fire', 'smoke', 'smoking', 'burning smell', 'smells? (?:like )?burning',
-    'sparking', 'sparks', 'shocked me', 'electrocut\\w*',
+    'shocked me', 'electrocut\\w*',
   ]), 'safety.txt'],
 
   // The trades. THE module for this product: it fires on the words a homeowner actually uses when

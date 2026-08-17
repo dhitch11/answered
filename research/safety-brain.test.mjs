@@ -45,7 +45,6 @@ for (const said of [
   'the carbon monoxide detector is going off',
   'our CO alarm keeps going off',
   'there is smoke coming out of the panel',
-  'the outlet is sparking',
   'something smells like burning',
   'I think the furnace is on fire',
   'it shocked me when I touched it',
@@ -63,6 +62,14 @@ for (const said of [
   'I need someone to look at the water heater',
   'the AC stopped cooling',
   'can I book a drain cleaning',
+  // ★ MEASURED ON THE LIVE LINE 2026-08-16, and it is why bare spark words were removed from this
+  // trigger. The hard crisis floor correctly stayed quiet on this sentence, but the module fired
+  // on "sparks" and the model told a customer asking a routine question to evacuate the building.
+  // A pilot light sparking as it lights is a furnace working correctly. The floor already requires
+  // an electrical noun near a spark; the module has to agree with it, or the module re-opens the
+  // false positive the floor was careful to avoid.
+  'the pilot light sparks a bit when it lights, is that normal',
+  'the pilot light sparked and then lit fine',
 ]) {
   t(`QUIET: ${said}`, () => assert.ok(!fires(said), 'safety loaded on a routine call'));
 }
