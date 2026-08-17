@@ -48,6 +48,11 @@ export const ROUTES = [
   { path: '/api/answered-voice',   kind: 'api', expect: [405, 403, 200], what: 'The demo number Twilio webhook.' },
   { path: '/api/sms-inbound',      kind: 'api', expect: [405, 200], what: 'Inbound texts. Mirrors a carrier STOP into the same suppression the call path reads.' },
   { path: '/api/sms-status',       kind: 'api', expect: [405, 200], what: 'Delivery receipts. Records every transition and never collapses sent into delivered.' },
+  // THE FRONT DOOR. Every public page used to post to a waitlist while a working account system sat
+  // behind a footer link. This is the signup itself: a contractor texts, an AI walks them through
+  // the setup one question at a time, and the account is real from the first reply. Signed POST
+  // only, so a GET answering 405 is the pass and is what proves it deployed.
+  { path: '/api/signup',           kind: 'api', expect: [405, 200], what: 'Text-first signup. A contractor texts and gets set up; refuses anything it cannot verify came from Twilio.' },
   { path: '/api/answered-brain',   kind: 'api', expect: [401, 405, 200], what: 'The demo line reasoning bridge. 401 to a stranger is correct.' },
   { path: '/api/call-voice',       kind: 'api', expect: [405, 403, 200], what: 'Outbound TwiML.' },
   { path: '/api/call-turn',        kind: 'api', expect: [405, 403, 200], what: 'One outbound conversational turn.' },
