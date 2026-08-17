@@ -21,7 +21,29 @@
 
 const crypto = require('crypto');
 
+// ★ THE SEVEN NAMES BELOW WERE FIRED BY THE PAGE AND REJECTED BY THIS FILE, EVERY TIME.
+// Measured 2026-08-17 by diffing every `answeredEvent('name')` in assets/answered.js against this
+// set: seven names 400'd, and they were the ENTIRE conversion funnel for the hero control. The
+// number tapped, the call placed, the call refused, and the denominator that makes any of those
+// mean something. Every homepage load also produced a visible console error, which is its own bad
+// signal to anyone looking.
+//
+// The failure was silent in the direction that matters: the page fires and forgets, so nothing on
+// the site looked broken while the only record of whether the primary CTA works was being dropped.
+// Launching would have meant no way to answer "does the demo button convert".
+//
+// An allowlist is the right design here and it stays. The lesson is narrower: a name added to the
+// PAGE is not a name added to the COLLECTOR, and nothing connected the two. If you add an event,
+// add it here in the same commit, and check the console for a 400 before you call it done.
 const ALLOWED = new Set([
+  // the hero call control, added 2026-08-17 after measuring them being refused
+  'callme_placed',
+  'callme_refused',
+  'callme_rendered',
+  'demo_call_tapped',
+  'demo_number_copied',
+  'ring_placed',
+  'ring_refused',
   'page_view',
   'track_flip',
   'aud_choice',

@@ -113,18 +113,43 @@ async function probeBrainReady(host) {
   if (!secret) return probeFail('env not set');
   const base = (process.env.URL || (host ? 'https://' + host : '')).replace(/\/+$/, '');
   if (!base) return probeFail('no site host available for the self-call');
-  try {
-    const r = await fetch(base + '/api/answered-brain', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ warm: true }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (r.status !== 200) return { landed: true, ok: false, reason: 'bridge answered ' + r.status };
-    return { landed: true, ok: true, reason: '' };
-  } catch (e) {
-    return probeFail('request failed: ' + String(e && e.message).slice(0, 80));
+  // ★ A COLD START IS NOT AN OUTAGE, AND THE OLD BUDGET COULD NOT TELL THEM APART.
+  //
+  // Measured 2026-08-17: a WARM brain answers this probe in 0.22 to 1.29 seconds, comfortably
+  // inside five. But the estate's own measurement of answered-brain's COLD start is 7.89 seconds,
+  // so the first probe after an idle period could never pass. When it failed, every call control on
+  // the site hid itself, because they are all gated on this one boolean. An audit sampling across a
+  // quiet window measured 28 unhealthy reads in 53, all of them this same timeout.
+  //
+  // So the product looked down about half the time while being entirely up, and the most repeated
+  // CTA on the site vanished with it.
+  //
+  // The fix is a RETRY, not a bigger budget. Raising the timeout to cover a cold start would make
+  // every genuine outage take that long to report, which is the wrong trade for a gate that hides
+  // the phone number. Instead: one short attempt, and if it times out, one more. The first attempt
+  // is what wakes the function, so the second is measuring a warm brain and answers in about a
+  // second. A real outage still fails both and still reports in a few seconds.
+  //
+  // Only a TIMEOUT is retried. A non-200 is a real answer from a live bridge and is reported
+  // immediately, because retrying a 502 just delays the truth.
+  let lastErr = '';
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const r = await fetch(base + '/api/answered-brain', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ warm: true }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (r.status !== 200) return { landed: true, ok: false, reason: 'bridge answered ' + r.status };
+      return { landed: true, ok: true, reason: attempt === 1 ? '' : 'warm on the second attempt' };
+    } catch (e) {
+      lastErr = String(e && e.message).slice(0, 80);
+      // Anything that is not a timeout is a real network failure; do not spend a second attempt.
+      if (!/abort|timeout/i.test(lastErr)) break;
+    }
   }
+  return probeFail('request failed after a retry: ' + lastErr);
 }
 
 // ── probe 3: Twilio Lookup v2 on the demo number ────────────────────────────
