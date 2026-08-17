@@ -1159,6 +1159,31 @@
   var saved = null;
   try { saved = localStorage.getItem('answered_track'); } catch (e) {}
   if (location.hash === '#business' || location.hash === '#biz') saved = 'biz';
+
+  // ★ A VISITOR WHO ARRIVED FROM A CONTRACTOR PAGE HAS ALREADY TOLD US WHO THEY ARE.
+  //
+  // Measured 2026-08-17: the homepage ships two complete messages and defaults to the consumer one.
+  //   default   h1 "You never have to be on the phone again."   sub: it picks up when you cannot
+  //   biz       h1 "Every call answered. Every job booked."     sub: it answers your line at 2 AM
+  // The business variant is strictly better for a trade contractor, and every contractor landing on
+  // `/` got the consumer version and had to find a 109px toggle to reach the one written for him.
+  //
+  // The fix is NOT to flip the default. This homepage is genuinely two sided and a consumer landing
+  // cold is a real visitor we would be mis-serving in the other direction. What is safe is to honour
+  // the signal a visitor has ALREADY GIVEN US: arriving from /trades or /recover, the two pages that
+  // exist only for businesses, is a stated intent, not a guess. A referrer is read-only and carries
+  // nothing identifying.
+  //
+  // An explicit saved choice always wins. Somebody who tapped "For me" stays on "For me" even if
+  // they later arrive from a business page, because a tap is a decision and a referrer is an
+  // inference, and an inference must never overwrite a decision.
+  if (!saved) {
+    try {
+      var ref = document.referrer || '';
+      if (/\/(trades|recover)\b/.test(ref) && ref.indexOf(location.host) > -1) saved = 'biz';
+    } catch (e) { /* no referrer is not a signal, so the consumer default stands */ }
+  }
+
   apply(saved === 'biz' ? 'biz' : 'me', false);
 
   function remeasure() {
