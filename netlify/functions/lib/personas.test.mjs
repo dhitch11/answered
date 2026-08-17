@@ -20,6 +20,7 @@ import {
   noteHeader, DEFAULT_NOTE_HEADER, RILEY_SPEC_FROZEN, RILEY_BOOKING,
 } from './personas.mjs';
 import { BOOK_TOOL, WINDOWS, WINDOW_KEYS } from './tools.mjs';
+import { notesAuthorizeCallback } from '../answered-brain.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -217,13 +218,20 @@ t('a declared path removes the default route, so the default must not be relied 
 
 // ── 3. THE FLOORS, EACH ONE FIRED AND EACH ONE HELD ─────────────────────────
 
-const fires = (p, text, by, ctx = '') => {
-  const g = guardClause(p, text, ctx);
+// ★ THE STATE ARGUMENT IS OPTIONAL AND DEFAULTS TO EMPTY, WHICH IS THE STRICT CASE. Two floors are
+// conditional on facts the guard cannot read out of the text: `booked` and, since 2026-08-17,
+// `callbackOk`. Production computes both and passes them (answered-brain.mjs builds `guardState`).
+// A test that omits state is therefore testing the FULL-STRENGTH floor, which is the right default
+// and the safe failure direction - but an assertion about behaviour the owner's notes AUTHORISE has
+// to pass the same state production would, or it is asserting against a configuration that never
+// serves a real call.
+const fires = (p, text, by, ctx = '', state = {}) => {
+  const g = guardClause(p, text, ctx, state);
   assert.equal(g.ok, false, 'expected ' + by + ' to fire on: ' + text);
   assert.equal(g.by, by, 'wrong floor fired on: ' + text);
 };
-const quiet = (p, text, ctx = '') => {
-  const g = guardClause(p, text, ctx);
+const quiet = (p, text, ctx = '', state = {}) => {
+  const g = guardClause(p, text, ctx, state);
   assert.equal(g.ok, true, 'a floor (' + g.by + ') wrongly fired on: ' + text);
 };
 
@@ -362,7 +370,17 @@ t('customer: the money floor does not eat ordinary counting', () => {
 });
 
 t('customer: a callback is allowed because it is true, a text is not', () => {
-  quiet(customer, 'I will take a message and the owner will call you back.', ownerCtx());
+  // ★ "because it is TRUE" is the whole point of this test, and the truth lives in OWNER_RULES:
+  // "After hours a caller gets a message taken and the owner calls back." So this assertion has to
+  // carry the same callbackOk production would derive from those notes. Deriving it here rather
+  // than hardcoding true also makes this a live test of the detector: if notesAuthorizeCallback
+  // stops recognising the owner's own phrasing, this fails. It already did once - the detector
+  // matched `call` but not `calls`, and gagged a business that genuinely calls people back.
+  const ownerState = { callbackOk: notesAuthorizeCallback(OWNER_RULES) };
+  assert.equal(ownerState.callbackOk, true, 'the owner notes say the owner calls back; the detector must see it');
+  quiet(customer, 'I will take a message and the owner will call you back.', ownerCtx(), ownerState);
+  // and with notes that say nothing about calling back, the same sentence is refused
+  fires(customer, 'I will take a message and the owner will call you back.', 'callback-promise', ownerCtx());
   fires(customer, 'I will text you when he is on his way.', 'message-promise', ownerCtx());
   fires(customer, 'I can email you the quote.', 'message-promise', ownerCtx());
 });

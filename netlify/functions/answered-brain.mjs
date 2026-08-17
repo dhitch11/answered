@@ -329,7 +329,13 @@ function calleeNumber(body, systemText) {
 export function notesAuthorizeCallback(notes) {
   const s = String(notes || '');
   if (!s.trim()) return false;
-  return /\b(?:(?:we|i|they|the owner|someone|somebody|a tech\w*)\s+(?:will\s+|always\s+|usually\s+|do\s+|does\s+)?(?:call|ring|phone)\s+(?:them|the caller|people|customers|you)?\s*back\b|call(?:s|ing)?\s+back\s+(?:within|inside|same day|the same day|by)\b|return\s+(?:all\s+)?calls?\b|calls?\s+(?:are|get)\s+returned\b)/i.test(s);
+  // ★ THE -S FORM. The first version matched `call` but not `calls`, so the notes sentence
+  // "After hours a caller gets a message taken and the owner calls back" read as NOT authorising a
+  // callback, and the floor gagged a business that genuinely does call people back. Caught by an
+  // existing test in personas.test.mjs, whose owner-notes fixture uses exactly that phrasing.
+  // Third-person singular is the natural way an owner writes their own rules ("the owner calls
+  // back", "someone calls you back"), so it was the likelier form and it was the one that missed.
+  return /\b(?:(?:we|i|they|he|she|the owner|someone|somebody|a tech\w*|the tech\w*)\s+(?:will\s+|always\s+|usually\s+|do\s+|does\s+)?(?:calls?|rings?|phones?)\s+(?:them|the caller|people|customers|you|him|her)?\s*back\b|call(?:s|ing)?\s+back\s+(?:within|inside|same day|the same day|by)\b|return\s+(?:all\s+)?calls?\b|calls?\s+(?:are|get)\s+returned\b|gets?\s+a\s+(?:call|callback)\s+back\b)/i.test(s);
 }
 
 function moduleState(inMsgs) {
