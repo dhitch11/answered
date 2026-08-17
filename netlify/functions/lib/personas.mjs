@@ -76,7 +76,48 @@ const DAY_RE = /\b(?:monday|thursday|friday|saturday|sunday)\b/i;
 // Riley is told to do. The line between them is the claim of completion, not the mention of a time.
 const BOOKED_CLAIM_RE = /\b(?:you(?:'re| are)? all set\b|you(?:'re| are) (?:booked|scheduled|confirmed|locked in)\b|i(?:'ve| have) (?:got )?(?:you )?(?:booked|scheduled)\b|we(?:'ve| have) (?:got )?(?:you )?(?:booked|scheduled)\b|(?:it|that|the visit|the appointment)(?:'s| is| has been) (?:booked|scheduled|confirmed)\b|you(?:'re| are) on the (?:books|schedule)\b|(?:it|that)(?:'s| is) on the (?:books|schedule)\b)/i;
 
-const CRISIS_RE = /\b(?:gas leak|smell(?:s|ing)? (?:like )?gas|carbon monoxide|co (?:alarm|detector)|on fire|house fire|fire in (?:the|my)|smoke (?:coming|pouring|filling|everywhere)|spark(?:s|ing)? (?:from|out of|in the)|flooding (?:right now|bad|fast)|actively flooding|water (?:pouring|gushing|shooting))\b/i;
+// ★ THIS FLOOR ENDS THE CALL (end: true), so it is the one regex on this estate where BOTH failure
+// directions are expensive: a miss leaves somebody in a house with a hazard talking to a booking
+// voice, and a false positive hangs up on a paying customer asking about a gas furnace. It is
+// widened below, deliberately and narrowly, and `personas.test.mjs` tests both directions.
+//
+// ★ WHAT THE ORIGINAL MISSED, measured 2026-08-16 against 17 natural phrasings: 11 were not caught.
+// Three distinct bugs, all of the same family - the pattern assumed one word order and one adjacency:
+//   1. WORD ORDER. "smell(s|ing) (like )?gas" catches "I smell gas" but NOT "there is a gas smell",
+//      which is how people more often say it. Now matched both ways.
+//   2. ADJACENCY. "water (pouring|gushing)" requires the two words to touch, so "water IS pouring
+//      through the ceiling" fell straight through to the booking voice. An optional copula now sits
+//      between, here and in the smoke pattern.
+//   3. ABSENT ENTIRELY. Rotten eggs and a sulfur smell are how a gas leak is usually DESCRIBED by
+//      somebody who has not concluded it is gas. A burning smell and an electric shock were nowhere.
+//
+// ★ AND WHAT IS DELIBERATELY STILL NARROW, because widening it hangs up on customers:
+//   - "smoke" is never matched bare. A smoke detector someone wants INSTALLED is routine work, and
+//     "smoke detector in the hallway" must not end the call. Smoke only counts when it is moving
+//     (coming, pouring, filling) or located ("smoke in the utility room").
+//   - Sparks require an electrical noun nearby, in either word order. A bare /spark/ matches a pilot
+//     light sparking when it lights, which is a furnace working correctly.
+//   - "flooding" stays qualified. A yard that floods when it rains is a job, not an evacuation.
+const CRISIS_RE = new RegExp('\\b(?:' + [
+  // Gas, in both word orders, plus the two smells people report INSTEAD of saying the word gas.
+  'gas leak', 'leaking gas', 'gas smell', 'smell(?:s|ing|ed)? (?:like )?gas', 'smell of gas',
+  'rotten eggs?', 'sulfur smell', 'smells? like sulfur',
+  // Carbon monoxide. The alarm IS the evidence and never needs confirming.
+  'carbon monoxide', 'co (?:alarm|detector)',
+  // Fire.
+  'on fire', 'house fire', 'fire in (?:the|my)',
+  // Smoke, only when moving or located. Never bare (see the smoke-detector note above).
+  'smoke (?:is |was |keeps )?(?:coming|pouring|filling|everywhere)', 'smoke in (?:the|my)',
+  // Burning. A burning smell from wiring is the call that must not be booked for Tuesday.
+  'burning smell', 'smells? (?:like )?(?:something )?burning', 'something(?:s| is)? burning',
+  // Electrical, requiring an electrical noun so a sparking pilot light stays a routine call.
+  '(?:outlet|panel|breaker|wir(?:e|ing)|socket|fuse box)[^.!?]{0,24}spark(?:s|ed|ing)',
+  'spark(?:s|ed|ing)[^.!?]{0,24}(?:outlet|panel|breaker|wir(?:e|ing)|socket|fuse box)',
+  'spark(?:s|ing)? (?:from|out of|in the)', 'shocked me', 'electrocut\\w*',
+  // Water, with the adjacency bug fixed.
+  'flooding (?:right now|bad|fast)', 'actively flooding',
+  'water (?:is |was |keeps )?(?:pouring|gushing|shooting)',
+].join('|') + ')\\b', 'i');
 
 const PAYMENT_IN_RE = /\b(?:card number|credit card|debit card|social security|ssn|cvv|routing number)\b|\b\d{13,16}\b/i;
 
