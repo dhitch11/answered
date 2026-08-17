@@ -425,17 +425,25 @@ async function handleApi(event) {
     return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
   }
 
-  // ── 5. one per session ─────────────────────────────────────────────────────
-  try {
-    const seen = await store.get(`session/${sessionHash}`, { type: 'json' });
-    const at = seen && Date.parse(seen.at || '');
-    if (Number.isFinite(at) && Date.now() - at < HOURS_24) {
-      return deny('session_used', 'You already asked for a call from this browser today. Call the demo line any time.');
-    }
-  } catch (e) {
-    console.error('CALL-ME: session read failed:', String(e && e.message).slice(0, 160));
-    return deny('store_down', 'We could not set that call up right now. Please try again in a minute.');
-  }
+  // ── 5. one per session — REMOVED 2026-08-16 on David's instruction ─────────
+  //
+  // This blocked a BROWSER for 24 hours after one request. David, verbatim: "What if they want to
+  // show their co-worker and get verification that it's cool, or their wife? I don't think we should
+  // gate this until we have a lot of people signed up, so just remove the gate on it."
+  //
+  // He is right, and the gate was worse than tight: it protected nobody. A per-browser limit does
+  // not protect the person being CALLED, which is the only party who needs protecting here. It only
+  // stopped the person sitting at the keyboard from demonstrating the product, which is the single
+  // thing we most want them to do right now. Somebody wanting to show a colleague is the best
+  // outcome this page has, and we were refusing it.
+  //
+  // It is gone, not loosened. The session key is still WRITTEN below, because the arbitration nonce
+  // uses it to settle two simultaneous clicks, but nothing reads it as a limit any more.
+  //
+  // ★ WHAT STILL PROTECTS THE CALLEE, and must not be removed with it: the per-NUMBER limit below
+  // (loosened, not deleted) and the global daily ceiling. Those exist because the person whose phone
+  // rings did not necessarily type their own number in, and an unlimited dialer pointed at a
+  // stranger is harassment with our caller ID on it.
 
   // ── 6. one per number, 24 hours ────────────────────────────────────────────
   let lastRec;
@@ -457,14 +465,30 @@ async function handleApi(event) {
   // A reservation is evidence that a request STARTED, not that a phone rang. It gets a short grace
   // window, long enough to arbitrate a genuine double click and nowhere near long enough to punish
   // somebody for our own failure. Only 'placed' earns the 24 hours.
+  // ★ A FEW PER DAY, NOT ONE. David 2026-08-16: "I like the idea of not letting people do it over
+  // and over again, but I would say we should let them do it a few times."
+  //
+  // One a day was a demo killer. A person tries it, it works, they want to show somebody, and we
+  // refuse them for a day. The limit now counts PLACED calls in a rolling 24 hours and allows
+  // several, which covers showing a colleague and a spouse and still stops a number being dialled
+  // fifty times by somebody who does not own it.
   const lastAt = lastRec && Date.parse(lastRec.at || '');
   const placed = lastRec && lastRec.outcome === 'placed';
-  const window = placed ? HOURS_24 : RESERVATION_GRACE_MS;
-  if (Number.isFinite(lastAt) && Date.now() - lastAt < window) {
-    const wait = Math.ceil((window - (Date.now() - lastAt)) / 1000);
-    return placed
-      ? deny('called_today', 'We already called that number today. One call a day is the rule we hold ourselves to.', { retry_after_seconds: wait })
-      : deny('in_flight', 'We are already setting up a call to that number. Give it a moment, and try again if nothing arrives.', { retry_after_seconds: wait });
+  const perNumber = Math.max(1, Number(process.env.ANSWERED_CALLME_PER_NUMBER_DAY || 5));
+  const recent = Array.isArray(lastRec && lastRec.placed_at)
+    ? lastRec.placed_at.filter((t) => Number.isFinite(Date.parse(t)) && Date.now() - Date.parse(t) < HOURS_24)
+    : (placed && Number.isFinite(lastAt) && Date.now() - lastAt < HOURS_24 ? [lastRec.at] : []);
+
+  if (recent.length >= perNumber) {
+    const oldest = Math.min(...recent.map((t) => Date.parse(t)));
+    const wait = Math.ceil((HOURS_24 - (Date.now() - oldest)) / 1000);
+    return deny('called_today', `We have already called that number ${recent.length} times today. That is the ceiling we hold ourselves to.`, { retry_after_seconds: wait });
+  }
+  // A bare RESERVATION still gets its short grace, so two clicks in the same breath are arbitrated
+  // and a reservation whose dial never happened costs 90 seconds rather than a day.
+  if (!placed && Number.isFinite(lastAt) && Date.now() - lastAt < RESERVATION_GRACE_MS) {
+    const wait = Math.ceil((RESERVATION_GRACE_MS - (Date.now() - lastAt)) / 1000);
+    return deny('in_flight', 'We are already setting up a call to that number. Give it a moment, and try again if nothing arrives.', { retry_after_seconds: wait });
   }
 
   // ── 7. daily ceiling ───────────────────────────────────────────────────────
@@ -758,7 +782,15 @@ async function handleApi(event) {
       at: nowIso(), phone_sha256: phoneHash, phone_last4: phone.slice(-4), record: recordKey, call_sid: call.sid,
     });
     await store.setJSON(`bysid/${call.sid}`, { token, record: recordKey, phone_sha256: phoneHash });
-    await store.setJSON(`last/${phoneHash}`, { at: nowIso(), nonce, record: recordKey, outcome: 'placed', call_sid: call.sid });
+    // ★ CARRY THE PLACED-CALL TIMESTAMPS FORWARD. The per-number ceiling counts calls that actually
+    // happened inside a rolling 24 hours, so this list is the only thing that makes it work. Without
+    // it every write would reset the count to one and the ceiling would never be reached. Trimmed to
+    // the window on write so the record cannot grow without bound.
+    const prior = Array.isArray(lastRec && lastRec.placed_at) ? lastRec.placed_at : (lastRec && lastRec.outcome === 'placed' && lastRec.at ? [lastRec.at] : []);
+    const placedAt = [...prior, nowIso()]
+      .filter((t) => Number.isFinite(Date.parse(t)) && Date.now() - Date.parse(t) < HOURS_24)
+      .slice(-20);
+    await store.setJSON(`last/${phoneHash}`, { at: nowIso(), nonce, record: recordKey, outcome: 'placed', call_sid: call.sid, placed_at: placedAt });
     await store.setJSON(countKey, { n: count + 1, at: nowIso() });
   };
   try { await bind(); } catch (e) {
