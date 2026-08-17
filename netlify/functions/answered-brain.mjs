@@ -338,10 +338,14 @@ export function notesAuthorizeCallback(notes) {
   return /\b(?:(?:we|i|they|he|she|the owner|someone|somebody|a tech\w*|the tech\w*)\s+(?:will\s+|always\s+|usually\s+|do\s+|does\s+)?(?:calls?|rings?|phones?)\s+(?:them|the caller|people|customers|you|him|her)?\s*back\b|call(?:s|ing)?\s+back\s+(?:within|inside|same day|the same day|by)\b|return\s+(?:all\s+)?calls?\b|calls?\s+(?:are|get)\s+returned\b|gets?\s+a\s+(?:call|callback)\s+back\b)/i.test(s);
 }
 
-function moduleState(inMsgs) {
+function moduleState(inMsgs, lang = 'en') {
   const said = new Set();
   const turns = (inMsgs || []).filter((m) => m && m.role === 'user').map((m) => String(m.content || ''));
-  for (const t of turns.slice(0, -1)) modulesFor(t, said);   // every turn except the newest
+  // ★ REPLAYED IN THE SAME LANGUAGE AS THE LIVE CALL. This rebuilds what has already been appended
+  // by walking the transcript, so if it replayed under a different language it would rebuild the
+  // WRONG set: modules that never loaded would look loaded, and modules that did would look fresh
+  // and append a second time. Appending twice is the single most machine-like thing a voice can do.
+  for (const t of turns.slice(0, -1)) modulesFor(t, said, lang);   // every turn except the newest
   return said;
 }
 
@@ -594,7 +598,11 @@ export default async (req) => {
   // imported it, so a caller could say "my water heater is leaking" and the trades knowledge sat on
   // disk unread. Built, wired and never fed, in my own work, one commit after writing a comment
   // warning about exactly that. The modules are only real from this line down.
-  const fresh = modulesFor(lastUser, moduleState(inMsgs));
+  // ★ THE PERSONA'S LANGUAGE DECIDES WHICH KNOWLEDGE CAN LOAD. Without this argument the Spanish
+  // line would pull English modules on shared trigger words - "gas", "breaker", "AC" are all said in
+  // US Spanish - and drop four thousand characters of English prose into a Spanish call mid-sentence.
+  // Defaults to 'en' when a persona does not declare one, which is every English persona.
+  const fresh = modulesFor(lastUser, moduleState(inMsgs, persona.lang), persona.lang || 'en');
   for (const m of fresh) system += '\n\n' + m.text;
   if (fresh.length) console.log(`answered-brain: loaded knowledge [${fresh.map((m) => m.name).join(', ')}] for ${persona.id}`);
 

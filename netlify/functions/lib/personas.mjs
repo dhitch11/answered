@@ -861,6 +861,7 @@ export const PERSONAS = {
   // A guard architecture is a claim about the language it guards.
   customer_es: {
     id: 'customer_es',
+    lang: 'es',
     label: "a paying business's own line, in Spanish",
     outModel: 'answered-customer-es',
     direction: 'inbound',

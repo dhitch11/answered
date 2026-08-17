@@ -171,6 +171,59 @@ export const MODULES = [
     'collections?', 'chase payment', 'net thirty', 'net 30', 'outstanding balance',
     'never paid', 'has not paid', 'wont pay', 'receivables?',
   ]), 'recover.txt'],
+
+  // ── SPANISH ────────────────────────────────────────────────────────────────────────────────────
+  // Every entry carries the 'es' tag, which is what keeps it off an English call and keeps the
+  // English modules off a Spanish one.
+  //
+  // ★ NOTE WHAT IS ABSENT FROM THE SAFETY TRIGGER: the clearest hazard phrasings are handled by
+  // lib/crisis-es.mjs BEFORE the model runs, and that floor ENDS the call. This module is the narrow
+  // band the floor cannot catch - somebody describing something worrying in words the floor does not
+  // know, or minimising it - so it fires on the MINIMISER, not on the hazard.
+  ['safety_es', word([
+    'no creo que sea nada', 'ha de ser nada', 'es poquito', 'poquito nada m[aá]s', 'siempre lo hace',
+    'ya lleva d[ií]as as[ií]', 'no es para tanto', 'de seguro no es nada', 'me da pena molestar',
+    'huele raro', 'huele feo', 'algo raro', 'ruido raro', 'me preocupa',
+  ]), 'safety_es.txt', 'es'],
+
+  ['trades_es', word([
+    'se tap[oó]', 'tapado', 'no baja', 'destapar', 'drenaje', 'ca[ñn]o', 'fregadero', 'lavabo',
+    'lavamanos', 'inodoro', 'escusado', 'excusado', 'regadera', 'ducha', 'tina', 'ba[ñn]era',
+    'calentador', 'calent[oó]n', 'b[oó]iler', 'agua caliente', 'gotea', 'llave', 'grifo', 'pluma',
+    'tuber[ií]a', 'tubo', 'fuga',
+    'no enfr[ií]a', 'no calienta', 'el aire', 'clima', 'aire acondicionado', 'minisplit',
+    'calefacci[oó]n', 'termostato',
+    'breaker', 'pastilla', 'se bot[oó]', 'se brinc[oó]', 'contacto', 'enchufe', 'tomacorriente',
+    'apagador', 'foco', 'bombillo', 'se fue la luz', 'parpadean',
+    'techo', 'tejas', 'gotera', 'se meti[oó] el agua', 'filtrando',
+    'lavadora', 'secadora', 'refri', 'nevera', 'refrigerador', 'estufa', 'horno', 'lavaplatos',
+  ]), 'trades_es.txt', 'es'],
+
+  ['human_range_es', word([
+    'llov(?:i[oó]|iendo)', 'lluvia', 'fr[ií]o', 'calor', 'helada', 'chispea\\w*', 'granizo',
+    'tormenta', 'viento', 'clima',
+    'mi esposa', 'mi esposo', 'mi mam[aá]', 'mi pap[aá]', 'los ni[ñn]os', 'mi hijo', 'mi hija',
+    'la familia', 'el trabajo', 'ando ocupado', 'ando manejando', 'en la obra',
+  ]), 'human_range_es.txt', 'es'],
+
+  ['money_es', word([
+    'cu[aá]nto', 'cu[aá]nto cobran', 'cu[aá]nto cuesta', 'precio', 'costo', 'cotizaci[oó]n',
+    'presupuesto', 'aproximado', 'la visita', 'el viaje', 'cobran por venir', 'muy caro',
+    'm[aá]s barato', 'seguro lo cubre', 'garant[ií]a', 'el due[ñn]o paga', 'el landlord',
+  ]), 'money_es.txt', 'es'],
+
+  ['scheduling_es', word([
+    'cita', 'agendar', 'programar', 'cu[aá]ndo pueden', 'cu[aá]ndo viene', 'a qu[eé] hora',
+    'hoy', 'ma[ñn]ana', 'esta semana', 'puede venir', 'mandar a alguien', 'mi direcci[oó]n',
+    'el port[oó]n', 'el c[oó]digo', 'el perro', 'el timbre', 'no hay nadie', 'voy a estar',
+  ]), 'scheduling_es.txt', 'es'],
+
+  ['upset_es', word([
+    'queja', 'me quejo', 'inaceptable', 'es el colmo', 'estoy molesto', 'estoy enojad[oa]',
+    'nunca vinieron', 'no lleg[oó] nadie', 'no vino nadie', 'ya van (?:dos|tres) veces',
+    'sigue igual', 'me cobraron de m[aá]s', 'reembolso', 'mi dinero', 'abogado', 'una rese[ñn]a',
+    'quiero hablar con el due[ñn]o',
+  ]), 'upset_es.txt', 'es'],
 ];
 
 // Read once per process. These files are small and immutable at runtime; re-reading them per turn
@@ -196,11 +249,23 @@ function read(file) {
  * @param {Set<string>} loaded module names already appended in this call, mutated here
  * @returns {{name:string, text:string}[]}
  */
-export function modulesFor(said, loaded) {
+/**
+ * @param {string} said        the caller's turn
+ * @param {Set<string>} loaded modules already appended in this call, mutated here
+ * @param {string} [lang]      'en' or 'es'. Defaults to 'en'.
+ *
+ * ★ LANGUAGE SCOPING IS NOT COSMETIC. Several trigger words are shared across the two languages -
+ * "gas", "breaker", "AC", "no heat" all appear in US Spanish speech - so without scoping an ENGLISH
+ * module loads on a Spanish call and the voice gets four thousand characters of English knowledge
+ * mid-sentence. The reverse is rarer but no better. A module declares its language and only its
+ * language's calls can load it.
+ */
+export function modulesFor(said, loaded, lang = 'en') {
   const text = String(said || '');
   if (!text.trim()) return [];
   const out = [];
-  for (const [name, trigger, file] of MODULES) {
+  for (const [name, trigger, file, moduleLang = 'en'] of MODULES) {
+    if (moduleLang !== lang) continue;
     if (loaded.has(name)) continue;
     if (!trigger.test(text)) continue;
     const body = read(file);
