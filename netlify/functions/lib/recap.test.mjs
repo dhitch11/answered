@@ -107,7 +107,7 @@ const REAL_SHAPE = {
     },
     analysis: { call_successful: 'success', transcript_summary: 'A brief test call.', call_summary_title: 'Test call' },
     transcript: [
-      { role: 'agent', message: 'Cedar Ridge Plumbing and Air. This is Riley, an AI assistant, and this call is recorded. What is going on?', time_in_call_secs: 0 },
+      { role: 'agent', message: 'Cedar Ridge Plumbing and Air. This is Thomas, an AI assistant, and this call is recorded. What is going on?', time_in_call_secs: 0 },
       { role: 'user', message: 'Proof engineer test call, ending', time_in_call_secs: 25 },
     ],
   },
@@ -154,9 +154,19 @@ test('a phone conversation is keyed by its Twilio sid; a browser one by its conv
 
 // ── disclosure, read off the wire ──────────────────────────────────────────────────────────────
 
+// ★ THE NAME IN THESE FIXTURES IS INPUT, NOT AN ASSERTION. They feed the disclosure detector a
+// realistic agent line and check what it concludes; the assistant's name is incidental and the test
+// would pass with any name. It was "Riley" until the rename and is now "Thomas" so the fixtures do
+// not describe a world that stopped existing - but correcting it changes no outcome here.
+//
+// ★ WHAT THESE TESTS GENUINELY CANNOT DO, AND WHY IT MATTERS: the greeting we ACTUALLY say lives in
+// ElevenLabs agent config, not in this repo. So this file proves the DETECTOR is right; it can never
+// prove the SHIPPED greeting passes it. /recording makes a public promise on that greeting's behalf.
+// research/live-disclosure-check.mjs closes that loop by reading the live first_message off the API
+// and running it through this same detector.
 test('disclosure is judged from what we actually said, and it is allowed to say no', () => {
   const good = disclosureFromTranscript([
-    { speaker: 'agent', text: 'Cedar Ridge Plumbing. This is Riley, an AI assistant, and this call is recorded.' },
+    { speaker: 'agent', text: 'Cedar Ridge Plumbing. This is Thomas, an AI assistant, and this call is recorded.' },
     { speaker: 'user', text: 'ok' },
   ]);
   assert.equal(good.all, true);

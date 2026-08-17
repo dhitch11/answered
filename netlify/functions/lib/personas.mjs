@@ -4,6 +4,14 @@
 // so every floor in it can be asserted without a phone.
 //
 // ★ WHY ONE FILE AND ONE BRIDGE, INSTEAD OF THREE.
+// ★ "riley" IS A ROUTE NAME. "Thomas" IS WHAT THE VOICE SAYS. Do not reconcile them.
+// The persona id `riley` is load-bearing: it is in config.path as /api/answered-brain/riley, it is
+// the ElevenLabs agent's configured LLM URL, and it is pinned by the frozen-spec digest test.
+// Renaming the id would 404 a live agent silently, which is precisely the failure the literal route
+// table exists to prevent. The SPOKEN name changed to Thomas on David's instruction and the spec
+// says "You are Thomas"; every customer-facing and operator-facing string has been updated to match.
+// Comments below that still say Riley are describing the slot, not the voice.
+//
 // Before this file there was one persona (Riley, the inbound demo receptionist)
 // living inside answered-brain.mjs with ten guard floors around her, and a
 // SECOND, UNGUARDED language layer inside call-turn.mjs that talked to the same

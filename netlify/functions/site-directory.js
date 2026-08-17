@@ -114,7 +114,7 @@ function directoryPage() {
 <h2>The phone</h2>
 <div class="card"><span class="u">+1 (916) 282-5278</span><span class="tag">live</span>
 <p class="k">★ CORRECTED 2026-08-15. This card named <span class="u">+1 (916) 350-4869</span> and tagged it live. That number is DEAD: it belonged to the previous Twilio account, which is finished. The live demo line is +1 (916) 282-5278, which is the number the site publishes on /pricing and the one the A2P campaign registers. A directory that names a dead number as live sends the next person to a disconnected line and makes them doubt the rest of the page.</p>
-<p>The demo line. Riley answers as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. First sentence always: AI assistant, call recorded. It will not quote prices, will not take card numbers, sends real emergencies to 911, and answers honestly when asked if it is an AI or a demo. Call it and try to break it, that is what it is for.</p>
+<p>The demo line. Thomas answers as Cedar Ridge Plumbing and Air, a clearly fictional demo shop. First sentence always: AI assistant, call recorded. It will not quote prices, will not take card numbers, sends real emergencies to 911, and answers honestly when asked if it is an AI or a demo. Call it and try to break it, that is what it is for.</p>
 <p class="k">This number is Answered's own, bought fresh. It is not connected to any other platform's numbers and never will be. A real test call is placed through the whole path every two hours (the canary); two fails in a row and every call button on the site removes itself automatically.</p></div>
 
 <h2>The machinery (functions)</h2>
