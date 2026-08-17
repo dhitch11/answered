@@ -813,6 +813,37 @@ async function handleApi(event) {
     console.error('CALL-ME: post dial binding failed (the call IS placed):', String(e && e.message).slice(0, 160));
   }
 
+  // ── WARM THE BRAIN, because we know a conversation is about to start ───────
+  //
+  // ★ MEASURED 2026-08-16 through the live endpoint: 7.89s COLD, 1.90s warm. That eight seconds is
+  // not spread across a call, it lands entirely on the FIRST turn, which is the first thing a new
+  // customer ever hears: silence. Inside a call the container stays warm because ElevenLabs hits it
+  // every turn, so the cold start hits precisely the moment that matters most and never shows up
+  // again for the rest of the conversation.
+  //
+  // ★ WHY HERE AND NOT A SCHEDULED FUNCTION. A cron keep-warm burns invocations around the clock to
+  // catch a handful of calls, and this estate has already measured that frequent deploys starve
+  // low-frequency scheduled functions to the point of never running. Here we have something a cron
+  // never has: certain knowledge that a conversation begins in about ten seconds, because we just
+  // dialled it. The ring gives us the warm-up window for free.
+  //
+  // ★ IT IS FIRE AND FORGET, AND MUST STAY THAT WAY. The phone is already ringing. Nothing below
+  // this line may delay, fail, or alter a call that is already placed, so there is no await on the
+  // response and every outcome is swallowed. {"describe":true} returns the persona registry without
+  // spending a single model token, so warming costs nothing but the container.
+  try {
+    const brainSecret = (process.env.ANSWERED_BRAIN_SECRET || '').trim();
+    if (brainSecret) {
+      const warmUrl = `${base}/api/answered-brain/onboard`;
+      fetch(warmUrl, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${brainSecret}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ describe: true }),
+        signal: AbortSignal.timeout(4000),
+      }).catch(() => { /* a cold brain is slow, never broken; this is an optimisation only */ });
+    }
+  } catch (e) { /* unreachable in practice, and still not allowed to matter */ }
+
   await logAttempt(store, {
     at: nowIso(), outcome: 'placed', call_sid: call.sid, status: call.status,
     phone_sha256: phoneHash, phone_last4: phone.slice(-4), area: n.area,
