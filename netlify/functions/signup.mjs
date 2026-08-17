@@ -48,6 +48,7 @@ import { PERSONAS, guardWhole } from './lib/personas.mjs';
 // reply. Consent withdrawal must not depend on somebody typing one word in isolation.
 import { isStop } from './lib/scripts.mjs';
 import { startAccount, saveConfig, dbConfigured } from './lib/accounts.mjs';
+import { rpc } from './lib/db.mjs';
 import { notifyOperator } from './lib/account-notify.mjs';
 
 export const config = {
@@ -269,7 +270,12 @@ export default async function handler(req, context) {
       // has to survive a dispute was the path that erased its own evidence.
       const rec = (await s.get(sha(from), { type: 'json', consistency: 'strong' })) || {};
       rec.stopped = nowIso();
-      await s.setJSON(sha(from), rec);
+      // A write failure must not throw: an unhandled rejection here is a 502, and Twilio
+      // answers a 502 by REDELIVERING the same message, which lands the answer one field to
+      // the right. Losing a write costs one turn; throwing costs a corrupted record.
+      try { await s.setJSON(sha(from), rec); } catch (e) {
+        console.error('signup: write failed for ' + rec.last4 + '; ' + String(e && e.message).slice(0, 90));
+      }
     } catch (e) { /* the carrier stop still stands; ours is the redundant half */ }
     console.log('signup: STOP received; the setup thread is closed for this number.');
     return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
@@ -345,6 +351,45 @@ export default async function handler(req, context) {
   // "you have sent too many messages" message. Answering an abuser costs exactly the thing we are
   // trying to stop spending. A real person who somehow reaches forty turns is not abandoned either:
   // their record and every answer they gave is intact, and the operator can see it.
+  // ★ THE BLOB COUNTER BELOW CANNOT SURVIVE A BURST, AND IT WAS MEASURED FAILING.
+  //
+  // 30 signed messages fired concurrently from one number: 30 replies, counter left reading 1.
+  // `rec.turns = (rec.turns || 0) + 1` is a read-modify-write, Netlify Blobs v8 has no
+  // compare-and-swap (`onlyIfMatch` does not exist in this version), so every lambda in a burst
+  // reads the same value and writes the same value. The effective cap was 40 x burst concurrency,
+  // and worse, a SUSTAINED attacker never accumulated: each new burst read the same stale count.
+  // It stopped a polite person and did nothing to a script.
+  //
+  // So the real gate is Postgres, which the estate already built for exactly this and which I
+  // should have looked for before writing a counter. `sv_rate_take` is
+  // `insert ... on conflict do update set n = n + 1 returning n`, one atomic statement: concurrent
+  // callers serialise on the row and no increment is lost.
+  //
+  // 60 an hour per number. A real setup is seven turns and the whole conversation takes minutes, so
+  // 60 is far past any honest signup while bounding a scripted sender to about $0.68 an hour.
+  //
+  // ★ IT FAILS CLOSED, matching `truce.mjs`. A rate limiter we cannot read is not permission to
+  // spend money on an unattributable request. The blob counter stays underneath as a second,
+  // weaker gate: it is exact when messages arrive one at a time, which is the ordinary case, and it
+  // still holds if the database is configured away.
+  try {
+    const gate = await rpc('sv_rate_take', {
+      p_bucket: 'signup_sms', p_key: from, p_limit: 60, p_window: '1 hour',
+    });
+    if (!gate || gate.allowed !== true) {
+      console.error(`signup: ${from.slice(-4)} is over the hourly rate limit. Silent.`);
+      return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+    }
+  } catch (e) {
+    if (dbConfigured()) {
+      console.error('signup: rate limiter unreadable; going silent rather than spending on an '
+        + 'unattributable request. ' + String(e && e.message).slice(0, 100));
+      return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+    }
+    // No database configured at all is a different situation from one that will not answer: the
+    // blob counter below is then the only gate we have, and it is better than none.
+  }
+
   const CAP = 40;
   rec.turns = (rec.turns || 0) + 1;
   if (rec.turns > CAP) {
@@ -392,7 +437,12 @@ export default async function handler(req, context) {
   // Skip anything already known, without ever moving backwards.
   while (rec.step < STEPS.length && rec.profile[STEPS[rec.step].key]) rec.step += 1;
   if (rec.step >= STEPS.length) rec.step = -1;
-  await s.setJSON(sha(from), rec);
+  // A write failure must not throw: an unhandled rejection here is a 502, and Twilio
+  // answers a 502 by REDELIVERING the same message, which lands the answer one field to
+  // the right. Losing a write costs one turn; throwing costs a corrupted record.
+  try { await s.setJSON(sha(from), rec); } catch (e) {
+    console.error('signup: write failed for ' + rec.last4 + '; ' + String(e && e.message).slice(0, 90));
+  }
 
   if (rec.step === -1) {
     // ★ THE DEFECT THIS BLOCK EXISTS TO FIX, AND IT WAS THE WORST ONE IN THE PRODUCT.
@@ -512,7 +562,12 @@ export default async function handler(req, context) {
   // Remember which delivery produced this reply, so a Twilio retry of the SAME message replays the
   // same answer instead of being recorded as a new one.
   if (msgSid) { rec.lastSid = msgSid; rec.lastLine = line; }
-  await s.setJSON(sha(from), rec);
+  // A write failure must not throw: an unhandled rejection here is a 502, and Twilio
+  // answers a 502 by REDELIVERING the same message, which lands the answer one field to
+  // the right. Losing a write costs one turn; throwing costs a corrupted record.
+  try { await s.setJSON(sha(from), rec); } catch (e) {
+    console.error('signup: write failed for ' + rec.last4 + '; ' + String(e && e.message).slice(0, 90));
+  }
 
   return new Response(reply(line).body, { status: 200, headers: { 'Content-Type': 'text/xml' } });
 }
