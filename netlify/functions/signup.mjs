@@ -28,9 +28,12 @@
 //     messages, and prompt instructions do not hold: the estate has seven output floors precisely
 //     because the model agreed to a rule and then broke it. Reusing them is not laziness, it is the
 //     only version that is safe.
-//  2. Write a half-account. The account row is created on the FIRST reply, so a person who stops
-//     halfway is a real account with an honest missing list, not a lost lead. Every later answer is
-//     an update to a row that already exists.
+//  2. Collect and go nowhere. On completion this writes a real account row via sv_account_start,
+//     saves the config, and emails the operator. ★ THAT PARAGRAPH USED TO SAY the account was
+//     created on the first reply, and it was FALSE: nothing in this file touched the account system
+//     and nothing anywhere read the store it wrote to. Every finished signup was told "a person
+//     assigns your number" and no person was told. A comment claiming a behaviour the code does not
+//     have is worse than no comment, because it reads as documentation and stops anyone checking.
 //  3. Text anyone who did not text us. This function only ever REPLIES. It is driven by inbound
 //     webhook, never by a scheduler, so it cannot become outreach by accident.
 //  4. Claim the line is live. It is not live until a number is assigned, which is a human step, and
@@ -39,6 +42,13 @@
 import crypto from 'node:crypto';
 import * as blobs from '@netlify/blobs';
 import { PERSONAS, guardWhole } from './lib/personas.mjs';
+// ★ isStop() carries twenty real phrasings and the voice path already uses it. A bare keyword match
+// caught 3 of 12 ways people actually say stop: "STOP texting me", "please stop", "remove me from
+// this list", "quit texting", "unsubscribe me" and the Spanish forms all fell through and got a
+// reply. Consent withdrawal must not depend on somebody typing one word in isolation.
+import { isStop } from './lib/scripts.mjs';
+import { startAccount, saveConfig, dbConfigured } from './lib/accounts.mjs';
+import { notifyOperator } from './lib/account-notify.mjs';
 
 export const config = {
   // A LITERAL. Netlify reads this by static analysis at bundle time and silently drops a computed
@@ -244,10 +254,20 @@ export default async function handler(req, context) {
   // Twilio's Advanced Opt-Out already replies at platform level, so we answer with empty TwiML and
   // let the platform speak. What we must do is stop the SETUP thread as well, which the platform
   // knows nothing about.
-  if (['stop', 'stopall', 'unsubscribe', 'cancel', 'end', 'quit', 'optout', 'revoke'].includes(word)) {
+  // ★ isStop() RATHER THAN A KEYWORD LIST. Measured against twelve real phrasings, the bare list
+  // caught three. "STOP texting me", "please stop", "stop sending me texts", "unsubscribe me",
+  // "remove me from this list", "quit texting", "no thanks, stop" and the Spanish forms all fell
+  // through and got a reply, because `replace(/[^a-z]/g,'')` collapses the whole body into one
+  // string and only an isolated keyword can match it. isStop() carries twenty patterns and the
+  // voice path already trusts it. A person who says stop has said stop, however they phrase it.
+  if (isStop(said)) {
     try {
       const s = store(event, 'signup');
-      const rec = (await s.get(sha(from), { type: 'json' })) || {};
+      // ★ STRONG CONSISTENCY HERE TOO. This read was the ONE left eventually consistent, and it is
+      // the highest-stakes path in the file. Measured: with the store lagging, a STOP read null,
+      // wrote `{stopped}` over a record holding five real answers, and destroyed it. The path that
+      // has to survive a dispute was the path that erased its own evidence.
+      const rec = (await s.get(sha(from), { type: 'json', consistency: 'strong' })) || {};
       rec.stopped = nowIso();
       await s.setJSON(sha(from), rec);
     } catch (e) { /* the carrier stop still stands; ours is the redundant half */ }
@@ -281,11 +301,26 @@ export default async function handler(req, context) {
     // and the fault was the store read being swallowed.
     //
     // A store that cannot be read is an incident, not a new customer. Say so.
-    rec = null;
+    // ★ A FAILED READ MUST NOT WRITE. This used to fall through to a fresh record which was then
+    // SAVED over the real one: measured, a thread holding four answers became `{profile:{}}` after
+    // a single failed read. The comment said it would "repeat the first question"; the actual
+    // damage was permanent data loss. A store we cannot read is a store we must not overwrite.
     console.error('signup: COULD NOT READ the thread for ' + from.slice(-4)
-      + '; treating as new, which will repeat the first question. ' + String(e && e.message).slice(0, 120));
+      + '; replying with nothing rather than overwriting a record we cannot see. '
+      + String(e && e.message).slice(0, 120));
+    return new Response(EMPTY_TWIML, { status: 200, headers: { 'Content-Type': 'text/xml' } });
   }
   if (!rec) rec = { started: nowIso(), profile: {}, step: 0, last4: from.slice(-4) };
+
+  // ★ IDEMPOTENCY. Twilio retries on a timeout or a non-2xx, and a retry used to be recorded as a
+  // NEW ANSWER: the same message landed one field to the right, so "Thomas" ended up in
+  // service_area and the question that field belonged to was never asked. The record then looked
+  // complete and was wrong. Measured twice, on two different fields.
+  const msgSid = String(params.MessageSid || params.SmsSid || '').trim();
+  if (msgSid && rec.lastSid === msgSid) {
+    console.log(`signup: duplicate delivery of ${msgSid} for ${rec.last4}; replying, recording nothing.`);
+    return new Response(reply(rec.lastLine || HELP_LINE).body, { status: 200, headers: { 'Content-Type': 'text/xml' } });
+  }
 
   // ── ★ A CAP, BECAUSE THIS ENDPOINT SPENDS MONEY ON BEHALF OF A STRANGER ────────────────────
   //
@@ -352,8 +387,86 @@ export default async function handler(req, context) {
   await s.setJSON(sha(from), rec);
 
   if (rec.step === -1) {
+    // ★ THE DEFECT THIS BLOCK EXISTS TO FIX, AND IT WAS THE WORST ONE IN THE PRODUCT.
+    //
+    // Until now this wrote a blob and returned a sentence. NOTHING read that blob: a repo-wide
+    // grep for the store name returned exactly two hits, both inside this file. No database row, no
+    // email, no HubSpot, no operator view. Every contractor who finished setup was told "a person
+    // assigns your number" and no person was ever told. At a hundred signups that is a hundred
+    // customers who did the work, believed us, and were invisible.
+    //
+    // Worse, this file's own header claimed "the account row is created on the FIRST reply" using
+    // sv_account_start. That code did not exist. I wrote a false claim in a comment and it read as
+    // documentation for hours, which is exactly the failure this estate keeps paying for.
+    //
+    // ★ THE CURSOR IS RETIRED HERE, ON PURPOSE. rec.asked stays pointing at the last question
+    // forever unless it is cleared, so every message a person sends AFTER finishing overwrites the
+    // escalation phone: "thanks!" became the number a real emergency rings. Measured. It is now
+    // null, and a finished thread stops recording answers.
+    rec.asked = null;
     rec.done = rec.done || nowIso();
-    await s.setJSON(sha(from), rec);
+
+    // Fire the handoff ONCE. A person who texts again after finishing must not create a second
+    // account or a second alert.
+    if (!rec.handedOff) {
+      rec.handedOff = nowIso();
+      const p = rec.profile || {};
+      const email = String(p.booking_destination || '').trim();
+
+      // The account itself. Best effort and NEVER fatal: the setup is already captured, and losing
+      // the reply because a database was slow would be a worse outcome than a delayed row.
+      if (dbConfigured() && /@/.test(email)) {
+        try {
+          const r = await startAccount({
+            email,
+            businessName: String(p.business_name || '').slice(0, 200),
+            ownerName: '',
+            phone: from,
+            trade: String(p.trade || '').slice(0, 80),
+            tokenHash: sha('signup-thread:' + from + ':' + rec.done),
+          });
+          const id = r && (r.account_id || r.id);
+          if (id) {
+            rec.accountId = id;
+            await saveConfig(id, {
+              greeting_name: String(p.greeting_name || '').slice(0, 80),
+              business_says: String(p.business_name || '').slice(0, 200),
+              service_area: String(p.service_area || '').slice(0, 200),
+              escalation_phone: String(p.escalation_phone || '').slice(0, 40),
+              booking_destination: email,
+            }, 'signup-thread');
+          }
+        } catch (e) {
+          console.error('signup: account write failed for ' + rec.last4 + ', the setup is still '
+            + 'stored and the operator is still told: ' + String(e && e.message).slice(0, 120));
+        }
+      }
+
+      // The human. This is the promise the closing sentence makes, so it is the one thing that must
+      // happen even when the database does not.
+      try {
+        await notifyOperator({
+          subject: `Answered signup: ${p.business_name || 'a new line'} (${rec.last4})`,
+          lines: [
+            `Business: ${p.business_name || '-'}`,
+            `Trade: ${p.trade || '-'}`,
+            `Line says: ${p.greeting_name || '-'}`,
+            `Area: ${p.service_area || '-'}`,
+            `Hours: ${p.hours_text || '-'}`,
+            `Bookings to: ${email || '-'}`,
+            `Emergencies to: ${p.escalation_phone || '-'}`,
+            `Set up by text from a number ending ${rec.last4}.`,
+            rec.accountId ? `Account ${rec.accountId}.` : 'No account row was written; assign by hand.',
+            'They have been told a person assigns their number. Nothing answers for them yet.',
+          ],
+        });
+      } catch (e) {
+        console.error('signup: OPERATOR WAS NOT TOLD about ' + rec.last4 + '. '
+          + String(e && e.message).slice(0, 120));
+      }
+    }
+
+    try { await s.setJSON(sha(from), rec); } catch (e) { /* the handoff already happened */ }
     console.log(`signup: setup complete for ${rec.last4} (${Object.keys(rec.profile).length} fields).`);
     return new Response(reply(DONE_LINE).body, { status: 200, headers: { 'Content-Type': 'text/xml' } });
   }
@@ -388,6 +501,9 @@ export default async function handler(req, context) {
   const line = firstEver ? `${GREET} ${asked}` : asked;
   rec.greeted = true;
   rec.asked = rec.step;
+  // Remember which delivery produced this reply, so a Twilio retry of the SAME message replays the
+  // same answer instead of being recorded as a new one.
+  if (msgSid) { rec.lastSid = msgSid; rec.lastLine = line; }
   await s.setJSON(sha(from), rec);
 
   return new Response(reply(line).body, { status: 200, headers: { 'Content-Type': 'text/xml' } });
