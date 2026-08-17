@@ -147,15 +147,52 @@ export default async function handler(req, context) {
 
   try {
     if (STOP_WORDS.has(word)) {
-      // The same key the call path checks as gate 4. One word, every door.
-      await store.setJSON(`stop/${h}`, {
+      // ★ TWO STORES, BECAUSE THERE ARE TWO GATES. FIXED 2026-08-17.
+      //
+      // This block used to write ONE key and claim "one word, every door". Measured, that comment
+      // was true for exactly one door out of five. `call-me.mjs` reads this Blobs key as its gate 4.
+      // Every OTHER path that places a call - lib/dial.mjs, lib/outbox.mjs, lib/hold-runtime.mjs,
+      // lib/jobs.mjs and recover.mjs - gates on `sv_dial_context` in Postgres and has never read
+      // this key. `consent-sync.mjs` bridges `record/` and not `stop/`, so nothing carried it over.
+      //
+      // So a person who texted STOP stopped getting texts (Twilio's platform opt-out) and stopped
+      // getting the website's setup call, and could still be DIALLED by four other paths. One of
+      // those is recover.mjs, which makes debt-collection calls, where stop-means-stop is not a
+      // preference: FDCPA 1692c(c) ends contact on the first hearing, and this file's own knowledge
+      // module says exactly that.
+      //
+      // Both writes are attempted independently and neither is allowed to swallow the other.
+      const blobWrite = store.setJSON(`stop/${h}`, {
         at: nowIso(),
         source: 'sms',
         keyword: word,
         message_sid: params.MessageSid || null,
         phone_last4: from.slice(-4),
+      }).then(() => true).catch((e) => {
+        console.error(`sms-inbound: STOP BLOBS WRITE FAILED for ${from.slice(-4)}: ${String(e && e.message).slice(0, 140)}`);
+        return false;
       });
-      console.log(`sms-inbound: STOP recorded from ${from.slice(-4)} via "${word}"; voice and text are now both suppressed for this number.`);
+
+      // ★ IMPORTED LAZILY, ON THIS BRANCH ONLY. A STOP must never fail because a database module
+      // could not load on a path that had nothing to do with it, and the vast majority of inbound
+      // messages are not STOPs.
+      const pgWrite = import('./lib/db.mjs')
+        .then((db) => db.suppress(from, `sms ${word}`, 'sms-inbound'))
+        .then(() => true)
+        .catch((e) => {
+          console.error(`sms-inbound: STOP POSTGRES WRITE FAILED for ${from.slice(-4)}: ${String(e && e.message).slice(0, 140)}. The dial paths gated on sv_dial_context will NOT see this stop.`);
+          return false;
+        });
+
+      const [blobOk, pgOk] = await Promise.all([blobWrite, pgWrite]);
+      if (blobOk && pgOk) {
+        console.log(`sms-inbound: STOP recorded from ${from.slice(-4)} via "${word}" in BOTH stores; every dial path and text path is suppressed for this number.`);
+      } else {
+        // ★ A PARTIAL STOP IS AN INCIDENT, NOT A WARNING. Say which door is still open, by name,
+        // because the next reader needs to know what to close by hand.
+        console.error(`sms-inbound: PARTIAL STOP for ${from.slice(-4)} — blobs=${blobOk ? 'ok' : 'FAILED'} postgres=${pgOk ? 'ok' : 'FAILED'}. ` +
+          `${!pgOk ? 'recover/dial/outbox/hold-runtime/jobs can still call this number. ' : ''}${!blobOk ? 'call-me can still call this number. ' : ''}Close it by hand.`);
+      }
     } else if (START_WORDS.has(word)) {
       // ★ A RESTART IS NOT A DELETE. The stop row is kept and marked, because "this person asked us
       // to stop on 2026-08-15 and asked us back on 2026-09-02" is the record a dispute needs, and a
@@ -168,7 +205,17 @@ export default async function handler(req, context) {
           stopped_at: prior.at || null, message_sid: params.MessageSid || null,
         });
         await store.delete(`stop/${h}`);
-        console.log(`sms-inbound: START from ${from.slice(-4)}; suppression lifted, prior stop preserved under resumed/.`);
+        // ★ STOP AND START ARE NOT SYMMETRIC, AND THAT IS THE SAFE DIRECTION. As of 2026-08-17 a
+        // STOP writes to BOTH stores, but db.mjs exposes `suppress` and no lift: `sv_suppress` is
+        // the only suppression RPC that exists, and there is deliberately no `sv_unsuppress`. So a
+        // START lifts the Blobs key that call-me.mjs reads, and CANNOT lift the Postgres row that
+        // dial/outbox/hold-runtime/jobs/recover gate on.
+        //
+        // The person is therefore resumed for the website's setup call and still suppressed for
+        // every outbound campaign path. That is over-suppression, which is the correct direction to
+        // fail for a legal control, and it is said out loud here rather than left for somebody to
+        // discover as a bug. Lifting the Postgres row is an operator action, on purpose.
+        console.log(`sms-inbound: START from ${from.slice(-4)}; Blobs suppression lifted, prior stop preserved under resumed/. NOTE: the Postgres suppression is NOT lifted (no unsuppress RPC exists) so outbound campaign paths remain suppressed until an operator clears it.`);
       }
     } else if (HELP_WORDS.has(word)) {
       // Twilio answers HELP at the platform level. Recorded so the volume is visible, not answered.
