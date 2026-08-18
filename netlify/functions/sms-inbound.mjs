@@ -280,6 +280,54 @@ export default async function handler(req, context) {
       //
       // The signature still validates: Twilio signs the URL it POSTs to, we hand signup the same
       // url, headers and raw body, and signup rebuilds the identical string.
+      // ★ A NEGOTIATION TURN IS TRIED BEFORE THE SETUP THREAD, ADDED 2026-08-18.
+      //
+      // Two products now share this one door. The tell is the SENDER'S NUMBER: tr_party_by_phone
+      // resolves it only to a LIVE thread-mode deal, so a person mid-negotiation is answered by
+      // their counterparty's agent, and everybody else falls through to setup exactly as before.
+      //
+      // Order matters and this order is deliberate. Someone in a live negotiation typing "yes" or
+      // "8500" would otherwise be read as an answer to a setup question, and the setup thread is
+      // stateful — it would advance, ask the next question, and their negotiation would go silent.
+      // Checking the narrower, provable condition first is the only ordering that cannot do that.
+      //
+      // It fails toward SETUP, never toward the negotiation: an unreadable lookup returns null and
+      // the message goes where it went yesterday. Missing a negotiation turn is recoverable by
+      // texting again; routing a stranger's SETUP into somebody's live deal is not.
+      try {
+        const parley = await import('./lib/parley-sms.mjs');
+        const party = await parley.partyForPhone(from);
+        if (party) {
+          console.log(`sms-inbound: ${from.slice(-4)} is side ${party.side} of live deal ${party.deal_id}; this is a negotiation turn.`);
+          // ★ ACKNOWLEDGE NOW, ANSWER AFTER. The reply is a top-tier model call with a fallback
+          // and a retry budget; Twilio's webhook window closes long before it returns. Holding the
+          // response open would time out and Twilio would REDELIVER the same message, which lands
+          // the turn twice in the thread. So the turn runs detached and the reply goes out through
+          // outbox.sms(), which is the path with the suppression check and the send log on it.
+          const work = parley.handleTurn({ party, body: params.Body, from })
+            .then((r) => console.log(`parley-sms: deal ${r.deal || party.deal_id} turn -> sent=${r.sent} settled=${r.settled ?? 'no'} ${r.reason || ''}`))
+            .catch((e) => console.error(`parley-sms: turn threw for deal ${party.deal_id}: ${String(e && e.message).slice(0, 160)}`));
+
+          // ★ waitUntil IS USED ONLY IF IT REALLY EXISTS, AND THAT IS NOT A STYLE CHOICE.
+          // Nothing else in this codebase calls context.waitUntil, so nobody has ever proven it is
+          // there. It is an Edge-runtime API; on a Lambda-backed Netlify function it may simply be
+          // undefined, and calling it would THROW — into the catch below, which falls through to
+          // the setup thread. A person mid-negotiation would have their message answered by the
+          // eight-question contractor questionnaire, which is the one outcome this whole branch
+          // exists to prevent. So it is feature-detected, and the fallback is a BOUNDED await:
+          // Twilio's webhook window is ~15s and it REDELIVERS on timeout, which would land the
+          // same turn in the thread twice.
+          if (typeof context?.waitUntil === 'function') {
+            context.waitUntil(work);
+          } else {
+            await Promise.race([work, new Promise((r) => setTimeout(r, 9000))]);
+          }
+          return twiml();
+        }
+      } catch (e) {
+        console.error(`sms-inbound: negotiation routing failed, falling through to setup: ${String(e && e.message).slice(0, 140)}`);
+      }
+
       console.log(`sms-inbound: body from ${from.slice(-4)} is not a keyword; handing it to the setup thread.`);
       try {
         const { default: signupHandler } = await import('./signup.mjs');
