@@ -153,7 +153,26 @@ const STOP_PATTERNS = [
   /^\s*stop\b/i,                                   // the whole utterance opens with it
   /\bstop\s+(call|contact|phon|ring|bother|dial|it\b|that\b)/i,
   /\b(please|just|hey|ok|okay|now)\s+stop\b/i,
-  /\bquit\s+(calling|phoning|bothering)\b/i,
+  /\bquit\s+(calling|phoning|bothering|texting|messaging|sending)\b/i,
+
+  // ★ THE CARRIER OPT-OUT KEYWORDS, ADDED 2026-08-17. This function was written for the VOICE path,
+  // where "stop" means stop CALLING, and it shows: `quit calling` matched and bare `quit` did not,
+  // `no more calls` matched and `no more texts` did not. @LANE-SEARCHLIGHT then wired it into the
+  // signup TEXT thread, where the words people use are different and where STOP, QUIT, CANCEL, END,
+  // UNSUBSCRIBE and STOPALL are the keywords carriers themselves recognise. Somebody replying QUIT
+  // to a text was getting an answer back from us.
+  //
+  // ★ THEY MATCH ONLY AS A WHOLE UTTERANCE, and that precision is the whole point. A bare `cancel`
+  // is an opt-out; "cancel my appointment" is a customer asking for something and suppressing them
+  // would be worse than not hearing them. Same for `end`, which is a carrier keyword and also an
+  // ordinary word. The anchors keep those apart.
+  /^\s*(?:quit|cancel|end|stopall|stop ?all|optout|opt ?out|revoke|unsubscribe)[\s.!]*$/i,
+
+  // The text-shaped siblings of the call-shaped patterns already above.
+  /\bstop\s+(?:text|messag)/i,
+  /\bno more (?:texts?|messages?|calls?)\b/i,
+  /\bdon'?t (?:text|message) me\b/i, /\bdo not (?:text|message) me\b/i,
+  /\bnever (?:text|message) me\b/i,
   /\btake me off\b/i, /\bremove me\b/i, /\btake this number off\b/i,
   /\bdo not call\b/i, /\bdon'?t call\b/i, /\bnever call\b/i, /\bno more calls\b/i,
   /\bnot interested\b/i, /\bno thank(s| you)\b/i,

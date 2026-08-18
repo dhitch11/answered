@@ -182,7 +182,21 @@ const STOP_PATTERNS = [
   /^\s*stop\b/i,
   /\bstop\s+(call|contact|phon|ring|bother|dial|it\b|that\b)/i,
   /\b(please|just|hey|ok|okay|now)\s+stop\b/i,
-  /\bquit\s+(calling|phoning|bothering)\b/i,
+  /\bquit\s+(calling|phoning|bothering|texting|messaging)\b/i,
+
+  // ★ THE CARRIER OPT-OUT KEYWORDS, ADDED 2026-08-17, AND THIS COPY MATTERS MOST.
+  // This is the DEBT COLLECTION path. FDCPA 1692c(c) ends contact on the first request, so a stop
+  // this list does not hear is not a missed preference, it is a violation. STOP, QUIT, CANCEL, END,
+  // UNSUBSCRIBE and STOPALL are the keywords carriers themselves recognise.
+  //
+  // ★ AND THERE ARE TWO isStop() FUNCTIONS ON THIS ESTATE - this one and lib/scripts.mjs - which is
+  // how the gap survived: fixing one leaves the other. They are deliberately separate because this
+  // path is broader (a false positive costs one call; a false negative costs a complaint and rightly
+  // so), but any keyword added to either belongs in both. Checked with a test that compares them.
+  /^\s*(?:quit|cancel|end|stopall|stop ?all|optout|opt ?out|revoke|unsubscribe)[\s.!]*$/i,
+  /\bstop\s+(?:text|messag)/i,
+  /\bno more (?:texts?|messages?)\b/i,
+  /\bdon'?t (?:text|message) me\b/i, /\bdo not (?:text|message) me\b/i,
   /\btake me off\b/i, /\bremove me\b/i, /\btake this number off\b/i,
   /\bdo not call\b/i, /\bdon'?t call\b/i, /\bnever call\b/i, /\bno more calls\b/i,
   /\bstop contacting me\b/i, /\bcease (and desist|contact|communication)/i,

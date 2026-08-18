@@ -90,6 +90,28 @@ test('a stop is heard in every shape somebody actually says it', () => {
   }
 });
 
+// ★ THE CARRIER KEYWORDS, pinned 2026-08-17. isStop() was written for the VOICE path and was then
+// wired into the signup TEXT thread, where the words differ: `quit calling` matched and bare `quit`
+// did not. STOP, QUIT, CANCEL, END, UNSUBSCRIBE and STOPALL are the keywords carriers themselves
+// recognise, so a person replying QUIT to a text was getting an answer back from us.
+test('every carrier opt-out keyword is heard as a stop on its own', () => {
+  for (const t of ['STOP', 'quit', 'QUIT', 'cancel', 'end', 'END', 'stopall', 'stop all',
+    'unsubscribe', 'opt out', 'optout', 'revoke', 'quit texting', 'no more texts',
+    'stop texting me', "don't text me", 'dont text me again']) {
+    assert.equal(isStop(t), true, `MISSED CARRIER STOP: ${t}`);
+  }
+});
+
+// ★ AND THE PRECISION THAT MAKES THAT SAFE. These keywords are also ordinary English words. They
+// count as an opt-out only as a WHOLE utterance, because "cancel my appointment" is a customer
+// asking for something and silencing them would be worse than not hearing them at all.
+test('a carrier keyword inside an ordinary sentence is not a stop', () => {
+  for (const t of ['cancel my appointment', 'can I cancel the visit', 'the job ended badly',
+    'end of the driveway', 'I want to end up with hot water', 'quit the job halfway']) {
+    assert.equal(isStop(t), false, `FALSE STOP: ${t}`);
+  }
+});
+
 test('a contractor describing their day is not a stop', () => {
   // The exact failure lib/scripts.mjs measured on a live call: a bare \bstop\b suppressed somebody
   // for answering the question they were asked.
