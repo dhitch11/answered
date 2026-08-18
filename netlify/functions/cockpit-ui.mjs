@@ -269,7 +269,13 @@ export const LOGIN = (msg) => `<!doctype html><html lang="en"><head><meta charse
 <title>Cockpit</title><style>${LOGIN_CSS}</style></head><body>
 <div class="card">
   <h1>Cockpit</h1>
-  <p>Call and text operations for Answered. This console places real calls to real people. Enter the PIN.</p>
+  <!-- "and text" was not true. The server implements an sms op, but NOTHING in this client ever
+       calls it: every api() call site in this file is board, contacts, contact, transcript,
+       calls, gatecheck, dial, hangup, suppress, disposition, note, searchnumbers, provision,
+       lineupdate, syncnumbers, campaign, autopilot - no sms. A login page is the first sentence
+       an operator reads, and it was promising a control that does not exist on the page behind
+       it. Texting lives in the admin console, which does have the composer. -->
+  <p>Call operations for Answered. This console can place real calls to real people when the outbound gate is open. Enter the PIN.</p>
   <form method="POST" autocomplete="off">
     <label for="pin">PIN</label>
     <input id="pin" name="pin" type="password" inputmode="numeric" autofocus autocomplete="off">

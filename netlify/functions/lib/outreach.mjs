@@ -308,30 +308,53 @@ export async function sendSms({ contactId, accountId, to, body, actor, meta = {}
     return recordBlocked({ contactId, channel: 'sms', to, actor,
       reason: state.why + (state.state ? ` (campaign status: ${state.state})` : '') });
   }
-  const auth = twilioAuth();
-  const from = (process.env.ANSWERED_SMS_FROM || process.env.ANSWERED_DEMO_NUMBER || '').trim();
-  if (!auth || !from) {
-    return recordBlocked({ contactId, channel: 'sms', to, actor,
-      reason: 'no Twilio sending number is configured on this deploy' });
-  }
+  // ★ ONE SEND PATH, NOT TWO WITH DIFFERENT BUGS.
+  //   This used to POST to Twilio directly and diverged from `outbox.sms()` — the path every
+  //   message this account has actually delivered goes through — in three ways, each of which
+  //   is its own defect:
+  //
+  //   1. NO SUPPRESSION CHECK. `outbox.sms()` reads the do-not-contact list and fails closed
+  //      when it cannot be read. This did not check at all, so the console's "Send a text"
+  //      button could text somebody who had already replied STOP. That is the one defect here
+  //      with a statutory consequence, and it was the quietest of the three.
+  //   2. NO MessagingServiceSid. It always sent a bare `From`. Every message this account has
+  //      delivered carried mg=MGab661e…; the single bare-From send in the log failed 30008.
+  //      A bare From on an A2P-registered brand is unregistered traffic and carriers drop it.
+  //   3. IT FELL BACK TO ANSWERED_DEMO_NUMBER — the PUBLIC demo receptionist line — whenever
+  //      ANSWERED_SMS_FROM was unset, which is its state in production right now. That puts
+  //      the number strangers call to hear the demo into a named contractor's SMS thread.
+  //      `jobs.mjs` already refuses exactly this substitution for voice; SMS had no such guard.
+  //
+  //   The repo already solved all three once. Reusing it is what the atomic rate limiter did
+  //   rather than shipping a second limiter with its own bugs. CRM logging stays here, because
+  //   that genuinely is this layer's job; the wire is outbox's.
+  const outbox = await import('./outbox.mjs');
   try {
-    const form = new URLSearchParams({ To: to, From: from, Body: String(body || '').slice(0, 1500) });
-    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${auth.account}/Messages.json`, {
-      method: 'POST',
-      headers: { Authorization: auth.header, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form, signal: AbortSignal.timeout(12_000),
-    });
-    const out = await r.json();
-    if (!r.ok) {
-      await log({ contact_id: contactId, account_id: accountId, channel: 'sms', to_addr: to,
-        from_addr: from, body, provider: 'twilio', status: 'failed',
-        failure_reason: `twilio ${r.status}: ${out && out.message}`, sent_by: actor, meta });
-      return { ok: false, error: (out && out.message) || `twilio ${r.status}` };
+    const r = await outbox.sms({ to, body: String(body || '').slice(0, 1500) });
+
+    // A refusal is not a failure to record. Suppression, a missing sender and an unreadable
+    // list all arrive as `skipped`, and each one belongs in the CRM as a blocked row with its
+    // real reason — `recordBlocked` writes to the same table, so a refusal is as auditable as
+    // a send. This is what "0 rows ever" in crm_messages was hiding: not even refusals landed.
+    if (r && r.skipped) {
+      return recordBlocked({ contactId, channel: 'sms', to, actor,
+        reason: r.reason || 'the send was refused before it reached the carrier' });
     }
+    if (!r || !r.ok) {
+      await log({ contact_id: contactId, account_id: accountId, channel: 'sms', to_addr: to,
+        body, provider: 'twilio', status: 'failed',
+        failure_reason: String((r && r.reason) || 'unknown send failure').slice(0, 200),
+        sent_by: actor, meta });
+      return { ok: false, error: (r && r.reason) || 'unknown send failure' };
+    }
+
+    // ★ `status` here is Twilio's own — normally `queued` or `accepted`, never `delivered`.
+    //   Acceptance is not delivery: a carrier rejection for an unregistered campaign arrives
+    //   later on the status callback. The row records what the provider actually said.
     await log({ contact_id: contactId, account_id: accountId, channel: 'sms', to_addr: to,
-      from_addr: from, body, provider: 'twilio', provider_id: out.sid, status: 'sent',
-      sent_by: actor, meta });
-    return { ok: true, provider_id: out.sid };
+      body, provider: 'twilio', provider_id: r.id, status: 'sent',
+      sent_by: actor, meta: { ...meta, provider_status: r.status || '' } });
+    return { ok: true, provider_id: r.id, provider_status: r.status || '', note: r.note };
   } catch (e) {
     await log({ contact_id: contactId, account_id: accountId, channel: 'sms', to_addr: to,
       body, provider: 'twilio', status: 'failed', failure_reason: String(e.message).slice(0, 200),

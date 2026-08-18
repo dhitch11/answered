@@ -1638,7 +1638,13 @@ function threadComposer(c, pre) {
     '<div class="row" style="gap:8px;flex-wrap:wrap">' +
       ch('email', 'Write an email', p.email, c.email, 'do-email') +
       ch('sms',   'Send a text',    p.sms,   c.phone, 'do-sms') +
-      ch('call',  'Place a call',   p.call,  c.phone, 'do-call') +
+      // THE LABEL NOW MATCHES WHAT THE BUTTON DOES. It read "Place a call", and it does not
+      //   place a call: outreach.callIntent() contains no Twilio call at all. It records the
+      //   intent, logs the consent basis, and hands back a tel: link for the operator to dial
+      //   from their own handset. That indirection is deliberate and correct - a second dial
+      //   path here would be a second way to reach a phone that does not cross the outbound
+      //   gate - but the button was describing the thing the code deliberately refuses to do.
+      ch('call',  'Call from your phone',   p.call,  c.phone, 'do-call') +
     '</div>' +
     '<div class="sm muted" style="margin-top:8px">' +
       (anyOpen
