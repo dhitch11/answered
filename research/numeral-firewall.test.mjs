@@ -29,7 +29,25 @@ const grab = (name) => {
 // numberSet joined the file when the substring test became a membership test; extract it too or
 // the harness evaluates a rawDigits whose dependency is missing and reports a ReferenceError as a
 // failure of the fix rather than of itself.
-const fn = new Function(grab('badNumeral') + '\n' + grab('numberSet') + '\n' + grab('rawDigits') + '\n; return {badNumeral, rawDigits};')();
+// ★ THE GRAB LIST IS A HARDCODED LIST, WHICH IS A DEFECT WITH A DELAY ON IT — and it fired.
+// `badNumeral` gained two dependencies on 2026-08-18 (`provenance`, `PRICE_SHAPED`) and this
+// harness evaluated a function whose scope was missing them, then reported the resulting
+// ReferenceError as if the GUARD had failed. That is the harness failing and blaming the subject.
+// Both are grabbed now, and the construction is wrapped so an incomplete harness says so in those
+// words instead of masquerading as a red guard.
+const NEEDED = ['badNumeral', 'numberSet', 'rawDigits', 'provenance', 'PRICE_SHAPED'];
+let fn;
+try {
+  fn = new Function(NEEDED.map(grab).join('\n') + '\n; return {badNumeral, rawDigits};')();
+  // Prove the evaluated copy actually runs before trusting anything it says.
+  fn.badNumeral('probe 1', fn.rawDigits(['1']), new Set());
+} catch (e) {
+  console.error('\n*** HARNESS INCOMPLETE, NOT A GUARD FAILURE ***');
+  console.error('    This file evaluates functions lifted out of personas.mjs. One of them now');
+  console.error('    depends on something not in NEEDED: ' + String(e.message));
+  console.error('    Add it to NEEDED. The guard itself has not been tested by this run.');
+  process.exit(2);
+}
 
 const callerSaid = ['Hi, my number is 916 350 4869 and my zip is 97204'];
 const ctx = fn.rawDigits(callerSaid);

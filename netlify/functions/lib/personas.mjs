@@ -318,9 +318,70 @@ const CONTACT_MSG_RE = /\b(?:i(?:'ll| will| can| am going to)? (?:text|email) yo
 // did say "350" — as part of their phone number. Distinguishing a price from a phone fragment needs
 // semantic role, which this guard does not have. It closes four of the six holes; the remaining two
 // need the money-word path or a grounded-figures allowlist.
+// ── PROVENANCE, ADDED 2026-08-18. THE HOLE THE COMMENT ABOVE SAID WAS STILL OPEN. ────────────
+//
+// The paragraph above ends "the remaining two need the money-word path or a grounded-figures
+// allowlist", and it was right that the shape change alone did not close them. @LANE-FOOTER then
+// measured it live on the shipped guard, with positive controls:
+//
+//   "My water heater is leaking"  ->  "The visit is 350."   BLOCKED
+//   "My number is 916 350 4869"   ->  "The visit is 350."   ALLOWED, spoken as fact
+//
+// Giving a callback number is the single most common thing a caller does, so the guard was weakest
+// on almost every real call, and `/trust` says in its own words: "The guardrail that matters most.
+// It will never quote a price." That sentence was false.
+//
+// ★ THE FIX IS SEMANTIC ROLE, WHICH IS EXACTLY WHAT THE COMMENT ASKED FOR, AND IT IS TWO IDEAS:
+//
+// 1. WHO SAID IT. A number the OWNER wrote in the notes may be quoted as a fact about the business.
+//    A number the CALLER said may be READ BACK and nothing else. Previously both landed in one set
+//    and the guard could not tell a price from a phone fragment because it never knew where either
+//    came from. Now the context carries its provenance.
+//
+// 2. WHAT ROLE THE NUMBER IS PLAYING IN THIS CLAUSE. In a price-shaped clause only the owner's
+//    figures are admissible; everywhere else the caller's own numbers still pass, so read-backs,
+//    addresses, times and quantities are untouched.
+//
+// Direction of failure: a clause we cannot classify is treated as ordinary, NOT as a price — but
+// the money-word path is owner-only unconditionally, so a spelled price cannot ride in on that.
+// riley has no owner notes at all, so for the demo line this reduces to "never says a price",
+// which is what the site promises.
+
+/** A clause where a bare figure would be heard as what something COSTS. */
+const PRICE_SHAPED = new RegExp(
+  // an explicit currency marker is always price-shaped
+  '\\$|\\b(?:dollars?|bucks|cents)\\b'
+  // ...or a cost noun/verb anywhere in the clause, which is what "The visit is 350" has and
+  // PRICE_RE did not look for. Deliberately a closed list of COST words rather than any copula:
+  // "it is 350" with no cost word stays ordinary, because that is usually a read-back.
+  + '|\\b(?:price[sd]?|pricing|cost[s]?|charge[sd]?|fee[s]?|rate[s]?|quote[sd]?|estimate[sd]?|'
+  + 'deposit|minimum|invoice|bill|billed|labou?r|hourly|flat|upfront|up front|'
+  + 'visit|trip|call-?out|service call|diagnostic|per hour|an hour|a month|a year|a visit)\\b',
+  'i',
+);
+
+/**
+ * Normalise a context into { caller, owner }.
+ * A bare Set is the legacy shape and is treated as CALLER-supplied, which is the safe reading:
+ * it means a persona that has not been split cannot accidentally license a price.
+ */
+function provenance(ctx) {
+  if (ctx && !(ctx instanceof Set) && (ctx.caller || ctx.owner)) {
+    return { caller: ctx.caller || new Set(), owner: ctx.owner || new Set() };
+  }
+  if (ctx instanceof Set) return { caller: ctx, owner: new Set() };
+  // A string context is the oldest shape of all. Keep it working, keep it caller-only.
+  const s = new Set(String(ctx || '').match(/\d+/g) || []);
+  return { caller: s, owner: new Set() };
+}
+
 function badNumeral(text, ctx, allow) {
-  // Back-compatible: a caller that still passes a string gets the old behaviour rather than a crash.
-  const has = ctx instanceof Set ? (d) => ctx.has(d) : (d) => Boolean(ctx) && String(ctx).includes(d);
+  const { caller, owner } = provenance(ctx);
+  // ★ THE ROLE TEST. In a price-shaped clause a caller-supplied digit is NOT a licence: the caller
+  // saying "916 350 4869" does not authorise "the visit is 350". Everywhere else the caller's own
+  // numbers still pass, which is what keeps read-backs, addresses, times and counts working.
+  const priceShaped = PRICE_SHAPED.test(String(text));
+  const has = priceShaped ? (d) => owner.has(d) : (d) => caller.has(d) || owner.has(d);
   const toks = String(text).match(/\d[\d:.,-]*/g) || [];
   for (const t of toks) {
     const d = t.replace(/\D+/g, '');
@@ -414,7 +475,11 @@ function badMoneyWords(text, ctx, allow) {
   // soup — and worse, once the context became a Set this line threw `ctxDigits.includes is not a
   // function`, which the money-word floor would have surfaced as a crash rather than a refusal.
   // Two call sites, one contract: membership, with the string form kept working for safety.
-  const has = ctx instanceof Set ? (d) => ctx.has(d) : (d) => Boolean(ctx) && String(ctx).includes(d);
+  // ★ OWNER-ONLY, NO ROLE TEST NEEDED. A figure sitting next to "dollars" is a price by
+  // construction, so there is no non-price reading to protect. A caller saying "three fifty" never
+  // licenses the voice to say "three fifty dollars" as the business's price.
+  const { owner } = provenance(ctx);
+  const has = (d) => owner.has(d);
   MONEY_WORD.lastIndex = 0; // the pattern carries /g; never trust its cursor
   let m;
   while ((m = MONEY_WORD.exec(String(text))) !== null) {
@@ -805,7 +870,14 @@ export const PERSONAS = {
     // The only persona that reads the SYSTEM note for numbers, because the note
     // is where the owner's own hours and prices live. A number he wrote down is
     // his to say; a number nobody wrote down is a fabrication either way.
-    ctx: (texts, systemText) => new Set([...digitsPlusSpoken(texts), ...digitsPlusSpoken([String(systemText || '')])]),
+    // ★ SPLIT BY PROVENANCE 2026-08-18. This used to merge the caller's digits and the owner's
+    // notes into ONE set, which is precisely how "the visit is 350" rode in on a caller's phone
+    // number. The owner's figures are quotable as facts about the business; the caller's are
+    // read-back-only. Same two sets, and now the guard can tell them apart.
+    ctx: (texts, systemText) => ({
+      caller: digitsPlusSpoken(texts),
+      owner: digitsPlusSpoken([String(systemText || '')]),
+    }),
     numAllow: new Set(['911']),
     ackBank: ['Okay.', 'Sure.', 'Alright.', 'Got it.', 'Mm-hm.'],
     breaker: 'Sorry, my line just glitched for a second. Are you still there?',
@@ -889,7 +961,14 @@ export const PERSONAS = {
     hardCloseAt: 22,
     softCloseNote:
       'Esta llamada ya va larga. Asegurese de tener el nombre, un numero para devolver la llamada y que esta pasando, repitalo una vez, y cierre con amabilidad.',
-    ctx: (texts, systemText) => new Set([...digitsPlusSpoken(texts), ...digitsPlusSpoken([String(systemText || '')])]),
+    // ★ SPLIT BY PROVENANCE 2026-08-18. This used to merge the caller's digits and the owner's
+    // notes into ONE set, which is precisely how "the visit is 350" rode in on a caller's phone
+    // number. The owner's figures are quotable as facts about the business; the caller's are
+    // read-back-only. Same two sets, and now the guard can tell them apart.
+    ctx: (texts, systemText) => ({
+      caller: digitsPlusSpoken(texts),
+      owner: digitsPlusSpoken([String(systemText || '')]),
+    }),
     // 911 is the one number this voice may say without anybody having given it, because the crisis
     // line says it. Same allowance as the English customer line, deliberately not widened.
     numAllow: new Set(['911']),

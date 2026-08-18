@@ -25,8 +25,16 @@ const t = (name, fn) => {
 };
 
 const P = PERSONAS.customer;
+// ★ CONTEXT SHAPE UPDATED 2026-08-18. This passed `['89']` — an ARRAY, which no persona ever
+// produces. It worked only because the guard's oldest back-compat branch stringified whatever it
+// was given and did a substring test, so "89" matched itself. Once the guard learned provenance,
+// an unlabelled context is read as CALLER-supplied (the safe reading), and "The call out fee is
+// 89 dollars" is correctly refused, because a caller saying 89 does not license the business's fee.
+//
+// The intent of these cases was always "the owner wrote 89 in the notes, so the line may say it".
+// That is now expressed rather than implied.
 const by = (text) => {
-  const r = guardClause(P, text, ['89'], {});
+  const r = guardClause(P, text, { caller: new Set(), owner: new Set(['89']) }, {});
   return r.ok ? null : r.by;
 };
 

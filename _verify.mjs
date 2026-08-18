@@ -3,7 +3,33 @@ import { chromium } from '/Users/user/reimburseos-v3-build/node_modules/playwrig
 const BASE = process.env.BASE || 'http://127.0.0.1:8908';
 // thanks.html was excluded from this list for six deploys and carried a real
 // defect the whole time. Every page that ships is swept, linked from a menu or not.
-const PAGES = ['/', '/trades.html', '/hold.html', '/recover.html', '/pricing.html', '/trust.html', '/thanks.html'];
+// ★ DERIVED, NOT TYPED, 2026-08-18. The comment above is right and the list below kept being
+// wrong anyway: it named 7 pages while the sitemap shipped 14. /about, /contact, /parley,
+// /privacy, /recording, /setup and /terms were never swept at any width — including /recording,
+// which makes the legal promise the whole greeting is built to keep, and /parley, which another
+// lane flagged the same night. A hardcoded list is a defect with a delay on it, and this one had
+// already fired once (thanks.html) and been "fixed" by adding one entry by hand.
+//
+// So the list is now the sitemap. Add a page, it gets swept, with nobody remembering to do it.
+// Falls back to the old literal ONLY if the sitemap cannot be read, and says so loudly, because a
+// silent fallback to a shorter list is how this failed the first time.
+const FALLBACK = ['/', '/trades', '/hold', '/recover', '/pricing', '/trust', '/thanks'];
+async function discoverPages() {
+  try {
+    const r = await fetch(BASE + '/sitemap.xml', { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('sitemap ' + r.status);
+    const xml = await r.text();
+    const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+    if (locs.length < FALLBACK.length) throw new Error(`sitemap listed only ${locs.length} pages`);
+    return [...new Set(locs)].sort();
+  } catch (e) {
+    console.log(`  !! SITEMAP UNREADABLE (${e.message}) — falling back to ${FALLBACK.length} hardcoded pages.`);
+    console.log('  !! THIS SWEEP IS INCOMPLETE. Do not read a green run as full coverage.');
+    return FALLBACK;
+  }
+}
+const PAGES = await discoverPages();
+console.log(`sweeping ${PAGES.length} pages x ${5} widths against ${BASE}\n  ${PAGES.join(' ')}\n`);
 const SIZES = [[320, 720], [390, 844], [768, 1024], [1440, 900], [1920, 1080]];
 
 // This machine's resolver intermittently fails on the custom domain while every
