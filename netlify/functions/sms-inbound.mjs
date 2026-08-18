@@ -193,6 +193,36 @@ export default async function handler(req, context) {
         console.error(`sms-inbound: PARTIAL STOP for ${from.slice(-4)} — blobs=${blobOk ? 'ok' : 'FAILED'} postgres=${pgOk ? 'ok' : 'FAILED'}. ` +
           `${!pgOk ? 'recover/dial/outbox/hold-runtime/jobs can still call this number. ' : ''}${!blobOk ? 'call-me can still call this number. ' : ''}Close it by hand.`);
       }
+
+      // ★ THREE STORES NOW, BECAUSE DELEGATION OPENED A THIRD DOOR. ADDED 2026-08-17.
+      //
+      // The moment this function began handing non-keyword bodies to the setup thread, signup.mjs
+      // stopped seeing STOP: it is intercepted here, one branch earlier. signup keeps its OWN
+      // `stopped` flag on its own blob record, and with nothing to set it the thread stayed open.
+      //
+      // MEASURED on prod immediately after the delegation shipped, which is the only reason this
+      // is not live right now:
+      //     SETUP      -> "This is Answered. I will set your line up..."
+      //     STOP       -> (silent)                     <- looked correct
+      //     "are you there?" -> "Hi, this is the AI phone line setup for..."   <- IT REPLIED
+      // A person who had just opted out was answered on the next message. That is the exact
+      // failure the two-store block above exists to prevent, reintroduced one layer up by a fix
+      // for something else.
+      //
+      // Delegating the STOP itself is what closes it: signup runs isStop() before anything else
+      // and marks its record with strong consistency. Its reply is discarded - the person has
+      // asked us to stop, so the only correct response is the silence Twilio already sends.
+      try {
+        const { default: signupHandler } = await import('./signup.mjs');
+        await signupHandler(
+          new Request(req.url, { method: 'POST', headers: req.headers, body: raw }),
+          context,
+        );
+      } catch (e) {
+        console.error(`sms-inbound: PARTIAL STOP for ${from.slice(-4)} — the setup thread was not `
+          + `marked stopped and can still reply. Close it by hand. `
+          + String(e && e.message).slice(0, 100));
+      }
     } else if (START_WORDS.has(word)) {
       // ★ A RESTART IS NOT A DELETE. The stop row is kept and marked, because "this person asked us
       // to stop on 2026-08-15 and asked us back on 2026-09-02" is the record a dispute needs, and a
