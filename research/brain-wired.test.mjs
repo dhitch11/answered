@@ -36,7 +36,11 @@ t('and BEFORE the owner notes and soft-close, so the cached prefix stays stable'
 
 console.log('\n── the loaded-set must not leak between callers ──');
 t('module state is derived from the transcript, not module scope', () => {
-  assert.match(src, /function moduleState\(inMsgs\)/, 'no per-call state function');
+  // ★ MATCHED ON THE INTENT, NOT THE EXACT SIGNATURE. This asserted /moduleState\(inMsgs\)/ and went
+  // red when a `lang` parameter was added for the Spanish line - a correct change that this test
+  // called a failure because it was pinned to a character-for-character arity. What matters is that
+  // the state is derived PER CALL from the transcript rather than held in module scope.
+  assert.match(src, /function moduleState\(\s*inMsgs\b/, 'no per-call state function taking the transcript');
   assert.ok(!/^const loaded = new Set\(\)/m.test(src),
     'a module-scope Set would carry one caller\'s loaded modules into the next caller\'s call');
 });

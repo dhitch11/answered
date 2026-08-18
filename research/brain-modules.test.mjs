@@ -18,7 +18,11 @@ for (const [said, want] of [
   ['My water heater is leaking', 'trades'],
   ['no hot water since last night', 'trades'],
   ['the breaker keeps tripping', 'trades'],
-  ['there is a burning smell from the outlet', 'trades'],
+  // ★ WAS 'trades'. A burning smell from an outlet now loads SAFETY first, which is correct and is
+  // the whole point of the safety module: modules append in array order and safety is first, so
+  // hazard knowledge reaches the model ahead of scheduling knowledge. The old expectation encoded
+  // the world before that module existed.
+  ['there is a burning smell from the outlet', 'safety+trades'],
   ['half the shingles came off', 'trades'],
   ['my kid gets home at three', 'human_range'],
   ['did you catch the game', 'human_range'],
@@ -66,7 +70,9 @@ t('every brain refuses to hand over identity data', () => {
 
 console.log('\n── NEGATIVE CONTROLS: it must not fire on everything ──');
 for (const [said, want] of [
-  ['I need to book something', 'none'],
+  // ★ WAS 'none'. 'book' is now a scheduling trigger, and a caller asking to book something SHOULD
+  // get the module about what makes a booking usable. This negative control predates that module.
+  ['I need to book something', 'scheduling'],
   ['it is wheat season', 'none'],          // caught by this suite before it shipped
   ['can you hear me okay', 'none'],
   ['', 'none'],
