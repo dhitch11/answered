@@ -37,7 +37,13 @@ import { rpc, dbConfigured } from './db.mjs';
 const KEY = () => (process.env.ANSWERED_ADMIN_KEY || '').trim();
 
 export const COOKIE = 'ans_admin';
-export const SESSION_HOURS = 12;
+// ★ 30 DAYS, RAISED FROM 12 ON 2026-08-18. Twelve hours meant the owner re-authenticated every
+//   single day, and a console people avoid logging into is a console nobody reads. The session is
+//   still a real one: a scrypt-verified password (N=16384), an HttpOnly + Secure + SameSite=Strict
+//   cookie, and a row in admin_sessions that can be revoked. What changed is only how often a
+//   legitimate operator is asked to prove themselves again, which is a usability setting, not the
+//   control itself. Sign-out and session revocation both still end it immediately.
+export const SESSION_HOURS = 24 * 30;
 
 /** scrypt parameters. N=16384 is roughly 100ms per verify on this runtime: slow enough to make
  *  offline cracking expensive, fast enough that a login does not time out a function. */

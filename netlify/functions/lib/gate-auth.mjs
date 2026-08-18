@@ -22,7 +22,9 @@ const KEY = () => {
   console.error('gate-auth: ANSWERED_COCKPIT_KEY is not set; falling back to a secret a third party holds. Set it.');
   return process.env.ANSWERED_BRAIN_SECRET || '';
 };
-const TTL_HOURS = 12;
+// Raised 12h -> 30d on 2026-08-18, same reasoning as admin-auth: the PIN is still required, the
+// cookie is still HttpOnly/Secure/SameSite, and this only changes how often the operator retypes it.
+const TTL_HOURS = 24 * 30;
 
 export const BASE_HEADERS = {
   'Content-Type': 'text/html; charset=utf-8',
