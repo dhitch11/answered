@@ -49,6 +49,7 @@ import { PERSONAS, guardWhole } from './lib/personas.mjs';
 import { isStop } from './lib/scripts.mjs';
 import { startAccount, saveConfig, dbConfigured } from './lib/accounts.mjs';
 import { rpc } from './lib/db.mjs';
+import { parseHours } from './lib/hours-parse.mjs';
 import { notifyOperator } from './lib/account-notify.mjs';
 
 export const config = {
@@ -89,14 +90,19 @@ const STEPS = [
   { key: 'trade', ask: 'What trade are you in? Plumbing, HVAC, electrical, roofing, something else?' },
   { key: 'greeting_name', ask: 'What should your line call itself when it picks up? Most people pick a first name.' },
   { key: 'service_area', ask: 'Where do you work? A town and a rough radius is plenty.' },
-  { key: 'hours_text', ask: 'What hours do you want it answering? You can say something like weekdays seven to five.' },
+  { key: 'hours_text', ask: 'What hours do you want it answering? You can say something like weekdays 7 to 5.' },
+  // ★ ADDED 2026-08-17. The database's `account_missing` view lists `services`, and nothing in the
+  // thread ever asked for it, so a completed signup could never leave `draft` no matter how well
+  // the other seven answers were captured. Measured on a real completed thread:
+  //     status draft · missing ["services","hours","email_verified"]
+  { key: 'services', ask: 'What work do you take? A few words is plenty, like drain cleaning, water heaters, repipes.' },
   { key: 'booking_destination', ask: 'Where should a booked job land? An email address works.' },
   { key: 'escalation_phone', ask: 'If somebody has a real emergency, what number should it ring?' },
 ];
 
 // The one line that opens the thread. Says who it is and what is about to happen, because a text
 // from an unknown number asking for a business name reads as a scam otherwise.
-const GREET = 'This is Answered. I will set your line up in about seven questions.';
+const GREET = 'This is Answered. I will set your line up in about eight questions.';
 
 const DONE_LINE = 'That is everything. Your setup is saved and you can change any of it any time. '
   + 'A person assigns your number, and until that happens nothing is answering for you.';
@@ -483,7 +489,27 @@ export default async function handler(req, context) {
             trade: String(p.trade || '').slice(0, 80),
             tokenHash: sha('signup-thread:' + from + ':' + rec.done),
           });
-          const id = r && (r.account_id || r.id);
+          // ★ THE RPC RETURNS THE ID NESTED, AND THIS LINE READ TWO KEYS THAT DO NOT EXIST.
+          // Measured against the live sv_account_start with production credentials:
+          //     top-level keys : ok, account, created, throttled
+          //     r.account_id   : undefined
+          //     r.id           : undefined
+          //     r.account.id   : 83b917d3-28b2-449a-9765-5abf13874250
+          // So `id` was always undefined, the whole `if (id)` block was dead, and saveConfig never
+          // ran. Every completed signup wrote an account row carrying the business name and then
+          // DISCARDED all seven answers - greeting_name, service_area, hours, booking destination,
+          // escalation number - while telling the contractor "Your setup is saved."
+          // Confirmed in live data: the two most recent text-signup accounts have every config
+          // field null and config.updated_at byte-equal to created_at, never patched. Positive
+          // control: a non-signup fixture account has greeting_name set and a later updated_at,
+          // so the RPC and saveConfig are both fine and only this caller was broken.
+          //
+          // ★ NOTHING COULD HAVE CAUGHT THIS FROM INSIDE THE REPO. The shape is a contract with a
+          // remote function; the schema on disk is not the schema serving. That is why the fix
+          // ships with research/signup-contract.test.mjs, which calls the LIVE RPC and asserts the
+          // extraction resolves truthy - a test that reads the far side of the boundary rather
+          // than a fixture we wrote to match our own assumption.
+          const id = r && (r.account_id || r.id || (r.account && r.account.id));
           if (id) {
             rec.accountId = id;
             await saveConfig(id, {
@@ -492,6 +518,25 @@ export default async function handler(req, context) {
               service_area: String(p.service_area || '').slice(0, 200),
               escalation_phone: String(p.escalation_phone || '').slice(0, 40),
               booking_destination: email,
+              // ★ AN ARRAY, NOT A STRING, AND THE TYPE IS LOAD-BEARING FOR THE WHOLE PATCH.
+              // Measured: passing a string throws Postgres 22023 out of sv_account_save_config and
+              // the ENTIRE patch is rejected, so greeting_name, service_area, booking_destination
+              // and escalation_phone all stayed null too. One wrong field type silently discarded
+              // every other answer — the same symptom as the id bug, from a different cause, and
+              // it shipped for the eight minutes between two deploys because I checked that the
+              // conversation read well and not that the row changed.
+              services: String(p.services || '')
+                .split(/[,;]|\band\b/).map((x) => x.trim()).filter(Boolean).slice(0, 12),
+              // ★ THE RAW SENTENCE IS ALWAYS KEPT, whether or not it parsed. It is what the person
+              // actually said, and an operator finishing the setup by hand needs it more than they
+              // need our interpretation of it.
+              hours_text: String(p.hours_text || '').slice(0, 200),
+              // ★ AND THE STRUCTURE ONLY WHEN IT IS CERTAIN. parseHours returns null on anything it
+              // cannot read with confidence, and this spreads nothing in that case, so `hours` stays
+              // missing and the operator surface keeps saying so. A guessed schedule would clear the
+              // missing-field warning while answering the line at the wrong times, which is worse
+              // than an obviously unfinished account.
+              ...(parseHours(p.hours_text).hours ? { hours: parseHours(p.hours_text).hours } : {}),
             }, 'signup-thread');
           }
         } catch (e) {
