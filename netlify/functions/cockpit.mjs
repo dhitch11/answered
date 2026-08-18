@@ -123,6 +123,22 @@ async function run(op, body, operator) {
     //    in. This is the only way to get live audio on a bridged AI call, and it is the whole
     //    reason every operator-touched call runs as a conference.
     case 'takeover': {
+      // ★ FAIL CLOSED, AND BEFORE THE CALLER IS MOVED. This check used to live below
+      //   `tw.updateCall`, so a live caller was redirected into the conference FIRST and the
+      //   operator number was read afterwards. With ANSWERED_OPERATOR_NUMBER unset — which is
+      //   its state in production right now, it is in no Netlify context — `addParticipant` was
+      //   skipped behind `if (to)`, NO error key was set, and the op returned `{ ok: true }`.
+      //   The handler below only 400s when `result.error` exists, so the console answered 200
+      //   and toasted "You are being called in. Pick up." while the customer sat alone in an
+      //   empty conference, taken off the AI that had been talking to them, and the operator's
+      //   phone never rang. listen/barge/whisper have always guarded at the top of their case;
+      //   takeover was the one path that acted first and checked second.
+      //   An unset operator number is an UNKNOWN, and an unknown is a refusal — never an ok.
+      const to = OPERATOR_NUMBER();
+      if (!to) {
+        return { error: 'ANSWERED_OPERATOR_NUMBER is not set, so there is nowhere to send the operator leg. Refusing BEFORE the caller is moved, rather than stranding them in a conference nobody can join. Set it to your mobile.' };
+      }
+
       const conf = body.conference_name || `ans-${body.call_sid}`;
       await tw.updateCall(body.call_sid, {
         Url: `${site()}/api/call-voice?mode=conference&disclosed=1&conf=${encodeURIComponent(conf)}`,
@@ -131,18 +147,22 @@ async function run(op, body, operator) {
       await db.updateCall(body.call_sid, { conference_name: conf });
       await db.addEvent(body.call_sid, 'operator_takeover', { operator, conference: conf });
 
-      const to = OPERATOR_NUMBER();
       let participant = null;
-      if (to) {
-        // A moment for the redirect to land before the operator leg arrives at the conference.
-        await new Promise((r) => setTimeout(r, 1200));
-        try {
-          participant = await tw.addParticipant(conf, {
-            From: process.env.CANARY_FROM_NUMBER || process.env.ANSWERED_DEMO_NUMBER,
-            To: to, Beep: 'false', EndConferenceOnExit: 'true', StartConferenceOnEnter: 'true',
-            Label: 'operator',
-          });
-        } catch (e) { return { ok: true, conference_name: conf, operator_leg_error: e.message }; }
+      // A moment for the redirect to land before the operator leg arrives at the conference.
+      await new Promise((r) => setTimeout(r, 1200));
+      try {
+        participant = await tw.addParticipant(conf, {
+          From: process.env.CANARY_FROM_NUMBER || process.env.ANSWERED_DEMO_NUMBER,
+          To: to, Beep: 'false', EndConferenceOnExit: 'true', StartConferenceOnEnter: 'true',
+          Label: 'operator',
+        });
+      } catch (e) {
+        // ★ AND THE SECOND FAIL-OPEN ON THIS PATH: this used to return `ok: true` with the
+        //   failure tucked into `operator_leg_error`, a key nothing reads. The caller HAS
+        //   already been moved by this point, so the honest answer is an error that says
+        //   exactly that — the operator must know the customer is now in a conference alone.
+        await db.addEvent(body.call_sid, 'operator_takeover_failed', { operator, conference: conf, reason: e.message });
+        return { error: `The caller was moved into conference ${conf}, but your operator leg could not be dialled: ${e.message}. They are in that conference with nobody else in it — call in manually or hang the call up now.` };
       }
       return { ok: true, conference_name: conf, participant_sid: participant?.call_sid || null };
     }
