@@ -453,6 +453,46 @@ STATES = [
               'receipt, fewer than five a month. Stopping them takes one word, and the full '
               'rules of the program are written out on the terms page. They applied from the '
               'first message onward.'),
+
+    # 2026-08-18, @LANE-FOOTER. THREE PRODUCTS WERE BEING SOLD IN THE PRESENT TENSE WITH NO ROW
+    # AT ALL. /hold said "Hold makes the call, works the menu, and waits... Ends with the hold
+    # receipt." /recover and /parley read the same way. The switchboard exists precisely so a
+    # page cannot quietly fall out of date, and these three were never wired into it — so the
+    # mechanism was working perfectly on four rows while three products it did not know about
+    # described themselves however they liked.
+    #
+    # MEASURED IN PRODUCTION BEFORE WRITING A WORD OF THIS, because a disclosure that guesses is
+    # just a different lie:
+    #     hold_sessions 0    hold_events 0
+    #     recover_invoices 0    recover_calls 0    recover_payments 0
+    #     truce_deals 61, of which 21 settled
+    #
+    # ★ AND THE PARLEY NUMBER IS THE ONE THAT NEEDED A SECOND LOOK. 61 deals and 21 settlements
+    # reads like a product in use. Every settled deal carries a party named Dana or Ryan — the
+    # fixtures from research/truce.test.mjs — and all 21 were created today, by that suite and by
+    # my own measurement runs. Exactly ONE deal in the table is not a fixture: 2026-08-14, still
+    # status 'open', meaning a second party never sealed a limit and it never negotiated. So the
+    # honest sentence is not "nobody has used it", it is "one person opened one and it never
+    # ran", and that is what the row says. A count that includes your own test traffic is not
+    # traction, and printing it as though it were would be the exact defect this row exists to
+    # prevent.
+    dict(key='hold', name='Hold', live=False, dated='2026-08-18',
+         short='Hold has not waited on hold for anybody yet',
+         body='Hold has never run. Not once, not in a trial: there are no sessions and no events '
+              'behind it. The page describes what it is built to do, the price is published in '
+              'advance, and the only thing you can do today is ask to be told when it runs.'),
+    dict(key='recover', name='Recover', live=False, dated='2026-08-18',
+         short='Recover has not chased an invoice yet',
+         body='Recover has never run. No invoice has been loaded, no call has been placed for one '
+              'and no payment has been collected through it. Everything written about it is a '
+              'description of the thing we built, not a report of something it did.'),
+    dict(key='parley', name='Parley', live=False, dated='2026-08-18',
+         short='one Parley deal has been opened by somebody outside this company, and it never ran',
+         body='The negotiation engine works and you can watch it settle on this page. What has not '
+              'happened is a real deal: one was opened from outside this company and stopped '
+              'before the second side sealed a limit, so it never negotiated. Every settlement in '
+              'our database is our own test traffic, and we would rather say that than let a '
+              'count of them stand in for customers.'),
 ]
 
 # THE CAPTION IS SHORT BECAUSE 320 IS REAL. At 27 characters this label wrapped
@@ -536,7 +576,15 @@ def state_note(keys, top=20, center=False, delay='d3'):
     repeats the whole switchboard four times is unreadable. This is the middle:
     the one row that bears on the sentence beside it, plus the way to the rest.
     """
-    parts = [d['short'] for d in STATES if d['key'] in keys]
+    rows_used = [d for d in STATES if d['key'] in keys]
+    parts = [d['short'] for d in rows_used]
+    # ★ A DATED CLAIM MUST CARRY THE DATE IT WAS MEASURED, NOT THE DATE THE MECHANISM WAS BUILT.
+    #   STATE_DATE is one global string, so the rows added on 2026-08-18 rendered "Stated
+    #   2026-08-14" — a disclosure asserting it was checked four days before the check happened.
+    #   A row may now carry its own `dated`. Where a note draws several rows, the OLDEST wins:
+    #   a sentence is only as fresh as its stalest component, and rounding that up would be the
+    #   same overstatement in a smaller place.
+    stated = min([d.get('dated', STATE_DATE) for d in rows_used] or [STATE_DATE])
     if len(parts) == 1:
         txt = parts[0]
     elif len(parts) == 2:
@@ -546,7 +594,7 @@ def state_note(keys, top=20, center=False, delay='d3'):
     mid = ('margin-inline:auto;text-align:left;width:fit-content;max-width:min(66ch,100%);'
            if center else 'max-width:66ch;')
     return ('<p class="src rv ' + delay + '" style="margin-top:' + str(top) + 'px;' + mid + '">'
-            'Stated ' + STATE_DATE + ': ' + txt + '. The whole line between what runs today and '
+            'Stated ' + stated + ': ' + txt + '. The whole line between what runs today and '
             'what does not is <a href="/pricing.html#state">on the pricing page</a>.</p>')
 
 
@@ -984,6 +1032,7 @@ RECOVER = '''
         <p class="eyebrow rv">Recover. For the work you already did.</p>
         <h1 class="display rv d1" style="font-size:clamp(34px,4.6vw,64px);text-wrap:balance">You already earned it.<br> <span class="lit">Somebody should ask for it.</span></h1>
         <p class="lede hero-sub rv d2">The invoice went out. Thirty one days went by. Nobody called. Recover makes the call, in your name, on your caller ID, and writes down what was promised.</p>
+        <!-- STATE:START rows=recover --><!-- STATE:END -->
         ''' + reversal('recover', top=24) + '''
         <div class="hero-actions rv d3" style="margin-top:26px">
           <a class="btn btn-primary" href="/setup">Set your rules</a>
@@ -1456,20 +1505,69 @@ _STATE_BLOCKS = {
 }
 
 def _standalone_state():
+    """Fill every state marker on the site, DISCOVERED rather than listed.
+
+    ★ THIS USED TO ITERATE `_STATE_BLOCKS` AND NOTHING ELSE, which meant a page could carry
+      STATE:START/END markers and be silently skipped, and — worse — a page with no markers at
+      all was simply invisible to the mechanism. That is how /hold, /recover and /parley came to
+      describe operating services in the present tense while the switchboard worked perfectly on
+      the four pages it had been told about. A hardcoded list is a defect with a delay on it: it
+      is correct on the day it is written and wrong the first time somebody adds a page.
+
+      Now the loop finds its own members from the property that defines them — the presence of a
+      marker — and a page opts in by carrying one. `_STATE_BLOCKS` keeps only the pages whose
+      block is genuinely bespoke (terms gets a full switchboard, not a one-line note).
+
+      A marker may name its rows: `<!-- STATE:START rows=hold -->`. That is the row whose subject
+      matches the promise beside it, which is the whole design of `state_note`. A marker with no
+      rows= and no bespoke block is a BUILD REFUSAL rather than a silent empty, because an empty
+      disclosure renders as nothing and reads as no disclosure being required.
+    """
     import re as _re, sys as _s2
-    for slug, block in _STATE_BLOCKS.items():
-        p = ROOT / slug
+    valid_keys = {d['key'] for d in STATES}
+    seen = 0
+    for p in sorted(ROOT.glob('*.html')):
         html = p.read_text(encoding='utf-8')
-        if '<!-- STATE:START -->' not in html or '<!-- STATE:END -->' not in html:
-            print('*** BUILD REFUSED: %s has lost its <!-- STATE:START/END --> markers, so the '
-                  'state disclosure would silently stop rendering ***' % slug, file=_s2.stderr)
+        m = _re.search(r'<!-- STATE:START(?P<attrs>[^>]*)-->', html)
+        if not m:
+            # only a page in the bespoke dict is REQUIRED to have markers
+            if p.name in _STATE_BLOCKS:
+                print('*** BUILD REFUSED: %s has lost its <!-- STATE:START/END --> markers, so the '
+                      'state disclosure would silently stop rendering ***' % p.name, file=_s2.stderr)
+                _s2.exit(1)
+            continue
+        if '<!-- STATE:END -->' not in html:
+            print('*** BUILD REFUSED: %s opens a STATE marker and never closes it ***' % p.name,
+                  file=_s2.stderr)
             _s2.exit(1)
-        out = _re.sub(r'<!-- STATE:START -->.*?<!-- STATE:END -->',
-                      lambda m: '<!-- STATE:START -->' + block + '<!-- STATE:END -->',
+
+        if p.name in _STATE_BLOCKS:
+            block = _STATE_BLOCKS[p.name]
+        else:
+            rows = [k.strip() for k in
+                    (_re.search(r'rows=([a-z,\s]+)', m.group('attrs')) or _re.match('', '')).group(1).split(',')] \
+                   if _re.search(r'rows=([a-z,\s]+)', m.group('attrs')) else []
+            rows = [k for k in rows if k]
+            unknown = [k for k in rows if k not in valid_keys]
+            if unknown:
+                print('*** BUILD REFUSED: %s asks for state row(s) %s that do not exist in STATES. '
+                      'A disclosure naming a row that was renamed renders as nothing. ***'
+                      % (p.name, ', '.join(unknown)), file=_s2.stderr)
+                _s2.exit(1)
+            if not rows:
+                print('*** BUILD REFUSED: %s carries a STATE marker with no rows= and no bespoke '
+                      'block, so it would render an EMPTY disclosure ***' % p.name, file=_s2.stderr)
+                _s2.exit(1)
+            block = '\n  ' + state_note(rows, top=18) + '\n'
+
+        out = _re.sub(r'<!-- STATE:START[^>]*-->.*?<!-- STATE:END -->',
+                      lambda mm: m.group(0) + block + '<!-- STATE:END -->',
                       html, count=1, flags=_re.S)
         if out != html:
             p.write_text(out, encoding='utf-8')
-        print('state block filled in', slug, len(block), 'bytes')
+        seen += 1
+        print('state block filled in', p.name, len(block), 'bytes')
+    print('state markers: %d page(s), discovered not listed' % seen)
 
 
 # ── post-step: pricing cards and CTAs, applied to EVERY page from one source ──
