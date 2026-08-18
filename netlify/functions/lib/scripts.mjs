@@ -188,8 +188,19 @@ export function isStop(text) {
 }
 
 /** Someone asking whether they are talking to a machine gets one honest sentence, never a speech. */
+// ★ "what are you" MATCHES ONLY AT THE END OF THE UTTERANCE, added 2026-08-17 after a live probe of
+// the outbound research call. It was /\bwhat are you\b/ and it fired on the three questions a
+// contractor is MOST likely to ask a cold caller:
+//
+//     "what are you selling"        -> got an AI disclosure instead of an answer
+//     "what are you calling about"  -> same
+//     "what are you offering"       -> same
+//
+// On a validation call that is a non-sequitur at the exact moment the person is deciding whether to
+// keep listening. Anchored to the end of the utterance it still catches the real identity question
+// ("what are you?", "what are you exactly?") and leaves every "what are you VERB-ing" alone.
 const ASKED_AI = [/\b(are|is) (you|this) (a |an )?(robot|bot|recording|machine|computer|a ?i|artificial)/i,
-  /\bam i talking to a (real )?(person|human)/i, /\bis (this|that) a real person\b/i, /\bwhat are you\b/i];
+  /\bam i talking to a (real )?(person|human)/i, /\bis (this|that) a real person\b/i, /\bwhat are you\b\s*(?:exactly|anyway|then)?\s*[?.!]*$/i];
 
 export const askedIfAI = (text) => ASKED_AI.some((re) => re.test(String(text || '')));
 export const AI_ANSWER = "Yes, I'm an A I voice. Happy to keep it short.";

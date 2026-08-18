@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { askedIfAI } from "./scripts.mjs";
 import {
   opening, debtStatement, VOICEMAIL, floorCheck, isStop, isDispute, isWrongNumber, saidYes, saidNo,
   parseAmountCents, parseDate, extractPromise, spokenMoney, spokenNumber,
@@ -284,4 +285,23 @@ test('money and phone numbers are spoken, never printed', () => {
   assert.equal(spokenMoney(119300), '1,193 dollars');
   assert.equal(spokenMoney(50050), '500 dollars and 50 cents');
   assert.equal(spokenNumber('+19165550123'), '9 1 6, 5 5 5, 0 1 2 3');
+});
+
+// ── the identity question, and the three that only look like it ──────────────────────────────────
+// ★ Found on a live probe of the OUTBOUND research call 2026-08-17. /\bwhat are you\b/ fired on the
+// three questions a contractor is most likely to ask a cold caller, so "what are you selling" got an
+// AI disclosure instead of an answer: a non-sequitur at the exact moment the person is deciding
+// whether to keep listening.
+test('a real identity question still gets the AI disclosure', () => {
+  for (const t of ['what are you', 'what are you?', 'what are you exactly?', 'are you a robot',
+    'is this a bot', 'am I talking to a real person', 'is this a recording']) {
+    assert.equal(askedIfAI(t), true, `MISSED IDENTITY QUESTION: ${t}`);
+  }
+});
+
+test('"what are you VERB-ing" is a question about the call, not about the caller', () => {
+  for (const t of ['what are you selling', 'what are you calling about', 'what are you offering',
+    'what are you doing', 'what are you guys about', 'what are you people selling']) {
+    assert.equal(askedIfAI(t), false, `FALSE IDENTITY QUESTION: ${t}`);
+  }
 });
