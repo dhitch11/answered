@@ -47,8 +47,22 @@ async function runDeal({ sellerFloor, buyerCeiling, sellerAsk, buyerOffer, subje
     op: 'create', subject, kind: 'rent',
     a_name: 'Dana', a_role: 'owner', b_name: 'Ryan', b_role: 'tenant',
   });
-  const a = d.you.rsplit ? null : d.you.split('/').pop();
-  const b = d.them.split('/').pop();
+  const a = d.you.split('/').pop();
+
+  // ★ `them` IS AN INVITATION CODE, NOT A TOKEN (fixed 2026-08-17, @LANE-SEARCHLIGHT).
+  // This test predated the invitation model and passed `them` straight to set_limit, which the
+  // handler rejects at truce.mjs:140 because it is 24 hex and TOKEN wants 48. The suite has been
+  // red ever since, and nobody knew, because the old aggregate could not report a failure.
+  //
+  // ★ IT LOOKED LIKE A PRODUCT DEFECT AND IT IS NOT. `${site}/truce/${b_claim}` returns HTTP 200,
+  // so the invitee gets a page that loads and a control that then refuses them. I measured the real
+  // flow before changing a line here: create -> claim(code) -> set_limit works for both parties,
+  // and claiming the same code twice is correctly refused. The product is right; the test was
+  // describing a version of it that no longer exists.
+  const claimed = await api({ op: 'claim', code: d.them.split('/').pop() });
+  const b = claimed.token;
+  if (!b) throw new Error('claim returned no token; the invitation flow is broken, not this test');
+
   await api({ op: 'set_limit', token: a, direction: 'min', amount: sellerFloor, opening: sellerAsk });
   const view = await api({ op: 'set_limit', token: b, direction: 'max', amount: buyerCeiling, opening: buyerOffer });
   created.push(d.deal_id);
