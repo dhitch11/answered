@@ -221,10 +221,48 @@ export default async function handler(req, context) {
       // Twilio answers HELP at the platform level. Recorded so the volume is visible, not answered.
       console.log(`sms-inbound: HELP from ${from.slice(-4)}.`);
     } else {
-      // ★ RECORDED, NEVER INTERPRETED. A body we do not recognise is a person talking to a number
-      // that does not yet run a conversation. Guessing at intent here is how a system invents a
-      // consent decision nobody made.
-      console.log(`sms-inbound: unrecognised body from ${from.slice(-4)} (${String(params.Body || '').length} chars); acknowledged, no action taken.`);
+      // ★ THE FRONT DOOR. FIXED 2026-08-17 — THIS BRANCH WAS SWALLOWING EVERY SIGNUP.
+      //
+      // The comment below used to end "a person talking to a number that does not yet run a
+      // conversation", and on 2026-08-16 that was true. On 2026-08-17 signup.mjs shipped, the
+      // waitlist was removed, and thirteen places across index/setup/pricing/trades began telling
+      // contractors to "Text SETUP to (916) 282-5278". Nothing repointed the webhook.
+      //
+      // Measured on the live Messaging Service MGab661e...:
+      //     inbound_request_url          = https://answered.reddenda.com/api/sms-inbound
+      //     use_inbound_webhook_on_number = false
+      //     senders                       = +18778060626, +19162825278
+      // So every inbound text lands HERE, and "SETUP" fell to this else branch: logged, empty
+      // TwiML, no reply. The seven-question thread, the account write and the operator email were
+      // all unreachable in production. 100% of self-serve signups were lost in silence.
+      //
+      // ★ AND IT WAS INVISIBLE BECAUSE OF HOW IT WAS TESTED. Every proof of the signup flow,
+      // including my own burst test and my 8-turn happy path, was a signed POST fired directly at
+      // /api/signup — which bypasses the routing question entirely. The Messages log shows ZERO
+      // real inbound texts ever, so no contractor had yet hit it. Reproduce through the serving
+      // path or do not publish.
+      //
+      // ★ WHY DELEGATE HERE RATHER THAN REPOINT THE SERVICE AT /api/signup. Two senders share this
+      // messaging service. Repointing moves STOP and START off this handler too, and the Postgres
+      // suppression mirror above is the one write that must never be skipped — Twilio honours the
+      // keyword at its own level, but the voice side only learns about it here. Keeping one inbound
+      // door and delegating the conversation leaves the legal writes exactly where they are.
+      //
+      // The signature still validates: Twilio signs the URL it POSTs to, we hand signup the same
+      // url, headers and raw body, and signup rebuilds the identical string.
+      console.log(`sms-inbound: body from ${from.slice(-4)} is not a keyword; handing it to the setup thread.`);
+      try {
+        const { default: signupHandler } = await import('./signup.mjs');
+        return await signupHandler(
+          new Request(req.url, { method: 'POST', headers: req.headers, body: raw }),
+          context,
+        );
+      } catch (e) {
+        // A throw here is a 502, and Twilio answers a 502 by redelivering the same message, which
+        // walks the contractor's answer one question to the right. Silence costs one turn.
+        console.error('sms-inbound: setup thread failed, staying silent rather than 502ing: '
+          + String(e && e.message).slice(0, 140));
+      }
     }
   } catch (e) {
     // A store failure on a STOP is the one error here that matters, so it is loud. Twilio has
