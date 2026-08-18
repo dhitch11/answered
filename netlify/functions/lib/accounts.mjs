@@ -222,9 +222,40 @@ export function renderGreeting(account) {
   const c = account.config;
   const says = c.business_says || account.business_name;
   const name = c.greeting_name;
+  // ★ THE RECORDING AND TRANSCRIPTION DISCLOSURE IS NOT OPTIONAL HERE, ADDED 2026-08-17.
+  //
+  // This greeting said "an AI assistant" and stopped. Meanwhile /recording promises, in the
+  // customer's own words, that the line "says two things in its first sentence: that you are
+  // talking to an AI, and that the call is recorded" — "Every call, everywhere, whichever state you
+  // are in, whether or not the local rule requires it." A business line assigned tomorrow would have
+  // made that promise false on its first call.
+  //
+  // ★ AND THE THIRD CLAUSE IS THE ONE THE ESTATE'S OWN LEGAL WORK SAYS MATTERS MOST. See the
+  // doctrine beside DISCLOSURE in lib/scripts.mjs: six adversarial lenses put the largest exposure
+  // in this program on the AI that LISTENS, because a wiretap claim is the class-certifiable one —
+  // one uniform practice applied identically to every callee, Cal. Penal Code 632.7 reaching any
+  // call involving a cell phone with no confidential-communication element (Smith v. LoanMe (2021)
+  // 11 Cal.5th 183), and Ribas v. Clark (1985) 38 Cal.3d 355 finding liability against a listener
+  // who never spoke. "This call is recorded" discloses the wrong object. The sentence has to name
+  // the second auditor, so it says transcribed too.
+  //
+  // Two lanes flagged the gap independently within an hour, and it was dormant only because
+  // ANSWERED_CUSTOMER_AGENT_ID is unset. That makes this fix-then-set, not set.
+  // ★ BOTH DISCLOSURES SIT IN THE FIRST SENTENCE, AND THAT IS NOT A STYLE CHOICE.
+  //
+  // A first pass at this fix put them in sentence two: "Thanks for calling X, this is Thomas. I am
+  // an AI assistant, and this call is recorded." That reads better and it STILL BREAKS THE PROMISE.
+  // recording.html says it twice, in the customer's own words: "In its first sentence, before
+  // anything else," and "Every call our AI is on says two things in its first sentence: that you
+  // are talking to an AI, and that the call is recorded." A greeting whose first sentence is a
+  // thank-you has moved the disclosure to second place on a page that sold it as first.
+  //
+  // So the greeting, the business name, the assistant name, the AI disclosure and the recording
+  // notice are ONE sentence. `assertGreetingKeepsTheRecordingPromise` in accounts-greeting.test.mjs
+  // parses that page and re-checks this at every run, so the two cannot drift apart again.
   return name
-    ? `Thanks for calling ${says}, this is ${name}, an AI assistant. How can I help?`
-    : `Thanks for calling ${says}. You are speaking with an AI assistant. How can I help?`;
+    ? `Thanks for calling ${says}, this is ${name}, an AI assistant, and this call is recorded and transcribed. How can I help?`
+    : `Thanks for calling ${says}, you are speaking with an AI assistant, and this call is recorded and transcribed. How can I help?`;
 }
 
 // ── what an owner is told, in plain words ────────────────────────────────────────────────────
