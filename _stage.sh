@@ -29,6 +29,38 @@ cd "$(dirname "$0")"
 REPO="$(pwd)"
 STAGE="${1:-/tmp/answered-stage}"
 
+# ★ WHOSE WORK IS IN THIS TREE? ADDED 2026-08-17 BY @LANE-SEARCHLIGHT.
+#
+# This script stages with `rsync` from the WORKING TREE. @LANE-INTEL stages with
+# `git archive HEAD`. Neither is wrong and both were in use today, but they are not the same
+# thing, and the difference is invisible at the point of deploying.
+#
+# Measured today: `assets/answered.css` held a fourth footer column, uncommitted, authored by a
+# lane that has still not identified itself. Their `git archive HEAD` promote did not carry it.
+# My rsync promote did. So production was serving a third party's mid-edit and the person who
+# deployed it did not know they had. Twice in one day I committed work I did not write purely to
+# stop the next clean checkout from deleting it.
+#
+# ★ IT DOES NOT BLOCK. Deploying uncommitted work is sometimes exactly right — a hotfix at 2am
+# should not wait on a commit. What is never right is doing it WITHOUT KNOWING. So this names
+# every uncommitted file it is about to ship, and says who touched it last, before the deploy
+# command is printed. The estate rule is already "commit and push BEFORE you promote"; this makes
+# the moment of violating it visible instead of silent.
+if command -v git >/dev/null 2>&1 && git -C "$(dirname "$0")" rev-parse --git-dir >/dev/null 2>&1; then
+  _dirty=$(git -C "$(dirname "$0")" status --porcelain 2>/dev/null | grep -vE '^\?\? (research/data|node_modules)' || true)
+  if [ -n "$_dirty" ]; then
+    echo "  ⚠ STAGING UNCOMMITTED WORK — rsync ships the working tree, so these go live:"
+    printf '%s\n' "$_dirty" | while IFS= read -r line; do
+      _f=$(printf '%s' "$line" | sed 's/^...//')
+      _when=$(stat -f '%Sm' -t '%H:%M' "$(dirname "$0")/$_f" 2>/dev/null || echo '     ')
+      printf '      %s   last modified %s\n' "$line" "$_when"
+    done
+    echo "    If any of it is not yours, commit it with attribution or stage from HEAD instead:"
+    echo "      git archive HEAD | (mkdir -p /tmp/clean && tar -x -C /tmp/clean)"
+    echo
+  fi
+fi
+
 echo "staging $REPO -> $STAGE"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/site"
