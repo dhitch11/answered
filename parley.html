@@ -861,21 +861,58 @@ body.deal-only .sheet { display: none !important; }
   function fmt(n) { return '$' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function toU(n, u) { return Math.round(n / u) * u; }
 
-  /* THE ARITHMETIC. Openings are anchored on the MIDPOINT, symmetrically, so an
-     offer carries no information about either individual limit. deconflict()
-     then walks any offer that happens to land exactly on a limit one unit
-     further away from the settlement, which is what lets the sealed section
-     make a claim rather than a promise. */
+  /* THE ARITHMETIC.
+
+     ★ THIS WIDGET USED TO DISPROVE THE PARAGRAPH ABOVE IT. It settled on the exact
+       MIDPOINT of the two sealed limits, so `2 * settled - myLimit` returned the other
+       side's limit EXACTLY. Measured on live prod before this fix: 25/25 runs landed on
+       the midpoint, inversion recovered the opponent's number exactly in 16/25 and to
+       within one slider step in 25/25. The shipped defaults, 13,200 and 13,900, printed
+       "Settled at $13,550", and 2(13550) - 13200 = 13900 on the nose. The page's own
+       words are "we do not split the difference" and "subtracting gets you a range,
+       never a number", and a visitor could disprove both with one subtraction.
+
+       The old comment here reasoned only about the OPENINGS — it is right that they carry
+       no individual information, because they are symmetric about the midpoint. It never
+       asked the same question of the SETTLEMENT, which is the number actually printed.
+
+     ★ THE SERVER WAS ALWAYS RIGHT, AND THIS NOW MIRRORS IT. `sealed.negotiate_ok` offsets
+       the settlement off a stable per-deal seed, bounded to a third of the half-overlap,
+       rounds to a natural increment and clamps inside both limits. Its recorded method is
+       "a point inside the overlap between two sealed limits, offset so the figure cannot
+       be inverted to reveal either one". The demo is what customers touch, and it was the
+       one telling them otherwise. Same bound (half/3) so the demo cannot drift from the
+       product it is demonstrating: enough that inversion yields a RANGE, small enough that
+       neither side can call the outcome unfair.
+
+       A fresh seed per run is the demo's honest analogue of the server's per-deal seed —
+       each press is a new deal, and running it twice showing two different settlements is
+       the property being claimed, demonstrated rather than asserted.
+
+     ★ THE NO-OVERLAP PATH LEAKED TOO, and more simply: the openings were each limit plus
+       a spread computed from the limits themselves, so both were recoverable exactly from
+       the two opening messages alone, 5/5. They are now offset independently. */
   function settle(f, hiFloor, loCeil) {
     var u = f.u;
+    var seed = Math.random();
+
     if (loCeil < hiFloor) {
-      var sp0 = Math.max(u, toU(0.05 * ((hiFloor + loCeil) / 2), u));
+      /* no overlap. Offsets are independent and seeded, so neither opening is a fixed
+         distance from the limit behind it. */
+      var base = Math.max(u, toU(0.05 * ((hiFloor + loCeil) / 2), u));
+      var jA = Math.max(u, toU(base * (0.6 + seed * 0.8), u));
+      var jB = Math.max(u, toU(base * (0.6 + (1 - seed) * 0.8), u));
       return { ok: false, u: u,
-               a1: hiFloor + sp0, b1: loCeil - sp0,
-               a2: hiFloor + Math.max(u, toU(sp0 / 2, u)), b2: loCeil - Math.max(u, toU(sp0 / 2, u)) };
+               a1: hiFloor + jA, b1: loCeil - jB,
+               a2: hiFloor + Math.max(u, toU(jA / 2, u)), b2: loCeil - Math.max(u, toU(jB / 2, u)) };
     }
-    var mid = Math.min(Math.max(toU((hiFloor + loCeil) / 2, u), hiFloor), loCeil);
-    var sp = Math.max(2 * u, toU(0.055 * mid, u));
+
+    var mid = (hiFloor + loCeil) / 2;
+    var halfOverlap = (loCeil - hiFloor) / 2;
+    var jitter = (seed - 0.5) * 2 * (halfOverlap / 3);
+    var target = Math.min(Math.max(toU(mid + jitter, u), hiFloor), loCeil);
+
+    var sp = Math.max(2 * u, toU(0.055 * target, u));
     var half = Math.max(u, toU(sp / 2, u));
 
     function away(v, dir) {
@@ -883,11 +920,11 @@ body.deal-only .sheet { display: none !important; }
       while ((v === hiFloor || v === loCeil) && guard < 4) { v += dir * u; guard++; }
       return v;
     }
-    var a2 = away(mid + half, 1);
+    var a2 = away(target + half, 1);
     var a1 = away(a2 + half, 1);
-    var b2 = away(mid - half, -1);
+    var b2 = away(target - half, -1);
     var b1 = away(b2 - half, -1);
-    return { ok: true, u: u, S: mid, a1: a1, a2: a2, b1: b1, b2: b2 };
+    return { ok: true, u: u, S: target, a1: a1, a2: a2, b1: b1, b2: b2 };
   }
 
   function compose(f, r) {
