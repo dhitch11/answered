@@ -126,12 +126,20 @@ t('riley caps are unchanged', () => {
 });
 
 t('riley floor ORDER is unchanged, because order is behaviour', () => {
-  // 'unbooked-claim' was added on 2026-08-14 when the voice grew hands, and it is FIRST because a
+  // 'unbooked-claim' was added on 2026-08-14 when the voice grew hands, and it was FIRST because a
   // false booking is the worst sentence this line can produce. The five frozen floors keep their
   // order relative to each other underneath it, which is the part that was never allowed to move.
+  //
+  // ★ 'spec-leak' TOOK FIRST PLACE ON 2026-08-18, deliberately, and the reasoning is the same one
+  // that put unbooked-claim there. A turn that recites the system prompt must be refused BEFORE it
+  // is judged on word count, price shape or numerals — otherwise a long leak is reported as a
+  // monologue and a leak containing a figure is reported as a numeral, and the incident is filed
+  // under the wrong name in the logs an operator reads. Order is behaviour, and the behaviour we
+  // want is: the worst thing it can say is the first thing we look for.
   assert.deepEqual(riley.outFloors.map((f) => f.by),
-    ['unbooked-claim', 'price', 'contact-promise', 'ai-denial', 'payment', 'slot-invention', 'numeral']);
-  assert.deepEqual(riley.outFloors.map((f) => f.by).filter((b) => b !== 'unbooked-claim'),
+    ['spec-leak', 'unbooked-claim', 'price', 'contact-promise', 'ai-denial', 'payment', 'slot-invention', 'numeral']);
+  // The frozen five are still in their original order relative to each other, underneath both.
+  assert.deepEqual(riley.outFloors.map((f) => f.by).filter((b) => b !== 'unbooked-claim' && b !== 'spec-leak'),
     ['price', 'contact-promise', 'ai-denial', 'payment', 'slot-invention', 'numeral']);
   assert.deepEqual(riley.inBranches.map((b) => b.by),
     ['crisis', 'payment-offered', 'ai-asked', 'demo-asked', 'abuse']);
@@ -616,7 +624,9 @@ t('describe() names every persona, leaks no prompt and no secret', () => {
   // because describe() is how an operator finds out what a voice actually enforces. It carries the
   // language-independent floors only; the English text/callback/coach/time floors are absent by
   // measurement, not by oversight. If someone later ports them, this assertion should change.
-  assert.deepEqual(d[4].output_floors, ['numeral', 'money-invention', 'monologue', 'stacked-question']);
+  // 'spec-leak' is the one floor that IS language-independent in the strongest sense: it compares
+  // output against that persona's own spec, so it needs no Spanish regex to work in Spanish.
+  assert.deepEqual(d[4].output_floors, ['spec-leak', 'numeral', 'money-invention', 'monologue', 'stacked-question']);
   assert.deepEqual(d[0].tools, [BOOK_TOOL], 'the registry tells the truth about what a voice can DO');
   assert.deepEqual(d[1].tools, []);
   assert.ok(d[1].input_branches.includes('stop'));
