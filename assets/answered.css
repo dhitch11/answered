@@ -896,6 +896,33 @@ section { position: relative; }
 .foot .btn-call { flex-direction: column; align-items: flex-start; gap: 3px; padding: 11px 14px; max-width: 100%; }
 .foot .btn-call .call-n { font-size: 13.5px; letter-spacing: 0; }
 
+/* ── ★★ THE FOOTER CALL CTA WAS INVISIBLE ON EVERY PHONE, AND ONLY A TOUCH DEVICE COULD SEE IT.
+   Measured on live prod, the same page, the same width, the ONLY variable being a touch pointer:
+       390 touch=true   <a href="tel:">  contrast  1.02:1   "Call the line yourself+1 (916) 282-5278"
+       390 touch=false  <button>         contrast 17.41:1   "Call the line yourself | +1 (916) 282-5278"
+   Lime text on a lime button. Unreadable, on the one control that carries the phone number, on
+   every page, for 100% of the people the site is actually for.
+
+   TWO CASCADE COLLISIONS, both invisible to any check that reads the rule instead of the result:
+
+   1. On a touch pointer the script swaps the control to an <a href="tel:"> so it can dial. That
+      changes NOTHING visually on desktop — and on an anchor, `.foot a { color: var(--t2) }`
+      (0-1-1) now outranks `.btn-primary { color: var(--ink-1000) }` (0-1-0). The button keeps
+      its lime background and takes the footer's muted link colour. `a.btn-primary` (0-2-1) is
+      the smallest thing that wins it back without touching either original rule.
+   2. `@media (max-width: 780px) { .foot ul a { display: inline-block } }` — a real tap-target
+      fix from an earlier lane — silently made my `flex-direction: column` INERT, because
+      flex-direction does nothing on an inline-block. The label and the number then set on one
+      line with no separator and read as one string. `.foot .btn-call` is (0-2-0) and beats
+      `.foot ul a` (0-1-2) on class count, so it holds regardless of source order.
+
+   ★ WHY I SHIPPED IT: I verified this footer with screenshots at 390 and called it done. Playwright
+   defaults to a FINE pointer, so my 390px "phone" got the <button> and read 17.41:1 — a real
+   measurement, of a rendering no phone ever receives. Emulating the viewport is not emulating the
+   device. Any check on this control must set hasTouch, or it is testing the desktop again. ── */
+.foot a.btn-primary { color: var(--ink-1000); }
+.foot .btn-call { display: inline-flex; }
+
 /* ── reveal. transform + opacity only. never leave base at opacity 0, or a
    browser without IntersectionObserver renders a permanently blank page. ── */
 .rv { opacity: 1; transform: none; }
