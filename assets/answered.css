@@ -822,13 +822,59 @@ section { position: relative; }
 
 /* ── footer ──────────────────────────────────────────────────────────────── */
 .foot { border-top: 1px solid var(--line); background: var(--ink-1000); }
-.foot-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 36px; padding-block: 54px 30px; }
-@media (max-width: 780px) { .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; } }
+/* ── FOUR COLUMNS, BECAUSE THERE ARE FOUR. ─────────────────────────────────
+   The Company group was added 2026-08-16 to close A2P 30907 (the site had to
+   name TWINFLAME INVESTMENTS LLC from any URL). `grid-template-columns` was
+   never updated from three, so a 10-link list wrapped to its own row and sat
+   orphaned under the brand with two empty tracks beside it. Measured at 1440
+   before the fix: rows=2, Company alone at 428px. Wrong at 1024 and 768 too.
+   Track count is stated once here and the breakpoints only ever reduce it. ── */
+.foot-grid { display: grid; grid-template-columns: 1.5fr repeat(3, minmax(0, 1fr)); gap: 36px; padding-block: 54px 30px; }
+/* below 1100 the fourth track puts "If your call was recorded" onto two lines,
+   so the brand takes the full row and the three link groups share the next */
+@media (max-width: 1099px) { .foot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .foot-grid > :first-child { grid-column: 1 / -1; } }
+/* 3 tracks hold to 700, not 780: at 768 two tracks orphaned Company onto a
+   third row again (measured rows=3). At 700 the narrowest track is ~213px and
+   "If your call was recorded" still sets on one line at 15px. */
+@media (max-width: 699px) { .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .foot h4 { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--t3); margin-bottom: 14px; }
-.foot li + li { margin-top: 9px; }
+
+/* ── THE LINK IS THE TAP TARGET, NOT THE GAP AROUND IT. ────────────────────
+   Measured: all 21 footer list anchors were 19px tall — under the WCAG 2.5.8
+   24px floor, far under the 44px Apple HIG target — while `li + li` spent
+   46px of vertical space on mobile. That gap looked like a hit area and was
+   not one: the tappable band was 19px with 46px of dead space between.
+   Paying for a real target out of the wasted gap fixes the accessibility
+   defect and returns ~400px of footer height on a phone at the same time.
+   Inline links inside the legal sentence below are NOT touched — WCAG 2.5.8
+   exempts targets inline in a sentence, and padding them would break the
+   line rhythm of the entity disclosure. ── */
+.foot li + li { margin-top: 2px; }
+.foot li > a { display: block; padding-block: 5px; }
 .foot a { color: var(--t2); font-size: 15px; }
 .foot a:hover { color: var(--bronze-2); }
+.foot li > .src { display: block; margin-top: 7px; }
+@media (max-width: 880px) {
+  .foot li + li { margin-top: 0; }
+  .foot li > a { padding-block: 12px; min-height: 44px; }
+}
 .foot-base { padding-block: 22px 40px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; }
+
+/* ── ★ THE STICKY CTA IS FIXED AND NOTHING RESERVED ROOM FOR IT. ───────────
+   `.scta` is `position:fixed; bottom:12px` carrying a 44px button — ~78px of
+   occupied screen — and it is shown below 881px. No element on the page ever
+   reserved that space, so scrolled fully to the bottom the last ~80px of the
+   footer rendered UNDERNEATH it, permanently. At 390 that buried "Privacy and
+   texting" and "If your call was recorded": two links a visitor could read
+   but never tap, on every phone, on every page.
+   Every geometry assertion passed the whole time — the elements are laid out
+   correctly, they are simply covered — which is why only a screenshot found
+   it. `env()` carries the notch, since the viewport is `viewport-fit=cover`.
+   Scoped to the same 880px breakpoint that shows the bar, so desktop, where
+   `.scta` is `display:none`, gains no phantom whitespace. ── */
+@media (max-width: 880px) {
+  .foot-base { display: grid; gap: 12px; padding-bottom: calc(40px + 82px + env(safe-area-inset-bottom, 0px)); }
+}
 
 /* ── reveal. transform + opacity only. never leave base at opacity 0, or a
    browser without IntersectionObserver renders a permanently blank page. ── */
