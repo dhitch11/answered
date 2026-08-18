@@ -30,7 +30,18 @@ async function discoverPages() {
 }
 const PAGES = await discoverPages();
 console.log(`sweeping ${PAGES.length} pages x ${5} widths against ${BASE}\n  ${PAGES.join(' ')}\n`);
-const SIZES = [[320, 720], [390, 844], [768, 1024], [1440, 900], [1920, 1080]];
+// ★ TOUCH IS PART OF THE SIZE, ADDED 2026-08-18. Emulating a viewport is NOT emulating a device.
+// Playwright defaults to a FINE pointer, so every "phone" run here was really a desktop rendered
+// narrow. That is not a theoretical gap: @LANE-FOOTER measured the footer call CTA at 17.41:1
+// contrast in a 390px Playwright window and at 1.02:1 on real phones — lime on lime, on the
+// control carrying the phone number, on every page. The site swaps that control to <a href="tel:">
+// on a coarse pointer, and `.foot a` then outranks `.btn-primary` on specificity. Both readings
+// were honest; only one of them was of a page a human has ever been served.
+// So the three narrow sizes now carry hasTouch + isMobile and a coarse pointer.
+const SIZES = [
+  [320, 720, true], [390, 844, true], [768, 1024, true],
+  [1440, 900, false], [1920, 1080, false],
+];
 
 // This machine's resolver intermittently fails on the custom domain while every
 // public resolver and the authoritative nameserver return the record. Pinning
@@ -42,8 +53,13 @@ const browser = await chromium.launch({ channel: 'chrome', args });
 let fails = 0;
 
 for (const path of PAGES) {
-  for (const [w, h] of SIZES) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
+  for (const [w, h, touch] of SIZES) {
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: h },
+      deviceScaleFactor: 1,
+      hasTouch: Boolean(touch),
+      isMobile: Boolean(touch),
+    });
     const page = await ctx.newPage();
     const errs = [];
     page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 160)); });
@@ -122,7 +138,7 @@ for (const path of PAGES) {
     if (bad) fails++;
     console.log(
       `${bad ? 'FAIL' : ' ok '} ${path.padEnd(13)} ${String(w).padStart(4)}x${h}  ` +
-      `status=${resp.status()} scrollX=${overflow} console=${errs.length} stuckReveals=${stuck}` +
+      `${touch ? 'touch' : 'mouse'} status=${resp.status()} scrollX=${overflow} console=${errs.length} stuckReveals=${stuck}` +
       (wide.length ? ` WIDE:${wide.join(' | ')}` : '') +
       (errs.length ? ` ERR:${errs.slice(0, 2).join(' ~ ')}` : '')
     );
