@@ -215,8 +215,62 @@ exports.handler = async (event) => {
   if (f['bot-field']) { return { statusCode: 303, headers: { Location: '/thanks.html' }, body: '' }; }
 
   const email = String(f.email || '').trim();
-  if (!email || email.indexOf('@') < 1) {
+
+  // ★ THE VALIDATOR WAS `email.indexOf('@') < 1`, AND THAT IS NOT A VALIDATOR.
+  //   It accepts anything with an @ after position 0 — including a CRLF payload, which was
+  //   measured travelling all the way to Resend and coming back a 502. Header injection through
+  //   a "to" address is the classic version of that, and this endpoint hands its value to a mail
+  //   provider. Length-capped, single @, no whitespace or control characters, and a real TLD.
+  const EMAIL_RE = /^[^\s@<>",;:\\]{1,64}@[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+  if (!email || email.length > 254 || /[\r\n\t\0]/.test(email) || !EMAIL_RE.test(email)) {
     return { statusCode: 400, body: 'An email address is required.' };
+  }
+
+  // ★ AND IT WAS AN UNAUTHENTICATED, UNRATE-LIMITED EMAIL AMPLIFIER.
+  //   Anyone could POST this endpoint in a loop: it sends an autoresponder from
+  //   info@reddenda.com to any address a stranger supplies, AND a notification to David whose
+  //   subject carries attacker-controlled text. The blast radius is not this function — it is the
+  //   sending REPUTATION of the address every customer email in this business leaves from, which
+  //   is not something you get back quickly once a provider or a receiver has decided about it.
+  //
+  //   The primitive already existed and this path simply never got it: `sv_rate_take` is a single
+  //   `insert … on conflict do update set n = n + 1 returning n`, so concurrent callers serialise
+  //   on the row (truce.mjs:211 and account-start.mjs:114 both use it). Two buckets, because they
+  //   stop different abuses: per-IP stops one machine hammering it, per-ADDRESS stops a distributed
+  //   caller mailbombing one victim from many IPs.
+  //
+  //   FAILS CLOSED, matching truce.mjs: if the limiter cannot be read we refuse rather than wave
+  //   through. An unreadable limiter is an unknown, and an unknown is not a permission.
+  //
+  //   ★ AND THAT IS IN TENSION WITH THIS FILE'S OWN HEADER, which says a lost lead is worse than
+  //     a lost CRM log. It is a real cost and it should be named rather than buried: this endpoint
+  //     now depends on the database, so a Supabase outage refuses submissions that would previously
+  //     have gone through. Taken deliberately, for two reasons. An open amplifier does not cost one
+  //     lead, it costs the sending reputation of the address every customer email leaves from, and
+  //     that does not come back on a deploy. And the refusal is not a dead end: it returns the same
+  //     503 and the same "email info@reddenda.com and we will pick it up" this file already gives
+  //     when the mail provider is missing, so the person still has a route to a human.
+  const ip = String(
+    event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || '',
+  ).split(',')[0].trim() || 'unknown';
+  try {
+    const { rpc } = await import('./lib/db.mjs');
+    const perIp = await rpc('sv_rate_take', {
+      p_bucket: 'interest_ip', p_key: ip, p_limit: 10, p_window: '1 hour',
+    });
+    if (!perIp || perIp.allowed !== true) {
+      return { statusCode: 429, body: 'That is a lot of submissions from one place in an hour. Try again later, or email info@reddenda.com.' };
+    }
+    const perAddr = await rpc('sv_rate_take', {
+      p_bucket: 'interest_addr', p_key: email.toLowerCase(), p_limit: 3, p_window: '24 hours',
+    });
+    if (!perAddr || perAddr.allowed !== true) {
+      return { statusCode: 429, body: 'We already have your note and a person is reading it. Reply to that email rather than sending another.' };
+    }
+  } catch (e) {
+    console.error('interest: rate limiter unreadable; refusing rather than waving through: '
+      + String((e && e.message) || e).slice(0, 160));
+    return { statusCode: 503, body: 'We could not record that right now. Please email info@reddenda.com and we will pick it up.' };
   }
 
   const KEY = process.env.RESEND_API_KEY;
