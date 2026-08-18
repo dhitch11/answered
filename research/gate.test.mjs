@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { classify, DEFAULT_POLICY, LANES, LICENSING_REQUIRED_STATES, BIOMETRIC_RISK_STATES, VERIFIED_STATES } from './lib/lane.mjs';
+import { npasForState } from './lib/npa.mjs';
 import { withinWindow, STATE_ZONES, MULTI_ZONE_STATES } from './lib/geo.mjs';
 import { suppress, suppression, paths } from './lib/store.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -35,7 +36,29 @@ const WEEKEND = new Date('2026-08-15T18:00:00Z');
 // `businessVerified` is on the base fixture for the same reason the DNC flags are on READY: it is
 // a property the corpus supplies for every real row, and without it every case below would fail for
 // a reason unrelated to what it tests. The business gate has its own section.
-const base = { phone: '+15125550142', state: 'OR', lookupOk: true, callCount30d: 0, dncListed: false, businessVerified: true };
+// ★ FIXTURE CORRECTED 2026-08-17. This read `phone: '+15125550142', state: 'OR'` — a TEXAS area
+// code labelled Oregon — and every case in this file inherited it. It passed because nothing
+// compared the two fields, which is exactly the defect `npa.mjs` now closes: state law was chosen
+// from the listing and the subscription fence from the area code, and they were free to disagree.
+// The test suite for the gate was itself carrying the confusion the gate had. 503 is Oregon.
+const base = { phone: '+15035550142', state: 'OR', lookupOk: true, callCount30d: 0, dncListed: false, businessVerified: true };
+
+// ★ A STATE OVERRIDE MUST BRING ITS OWN AREA CODE WITH IT.
+// Every per-state case below used to write `{ ...base, state: 'TX' }` and keep base's phone, so it
+// asserted Texas law against an Oregon number. The gate could not see it, because until 2026-08-17
+// nothing compared the two fields. Rather than hand-typing a number per state — which is the same
+// mistake with more chances to make it — the fixture is DERIVED from NANPA's own map, so a state
+// can never again be tested against a number that does not belong to it.
+// The subscription fence is a SEPARATE control with its own section at the end. A per-state case
+// must not be able to pass or fail on it by accident, so it gets a policy that subscribes to the
+// state it is testing, and nothing else changes.
+const readyIn = (st) => ({ ...READY, subscribedAreaCodes: new Set(npasForState(st)) });
+
+const inState = (st, rest = {}) => {
+  const npas = npasForState(st);
+  assert.ok(npas.length, `no NPA on file for ${st}; the fixture cannot be built`);
+  return { ...base, state: st, phone: `+1${npas[0]}5550142`, ...rest };
+};
 
 // ★ The default policy now refuses EVERY non-consented call, because the do-not-call program does
 // not exist yet and 47 CFR 64.1200(d) is a condition precedent. READY is the same policy with those
@@ -48,7 +71,7 @@ const READY = {
   ...DEFAULT_POLICY,
   dncScrubbed: true,
   dncProceduresInPlace: true,
-  subscribedAreaCodes: new Set(['512', '503', '971', '541', '458']),
+  subscribedAreaCodes: new Set(['503', '971', '541', '458']),
 };
 
 console.log('\nLINE TYPE');
@@ -102,7 +125,7 @@ console.log('\nSUPPRESSION AND FREQUENCY');
 test('a suppressed number is RED even with consent on file', () => {
   const v = classify(
     { ...base, lineType: 'landline', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'form' } },
-    READY, new Set(['+15125550142']), OPEN,
+    READY, new Set(['+15035550142']), OPEN,
   );
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /suppression/);
@@ -199,19 +222,19 @@ test('64.1200(d) procedures are a condition precedent, not a mitigation', () => 
 });
 for (const st of ['TX', 'WA', 'FL']) {
   test(`${st} is refused: registration and bond bind before the first call`, () => {
-    const v = classify({ ...base, state: st, lineType: 'landline' }, READY, new Set(), OPEN);
+    const v = classify(inState(st, { lineType: 'landline' }), readyIn(st), new Set(), OPEN);
     assert.equal(v.lane, LANES.RED);
     assert.match(v.reasons.join(' '), /registration and bond/);
   });
 }
 test('IL is refused while a voiceprint cannot be ruled out', () => {
-  const v = classify({ ...base, state: 'IL', lineType: 'landline' }, READY, new Set(), OPEN);
+  const v = classify(inState('IL', { lineType: 'landline' }), READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /WRITTEN release/);
 });
 test('consent still clears the licensing states, because it is a different basis', () => {
   const v = classify(
-    { ...base, state: 'TX', lineType: 'mobile', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'ring_test' } },
+    inState('TX', { lineType: 'mobile', consent: { grantedAt: '2026-08-01', scope: 'research_call', source: 'ring_test' } }),
     READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.GREEN);
 });
@@ -226,34 +249,34 @@ console.log('\nTHE FOUR-STATE VERIFICATION, ENFORCED RATHER THAN NOTED');
 test('CALIFORNIA is refused for an autonomous call, however clean the number is', () => {
   // The number itself is perfect: fixed business landline, registry-clear, inside the window.
   // California still refuses, because 2874 is about WHO SPEAKS FIRST, not about the number.
-  const v = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  const v = classify(inState('CA', { lineType: 'landline', dncListed: false }), READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /2874|natural-voice/i);
 });
 test('CALIFORNIA opens the moment a live human really opens the call', () => {
-  const v = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false },
-    { ...READY, humanOpener: true }, new Set(), OPEN);
-  assert.equal(v.dialable, true);
+  const v = classify(inState('CA', { lineType: 'landline', dncListed: false }),
+    { ...readyIn('CA'), humanOpener: true }, new Set(), OPEN);
+  assert.equal(v.dialable, true, v.reasons.join(' | '));
 });
 test('NEVADA is refused until the recording region is attested in writing', () => {
-  const v = classify({ ...base, state: 'NV', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  const v = classify(inState('NV', { lineType: 'landline', dncListed: false }), READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /all-party|NRS 200\.620/i);
 });
 test('ARIZONA is refused as a licensing gate, exactly like TX/WA/FL', () => {
-  const v = classify({ ...base, state: 'AZ', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  const v = classify(inState('AZ', { lineType: 'landline', dncListed: false }), READY, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
   assert.match(v.reasons.join(' '), /registration/i);
 });
 test('OREGON is the one of the four that a clean number actually passes', () => {
-  const v = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  const v = classify(inState('OR', { lineType: 'landline', dncListed: false }), READY, new Set(), OPEN);
   assert.equal(v.dialable, true, v.reasons.join(' '));
 });
 test('AN UNREAD STATE IS REFUSED, however clean the number is', () => {
   // This is the seam that measuring the book exposed: 774 numbers in NY, PA, NC, MI, OH and VA
   // came back dialable under a gate that refuses everything else it cannot prove.
   for (const st of ['NY', 'PA', 'NC', 'MI', 'OH', 'VA']) {
-    const v = classify({ ...base, state: st, lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+    const v = classify(inState(st, { lineType: 'landline', dncListed: false }), readyIn(st), new Set(), OPEN);
     assert.equal(v.lane, LANES.RED, `${st} must be refused until somebody reads it`);
     assert.match(v.reasons.join(' '), /nobody has read/);
   }
@@ -268,9 +291,9 @@ test('the verified set is the states actually read, and it is not the same as th
   assert.deepEqual(open, ['OR']);
 });
 test('the incentive offer is an OBLIGATION on the call, not a note in the script', () => {
-  const v = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, READY, new Set(), OPEN);
+  const v = classify(inState('OR', { lineType: 'landline', dncListed: false }), READY, new Set(), OPEN);
   assert.ok(v.obligations.includes('make_no_incentive_offer'));
-  const cleared = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false },
+  const cleared = classify(inState('OR', { lineType: 'landline', dncListed: false }),
     { ...READY, mayOfferIncentive: true }, new Set(), OPEN);
   assert.ok(!cleared.obligations.includes('make_no_incentive_offer'));
 });
@@ -278,9 +301,9 @@ test('a state window floor can only tighten our window, never widen it', () => {
   // 08:30 Pacific is inside a hypothetical 8am campaign window but outside California's 9am floor.
   const eightThirtyPacific = new Date('2026-08-17T15:30:00Z'); // Monday, 08:30 PDT
   const wide = { ...READY, humanOpener: true, window: { ...READY.window, startHour: 8 } };
-  const ca = classify({ ...base, state: 'CA', lineType: 'landline', dncListed: false }, wide, new Set(), eightThirtyPacific);
+  const ca = classify(inState('CA', { lineType: 'landline', dncListed: false }), wide, new Set(), eightThirtyPacific);
   assert.equal(ca.dialable, false, 'CA must not be dialable at 08:30 even on an 8am campaign window');
-  const or = classify({ ...base, state: 'OR', lineType: 'landline', dncListed: false }, wide, new Set(), eightThirtyPacific);
+  const or = classify(inState('OR', { lineType: 'landline', dncListed: false }), wide, new Set(), eightThirtyPacific);
   assert.equal(or.dialable, true, 'Oregon has no such floor and should still be dialable at 08:30');
 });
 
@@ -324,7 +347,7 @@ console.log('\nSUPPRESSION ROUND TRIP (write it, then read it back through the g
 {
   const backup = await readFile(paths.suppression, 'utf8').catch(() => null);
   try {
-    const num = '+15125550999';
+    const num = '+15035550999';
     await suppress(num, 'said stop on call CA00000000000000000000000000000000');
     const set = await suppression();
 
@@ -362,12 +385,15 @@ test('with no subscription on file, even a perfect number is refused', () => {
   assert.match(v.reasons.join(' '), /310\.8\(a\)|unsubscribed area code/);
 });
 test('a number OUTSIDE the subscribed area codes is refused, however clean it is', () => {
-  // 512 is a real, valid, fixed business line in a verified-clean state. It is still refused,
-  // because we never bought that area code, and a flawless scrub is no defence for that.
-  const pol = { ...READY, subscribedAreaCodes: new Set(['503', '971', '541', '458']) };
-  const v = classify({ ...base, phone: '+15125550142', lineType: 'landline', dncListed: false }, pol, new Set(), OPEN);
+  // 458 is a real, valid, fixed business line in a verified-clean state, and it is genuinely an
+  // OREGON code, so nothing else in the gate objects to it. It is still refused, because we never
+  // bought that area code, and a flawless scrub is no defence for that.
+  // ★ This case used a 512 (Texas) number until 2026-08-17. That made it pass for TWO reasons at
+  // once, and a test that can pass for a reason it is not testing is not measuring what it claims.
+  const pol = { ...READY, subscribedAreaCodes: new Set(['503', '971', '541']) };
+  const v = classify({ ...base, phone: '+14585550142', lineType: 'landline', dncListed: false }, pol, new Set(), OPEN);
   assert.equal(v.lane, LANES.RED);
-  assert.match(v.reasons.join(' '), /area code 512 is not in our do-not-call subscription/);
+  assert.match(v.reasons.join(' '), /area code 458 is not in our do-not-call subscription/);
 });
 test('a number INSIDE the subscribed area codes passes', () => {
   const pol = { ...READY, subscribedAreaCodes: new Set(['503', '971', '541', '458']) };
@@ -384,7 +410,7 @@ test('AN OVERLAY IS A SECOND SUBSCRIPTION, NOT THE SAME ONE', () => {
 
 
 console.log('\nTHE HUMAN-DIALLED LANE (David 2026-08-14: keep the mobiles, we will be calling them)');
-const HUMAN = { ...READY, humanDialed: true, subscribedAreaCodes: new Set(['512', '503', '971', '541', '458']) };
+const HUMAN = { ...READY, humanDialed: true, subscribedAreaCodes: new Set(['503', '971', '541']) };
 test('a mobile is REACHABLE when a person dials and a person speaks', () => {
   const v = classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(), OPEN);
   assert.equal(v.dialable, true, v.reasons.join(' '));
@@ -413,17 +439,20 @@ test('STATE LAW STILL BINDS on the human lane — manual dialling cures none of 
     const v = classify({ ...base, state: st, lineType: 'mobile' }, HUMAN, new Set(), OPEN);
     assert.equal(v.lane, LANES.RED, `${st} must still refuse a human-dialled mobile`);
   }
-  const ca = classify({ ...base, state: 'CA', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  const ca = classify(inState('CA', { lineType: 'mobile' }), HUMAN, new Set(), OPEN);
   assert.equal(ca.lane, LANES.RED, 'CA still needs its opener');
-  const unread = classify({ ...base, state: 'NY', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  const unread = classify(inState('NY', { lineType: 'mobile' }), HUMAN, new Set(), OPEN);
   assert.equal(unread.lane, LANES.RED, 'an unread state is still a refusal');
 });
 test('the window, the cap, suppression and the subscription fence all still bind', () => {
   assert.equal(classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(), SHUT).lane, LANES.HOLD);
   assert.equal(classify({ ...base, lineType: 'mobile', callCount30d: 1 }, HUMAN, new Set(), OPEN).lane, LANES.RED);
-  assert.equal(classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(['+15125550142']), OPEN).lane, LANES.RED);
-  const offNpa = classify({ ...base, phone: '+12125550142', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
-  assert.equal(offNpa.lane, LANES.RED, '212 is not in the subscription');
+  assert.equal(classify({ ...base, lineType: 'mobile' }, HUMAN, new Set(['+15035550142']), OPEN).lane, LANES.RED);
+  // 458 is Oregon, so the jurisdiction check is satisfied and the SUBSCRIPTION is the only thing
+  // left to refuse it. (This was 212 — New York — which was refused three ways over.)
+  const offNpa = classify({ ...base, phone: '+14585550142', lineType: 'mobile' }, HUMAN, new Set(), OPEN);
+  assert.equal(offNpa.lane, LANES.RED, '458 is not in the subscription');
+  assert.match(offNpa.reasons.join(' '), /not in our do-not-call subscription/);
 });
 test('the human lane does NOT quietly widen anything else', () => {
   // nonFixedVoip, unknown, voicemail and a failed lookup stay refused. The lane relaxes line-type

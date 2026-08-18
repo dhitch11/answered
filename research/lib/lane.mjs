@@ -28,6 +28,7 @@
 // path in this file where uncertainty resolves to "dial it".
 
 import { withinWindow, nextOpenTime } from './geo.mjs';
+import { jurisdictionAgrees } from './npa.mjs';
 
 export const LANES = { GREEN: 'green', AMBER: 'amber', RED: 'red', HOLD: 'hold' };
 
@@ -264,6 +265,17 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
   if (!rec.phone || !/^\+1\d{10}$/.test(rec.phone)) return deny('not a valid US E.164 number');
   if (suppress.has(rec.phone)) return deny('on the suppression list');
 
+  // ★ /^\+1\d{10}$/ IS NOT A TEST FOR "AMERICAN", AND THE CORPUS PROVES IT.
+  // +1 is the country code for the whole North American Numbering Plan. 22 rows in the live
+  // corpus carry Canadian NPAs (514 Montreal, 581 Quebec, 548 Ontario) and pass that regex
+  // perfectly. The TCPA is not the governing statute in Quebec, and nobody here has read what is.
+  // One row carried NPA "154", which is not an area code at all. Both are refused here rather
+  // than 200 lines later by the area-code subscription fence, which only catches them today by
+  // the accident of being unset. This half runs even WITH consent, because consent to be called
+  // is not a choice of law.
+  const geo0 = jurisdictionAgrees(rec.phone, rec.state);
+  if (geo0.why === 'npa') return deny(geo0.reason);
+
   // --- consent short-circuits the line-type question entirely -------------------------------
   const consent = rec.consent && rec.consent.grantedAt ? rec.consent : null;
   const consentValid = consent
@@ -328,6 +340,20 @@ export function classify(rec, policy = DEFAULT_POLICY, suppress = new Set(), at 
   // call, AI-voiced or human-voiced, because none of them care which it is.
   const st = String(rec.state || '').toUpperCase();
   if (!consentValid) {
+    // ★ RESOLVE WHICH JURISDICTION THIS IS BEFORE APPLYING ANY JURISDICTION'S LAW.
+    //
+    // `rec.state` comes from the published business listing. The subscription fence further down
+    // reads the AREA CODE. Nothing compared them, and in the live corpus they disagree on 2,513
+    // rows — 368 labelled OR carrying 360, which is Washington, a state that requires a
+    // telephone-solicitor registration and a bond before call one.
+    //
+    // Portability means the area code has not proven a location since 2003, so a disagreement is
+    // NOT evidence the listing is wrong. It is two independent signals pointing at two different
+    // bodies of law with no basis to choose between them, which is this file's definition of a
+    // refusal everywhere else. It refuses here too.
+    const geo = jurisdictionAgrees(rec.phone, rec.state);
+    if (!geo.ok) return deny(geo.reason);
+
     // Fail closed on the map itself, before any per-state rule runs. An unread state is an
     // unanswered question, and this file answers those the same way everywhere else: no.
     if (!VERIFIED_STATES.has(st)) {
