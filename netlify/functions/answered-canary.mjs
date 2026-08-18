@@ -116,9 +116,42 @@ const TWIML = '<Response><Pause length="8"/></Response>';
 //   + 16s of detail budget (measured need is ~11s once the conversation exists)
 // Every poll short circuits the moment it has its answer, so the normal run is
 // about 15 seconds and the budgets only get spent when something is wrong.
+// ★ REBALANCED 2026-08-18, @LANE-FOOTER, WITHOUT TOUCHING THE 27s TOTAL.
+//   The gate went red on "two consecutive canary fails", both reading:
+//   "ElevenLabs had not finished processing within 16 seconds (last state
+//   processing)". That is the honest half of this file working exactly as
+//   designed — landed:false, "could not be READ, not that it was missing" —
+//   but while it holds, every health-gated call control on the site hides the
+//   phone number, so vendor latency reads to a visitor as a phone company you
+//   cannot phone.
+//
+//   MEASURED BEFORE CHANGING A NUMBER: the last 10 canary conversations are
+//   ALL status=done, dur=8s. Nothing is failing. They simply become readable
+//   later than they used to — the header's measured ~11s need has drifted past
+//   16s on the vendor's side.
+//
+//   THE ONE THING I DID NOT DO IS RAISE THE TOTAL. A scheduled function is
+//   killed at 30s and a canary killed mid-run writes NOTHING, which is the
+//   invisible failure this whole file exists to prevent. So the extra time is
+//   taken from the list budget, which had 3.7x headroom over its measured 2.7s
+//   need and now has 1.9x. Worst case is unchanged at ~27s.
+//        list   10s -> 5s   (measured need 2.7s)
+//        detail 16s -> 21s  (measured need was ~11s, now >16s)
+//
+//   ★ AND THIS IS A PATCH, NOT THE FIX. Any in-run read races the vendor, and
+//   a race against a 30s ceiling is one the vendor can always win by getting
+//   slower. The durable design is to stop reading the call you just placed:
+//   each run verifies the PREVIOUS run's call — which has had two hours to
+//   process and is guaranteed readable — and places a new one for the next run
+//   to check. That removes the race entirely and costs no waiting at all. The
+//   tradeoff is honest and worth stating: a genuine disclosure regression would
+//   be caught up to one cycle later than it is today. Written up in
+//   .terminal-claims.md rather than done here, because rebuilding the polling
+//   architecture of the estate's most carefully-reasoned control at the end of
+//   a long session is how a subtle file becomes a broken one.
 const POLL_MS = 2000;
-const LIST_BUDGET_MS = 10000;
-const DETAIL_BUDGET_MS = 16000;
+const LIST_BUDGET_MS = 5000;
+const DETAIL_BUDGET_MS = 21000;
 const TERMINAL = new Set(['done', 'failed', 'error']);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
